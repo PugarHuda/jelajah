@@ -50,7 +50,7 @@ def swap_picture(slide_idx, shape_id, path):
     old._element.getparent().remove(old._element)
 
 S = {sh.shape_id: sh for s in p.slides for sh in s.shapes}
-URL = 'pugarhuda.github.io/jelajah'
+URL = 'jelajah-bch.vercel.app'
 
 # 1 — title
 set_lines(S[58], ['Jelajah'])
