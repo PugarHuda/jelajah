@@ -83,6 +83,7 @@ node claims/cli.mjs activate --network chipnet     # after `delay` blocks
 - Claims (2,361 bytes each, depth-16 proofs, accepted by chipnet nodes): [`48cb57ed…`](https://chipnet.imaginary.cash/tx/48cb57ed89cf741242aaccc97127bad10638a978d1db9006a2af1f6d2f16ce34), [`34e0896c…`](https://chipnet.imaginary.cash/tx/34e0896ceb5cb8d64dc44b054e94613212ba909ef95925526c6bf4cadc6a465e)
 - `sync` replayed both claims from the chain, and the rebuilt claimed root **matches** the keeper.
 - Epoch 1 proposal, using real November data: [`7299e9c0…`](https://chipnet.imaginary.cash/tx/7299e9c0dd71d2c12b822e9e3c465383ec368a1d5e0be1a9c455dcf00a7b5a8e)
+- Epoch 1 activated after the 2-block CSV delay (enforced by chipnet consensus): [`f2ecd0fe…`](https://chipnet.imaginary.cash/tx/f2ecd0fe4e6aff8d5ffd29072c21636b0e514af304aaea0c444378a21ece788e). The claimed totals carried over, and `sync` still rebuilds a root that **matches** the keeper.
 
 ## Cost: push vs pull (`node claims/cost.mjs`, 1 sat/byte)
 
