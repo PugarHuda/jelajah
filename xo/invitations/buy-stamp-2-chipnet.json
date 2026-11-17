@@ -1,0 +1,139 @@
+{
+  "invitationIdentifier": "7f5cde346af146118d8307b2c6698f14",
+  "templateIdentifier": "9bdd0bd414ca6cf3cde5d9ec4919edc332f51feee11f6f049c308ab4fb6f4d34",
+  "actionIdentifier": "buyStamp",
+  "createdAtTimestamp": 1794896652340,
+  "commits": [
+    {
+      "commitIdentifier": "4119165a22f833e7fdfe2718e16d13c1",
+      "createdAtTimestamp": 1794896652340,
+      "data": {
+        "variables": [
+          {
+            "variableIdentifier": "merchantId",
+            "roleIdentifier": "buyer",
+            "value": "02"
+          },
+          {
+            "variableIdentifier": "stallPrice",
+            "roleIdentifier": "buyer",
+            "value": "<bigint: 5000n>"
+          },
+          {
+            "variableIdentifier": "stallLockingScript",
+            "roleIdentifier": "buyer",
+            "value": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+          },
+          {
+            "variableIdentifier": "stampCategory",
+            "roleIdentifier": "buyer",
+            "value": "ccdb19f03632ba9718c268579c757aad138a3a3641eba82d78b6870c6fe95f8f"
+          },
+          {
+            "variableIdentifier": "minterSatoshis",
+            "roleIdentifier": "buyer",
+            "value": "<bigint: 1000n>"
+          },
+          {
+            "variableIdentifier": "buyerLockingScript",
+            "roleIdentifier": "buyer",
+            "value": "76a914da62a6a922f9a2c33039632d6f469b3f5e3773f088ac"
+          },
+          {
+            "variableIdentifier": "stampCommitmentHex",
+            "roleIdentifier": "buyer",
+            "value": "02da62a6a922f9a2c33039632d6f469b3f5e3773f0"
+          }
+        ],
+        "inputs": [
+          {
+            "outpointTransactionHash": "<Uint8Array: 0xc5c996a8b4282e196925a1200813be562eb3601c0b6e4858139b0dfa38d83723>",
+            "outpointIndex": 0,
+            "inputIdentifier": "minterInput",
+            "unlockingBytecode": "<Uint8Array: 0x4c7c520288131976a9147d72774e699e049195bf07c909b021be91f10a6288acc0009d00cd00c78800d100ce8800d200cf8800cc00c69d51cd8851cca16951d1008800ce01207f7552d18852cd8201199d76537f7701147f757c0376a91452797e0288ac7e8852d27b7b7e8852d3009dc454a169c4549c6353d100886851>"
+          },
+          {
+            "outpointTransactionHash": "<Uint8Array: 0x1f09679677e30c880eedd94210a7625ca126d5232b538dbfab851eb1d0cb33d8>",
+            "outpointIndex": 0
+          }
+        ],
+        "roleIdentifier": "buyer"
+      },
+      "expiresAtTimestamp": 1794914652340,
+      "signature": "d70f11653578e8b29ad1a1f347195ba7501760fd72acff539558a2412500334ffc5916b66f08cc2b51b5220159d88d94a7125d1ad7c686e6a11c7c4bde213f27",
+      "entityIdentifier": "tpubDEPSEdanzD2naahBsUUU7YdAWyMWTjJYEdhhV96v31GRrk61w8GpenBf1jroRcePB4BuH9Mqu2YZwWPWhhDw7NQbCkXiAcgkzQnsbTkvVE3"
+    },
+    {
+      "commitIdentifier": "7419762624a0b9a28399174e0d465183",
+      "previousCommitIdentifier": "4119165a22f833e7fdfe2718e16d13c1",
+      "createdAtTimestamp": 1794896652606,
+      "data": {
+        "outputs": [
+          {
+            "outputIdentifier": "minterOutput",
+            "lockingBytecode": "<Uint8Array: 0xaa200ecb45eccf34da0619e075e220ff01fcbf0df9293ec88c74672da0e270a5866987>"
+          },
+          {
+            "outputIdentifier": "paymentOutput",
+            "lockingBytecode": "<Uint8Array: 0x76a9147d72774e699e049195bf07c909b021be91f10a6288ac>"
+          },
+          {
+            "outputIdentifier": "stampOutput",
+            "lockingBytecode": "<Uint8Array: 0x76a914da62a6a922f9a2c33039632d6f469b3f5e3773f088ac>"
+          }
+        ]
+      },
+      "expiresAtTimestamp": 1794914652606,
+      "signature": "e860e00165d638d4ace06d82673fdf4afb0268ae15f56116fcdb81063378b6880157ddebc046dfc08d60b777f67e2468cd840b778a40d3c8a249ae3d69f9cb07",
+      "entityIdentifier": "tpubDEPSEdanzD2naahBsUUU7YdAWyMWTjJYEdhhV96v31GRrk61w8GpenBf1jroRcePB4BuH9Mqu2YZwWPWhhDw7NQbCkXiAcgkzQnsbTkvVE3"
+    },
+    {
+      "commitIdentifier": "ee9403bdd2f681fcdb0e3043f9e0c1cf",
+      "previousCommitIdentifier": "7419762624a0b9a28399174e0d465183",
+      "createdAtTimestamp": 1794896653927,
+      "data": {
+        "outputs": [
+          {
+            "valueSatoshis": "<bigint: 23200n>",
+            "lockingBytecode": "<Uint8Array: 0x76a9144cf0afd89bf45db746aa0e1cf80b1eaa5b6b1dc988ac>"
+          }
+        ]
+      },
+      "expiresAtTimestamp": 1794914653927,
+      "signature": "80dc2d2009f7301a8b6bec266aceaa24a31d5969c97093748bf7c36cf08905bda3b3aead627b83fa9effcb0ca36929390849bd353869e3dcf2788fc10ec05065",
+      "entityIdentifier": "tpubDEPSEdanzD2naahBsUUU7YdAWyMWTjJYEdhhV96v31GRrk61w8GpenBf1jroRcePB4BuH9Mqu2YZwWPWhhDw7NQbCkXiAcgkzQnsbTkvVE3"
+    },
+    {
+      "commitIdentifier": "33e399f937b4534358ceeddf967835e5",
+      "previousCommitIdentifier": "ee9403bdd2f681fcdb0e3043f9e0c1cf",
+      "createdAtTimestamp": 1794896654157,
+      "data": {
+        "inputs": [
+          {
+            "mergesWith": {
+              "commitIdentifier": "4119165a22f833e7fdfe2718e16d13c1",
+              "itemIndex": 1
+            },
+            "unlockingBytecode": "<Uint8Array: 0x4153e80cdde4b2223b8d7105f7ec24bd799bc8c5c89fdae47fe91a225a2a5dc1421319be43e936084e1f5cce27557fdf9144465ec70780e667177f407e189c05de412103318b1750f2a664ab56c8a0d6797947bd1ce3f1ce1330966f10ec6789e35bb729>"
+          }
+        ]
+      },
+      "expiresAtTimestamp": 1794914654157,
+      "signature": "d89ec65b71995a4241b945b24546acd0bd132092026bd61da4bd87f45ba4e7576ae39d991f7c72ce8345e898dbfa0a99ee9001ea88bf8b8ed5a1ffcd0d850d56",
+      "entityIdentifier": "tpubDEPSEdanzD2naahBsUUU7YdAWyMWTjJYEdhhV96v31GRrk61w8GpenBf1jroRcePB4BuH9Mqu2YZwWPWhhDw7NQbCkXiAcgkzQnsbTkvVE3"
+    }
+  ],
+  "result": {
+    "transactions": {
+      "buyStampTransaction": {
+        "transactionHash": "ef106294af3bd134fad1b7dc02a00ad5402abd306648a39bde67d798ad2c1f00",
+        "createdAtTimestamp": 1794896654279,
+        "createdByEntityIdentifier": "tpubDEPSEdanzD2naahBsUUU7YdAWyMWTjJYEdhhV96v31GRrk61w8GpenBf1jroRcePB4BuH9Mqu2YZwWPWhhDw7NQbCkXiAcgkzQnsbTkvVE3",
+        "createdBySignature": "75c1ccb5fe67fab36b241ccd61ceb772b8d77a08fe0307788f27a78dfd5155eb611e528fb8561b7e83a0d0635c70cd2a13ad910b94d5768c7859d9aa7cdd0cf0",
+        "broadcastedAtTimestamp": 1794896655636,
+        "broadcastedByEntityIdentifier": "tpubDEPSEdanzD2naahBsUUU7YdAWyMWTjJYEdhhV96v31GRrk61w8GpenBf1jroRcePB4BuH9Mqu2YZwWPWhhDw7NQbCkXiAcgkzQnsbTkvVE3",
+        "broadcastedBySignature": "80b598a860c47bfda3835e63c4f180dec97625bca446dc62db5b6ee2018bef2e903cabb642af2d9f5115426a203406e33bfd046266fc0adb7dcab560d8f4b108"
+      }
+    }
+  }
+}
