@@ -35,6 +35,7 @@ There is no server and no database. State lives in UTXOs and NFT commitments, an
 | The organizer runs off with the pool | The vault only pays out through `claim()` until `endTime`. |
 | Extra stamps minted / a minter drained | Minter value and token must come back unchanged, and no other output may carry tokens. |
 | A trophy reused as a stamp | Trophy id `00` can never satisfy `id > prev` starting from 0. |
+| **Every stall in a set colludes** with a buyer and refunds them off-chain | **Not prevented on chain.** The buyer pays only fees, so the pool can be drained one reward at a time. The price rule only stops a single cheater. A merchant co-signature doesn't help (the merchants are the colluders), and one claim per pkh is beaten by using many addresses. The real fix is governance: **the stalls fund the pool themselves** in proportion, so colluding only drains their own money. (In the demo every stall payment goes to the organizer, who also funds the pool, so the risk is zero.) An optional organizer co-signature on each stamp is the centralized alternative. |
 
 ## Try it
 Open the demo, press **Connect wallet**, and scan the code with Selene or Paytaca (WizardConnect). Buy at 3 stalls, then claim.
