@@ -17,7 +17,7 @@ export default function App() {
 }
 
 function Rally() {
-  const wc = useWizardConnect({ dappName: 'Jelajah', dappIcon: `${location.origin}/favicon.svg` });
+  const wc = useWizardConnect({ dappName: 'Jelajah', dappIcon: new URL('favicon.svg', location.origin + import.meta.env.BASE_URL).href });
   const [coins, setCoins] = useState<Coin[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
