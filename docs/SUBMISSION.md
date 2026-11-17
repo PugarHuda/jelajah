@@ -11,7 +11,7 @@
 - CashTokens address (EMBER2026 votes / prizes): bitcoincash:zrd56cv5ap5v2kc2dgc8hvt4e9g84pmrjcydclcrgj
 
 **Tracks:** Mainnet Track
-**Bounties:** FoldingCash Reward Claims (`claims/`)
+**Bounties:** FoldingCash Reward Claims (`claims/`) · Build with XO + Migrate to XO (`xo/`)
 
 **Prior work:** none. Built from scratch during BLAZE; first commit 17 Nov 2026.
 
@@ -42,3 +42,7 @@ Pull-based Merkle claims built on a **second "claimed" Merkle tree** that shares
 - a push vs pull cost table (operator: 45,792 sats/month for 62 folders vs ~1,000 sats/epoch at any scale).
 
 See `claims/README.md`.
+
+### Build with XO / Migrate to XO (`xo/`)
+Jelajah's buy-and-stamp step as an XO template. Its locking script assembles byte-for-byte to the live StampMinter covenant, so the XO engine spends the same minters as the web app. Executed on chipnet ([`ef106294…`](https://chipnet.imaginary.cash/tx/ef106294af3bd134fad1b7dc02a00ad5402abd306648a39bde67d798ad2c1f00)) and inspected in blaze.xo.cash. The invitation and template JSON are in the repo.
+**Feedback (~500 words, must be written by Pugar personally):** TODO. Raw facts are in `xo/README.md`.

@@ -67,7 +67,11 @@ stamps [`165bffba…`](https://chipnet.imaginary.cash/tx/165bffba2adb6b96da8c8b8
 ## Stack
 CashScript 0.14 · libauth · WizardConnect (`@wizardconnect/react`) · React + Vite · Electrum (Fulcrum) · BCMR metadata (optional, at deploy time).
 
+## Bounties in this repo
+- **FoldingCash Reward Claims:** [`claims/`](claims/README.md). Pull-based Merkle claims built on a second, on-chain "claimed" tree, run on real FoldingCash distro data on chipnet.
+- **Build with XO / Migrate to XO:** [`xo/`](xo/README.md). Jelajah's buy-and-stamp step as an XO template that assembles byte-for-byte to the live StampMinter covenant, executed through the XO engine on chipnet.
+
 ## Not yet
 - Prices and rewards in PUSD (ParyonUSD).
-- An XO template for buy-and-stamp and claim.
+- An XO follow-up action for the claim.
 - Merkle pull-claims for rallies with thousands of people.
