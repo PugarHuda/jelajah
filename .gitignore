@@ -31,3 +31,4 @@ claims/.demo.*.json
 xo/.wallet.*.json
 xo/node_modules
 xo/built.json
+*.sqlite
