@@ -47,7 +47,7 @@ const StampMinter = read('src/contracts/StampMinter.json');
 const RewardVault = read('src/contracts/RewardVault.json');
 
 if (cmd === 'reclaim') {
-  const rally = read('src/rally.json');
+  const rally = read(`src/rally.${network}.json`);
   const vault = new Contract(RewardVault, vaultArgs(rally), { provider });
   const [v] = await vault.getUtxos();
   const { txid } = await new TransactionBuilder({ provider })
@@ -148,7 +148,7 @@ const spent = DUST * BigInt(minters.length + 1) + pool;
 tb.addOutput({ to: organizerLock, amount: base.satoshis - spent - 3000n });
 const { txid } = await tb.send();
 
-write('src/rally.json', { ...rally, genesisTx: txid });
+write(`src/rally.${network}.json`, { ...rally, genesisTx: txid });
 console.log(`rally "${cfg.name}" live on ${network}`);
 console.log('category', category);
 console.log('genesis ', txid);

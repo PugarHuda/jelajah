@@ -7,8 +7,7 @@ import { secp256k1, hash160, encodeLockingBytecodeP2pkh, lockingBytecodeToCashAd
 import { rallyContracts, buildStamp, buildClaim, isRallyNft } from '../src/lib/tx.js';
 
 const { values: { network } } = parseArgs({ options: { network: { type: 'string', default: 'chipnet' } } });
-const rally = JSON.parse(readFileSync(new URL('../src/rally.json', import.meta.url)));
-if (rally.network !== network) throw new Error(`src/rally.json is for ${rally.network}`);
+const rally = JSON.parse(readFileSync(new URL(`../src/rally.${network}.json`, import.meta.url)));
 const provider = new ElectrumNetworkProvider(network);
 const prefix = network === 'mainnet' ? 'bitcoincash' : 'bchtest';
 const explorer = network === 'mainnet' ? 'https://blockchair.com/bitcoin-cash/transaction/' : 'https://chipnet.imaginary.cash/tx/';

@@ -2,13 +2,41 @@
   "name": "Jelajah Jogja",
   "description": "Stamp rally across Yogyakarta street-food stalls. Buy at any 3 stalls, burn the stamps, get paid back and keep a trophy.",
   "needed": 3,
-  "reward": 10000,
-  "rewardsInPool": 20,
+  "reward": 5000,
+  "rewardsInPool": 6,
   "durationDays": 60,
   "merchants": [
-    { "id": 1, "name": "Kopi Joss", "tagline": "Charcoal coffee by the station", "emoji": "☕", "color": "#7a4a2b", "price": 5000 },
-    { "id": 2, "name": "Bakmi Jawa", "tagline": "Wood-fire noodles", "emoji": "🍜", "color": "#c2410c", "price": 5000 },
-    { "id": 3, "name": "Sate Klathak", "tagline": "Goat satay on bicycle spokes", "emoji": "🍢", "color": "#b91c1c", "price": 5000 },
-    { "id": 4, "name": "Es Dawet", "tagline": "Iced coconut and palm sugar", "emoji": "🥥", "color": "#15803d", "price": 5000 }
+    {
+      "id": 1,
+      "name": "Kopi Joss",
+      "tagline": "Charcoal coffee by the station",
+      "emoji": "☕",
+      "color": "#7a4a2b",
+      "price": 2000
+    },
+    {
+      "id": 2,
+      "name": "Bakmi Jawa",
+      "tagline": "Wood-fire noodles",
+      "emoji": "🍜",
+      "color": "#c2410c",
+      "price": 2000
+    },
+    {
+      "id": 3,
+      "name": "Sate Klathak",
+      "tagline": "Goat satay on bicycle spokes",
+      "emoji": "🍢",
+      "color": "#b91c1c",
+      "price": 2000
+    },
+    {
+      "id": 4,
+      "name": "Es Dawet",
+      "tagline": "Iced coconut and palm sugar",
+      "emoji": "🥥",
+      "color": "#15803d",
+      "price": 2000
+    }
   ]
 }
