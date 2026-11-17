@@ -23,7 +23,15 @@ function Rally() {
   const [error, setError] = useState<string | null>(null);
   const [log, setLog] = useState<{ label: string; txid: string }[]>([]);
   const [pool, setPool] = useState<bigint | null>(null);
-  const connected = wc.state === 'connected' && wc.manager;
+  if (import.meta.env.DEV) (window as unknown as { __wc: unknown }).__wc = wc; // debugging aid in dev only
+  const lock = wc.state === 'connected' ? buyerLock(wc.manager) : null;
+  const connected = !!lock; // connected AND the wallet shared its keys
+  const [, tick] = useState(0);
+  useEffect(() => { // xpubs can land after "connected" without a re-render; poll until they do
+    if (wc.state !== 'connected' || connected) return;
+    const t = setInterval(() => tick((n) => n + 1), 500);
+    return () => clearInterval(t);
+  }, [wc.state, connected]);
 
   const refresh = useCallback(async () => {
     vault.getUtxos().then((u) => setPool(u[0]?.satoshis ?? 0n)).catch(() => {});
@@ -37,7 +45,6 @@ function Rally() {
   }, [refresh]);
 
   const nfts = coins.filter((c) => isRallyNft(rally, c.utxo));
-  const lock = connected ? buyerLock(wc.manager!) : null;
   const mine = (c: Coin) => lock && c.utxo.token!.nft!.commitment.slice(2) === hex(lock.slice(3, 23));
   const stamps = nfts.filter((c) => stallOf(c) > 0 && mine(c));
   const trophies = nfts.filter((c) => stallOf(c) === 0);
@@ -81,8 +88,8 @@ function Rally() {
             {wc.walletName ?? 'Wallet'} · {sats(bch)}
           </button>
         ) : (
-          <button className="primary" onClick={wc.connect} disabled={wc.state === 'connecting'}>
-            {wc.state === 'connecting' ? 'Waiting for wallet…' : 'Connect wallet'}
+          <button className="primary" onClick={wc.connect} disabled={wc.state === 'connecting' || wc.state === 'connected'}>
+            {wc.state === 'connecting' ? 'Waiting for wallet…' : wc.state === 'connected' ? 'Loading wallet…' : 'Connect wallet'}
           </button>
         )}
       </header>
@@ -122,7 +129,7 @@ function Rally() {
                   <p className="muted small">{m.tagline}</p>
                   <button className={have ? 'ghost' : 'primary'} disabled={!connected || !!busy}
                     onClick={() => buy(m)} title={connected ? undefined : 'Connect your wallet first'}>
-                    {busy === `${m.emoji} Stamped at ${m.name}` ? 'Approve in wallet…' : have ? `Buy again · ${sats(m.price)}` : `Buy & stamp · ${sats(m.price)}`}
+                    {busy === `${m.emoji} Stamped at ${m.name}` ? 'Approve in wallet…' : have ? `Again · ${sats(m.price)}` : `Buy · ${sats(m.price)}`}
                   </button>
                 </article>
               );

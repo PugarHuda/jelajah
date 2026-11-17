@@ -40,8 +40,8 @@ export function Trophy({ size = 120, name }: { size?: number; name: string }) {
       <path d="M40 34h-9a9 9 0 0 0 11 13M80 34h9a9 9 0 0 1-11 13" fill="none" stroke="var(--gold)" strokeWidth="3.5" />
       <rect x="55" y="63" width="10" height="14" fill="var(--gold)" />
       <rect x="44" y="77" width="32" height="8" rx="2" fill="var(--gold)" />
-      <text x="60" y="101" textAnchor="middle" fontSize="9" fontWeight="800" letterSpacing="1.5" fill="var(--ink)"
-        fontFamily="var(--font-display)">{name.toUpperCase()}</text>
+      <text x="60" y="100" textAnchor="middle" fontSize="8" fontWeight="800" fill="var(--ink)"
+        textLength="72" lengthAdjust="spacingAndGlyphs" fontFamily="var(--font-display)">{name.toUpperCase()}</text>
     </svg>
   );
 }
