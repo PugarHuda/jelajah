@@ -1,0 +1,57 @@
+{
+  "contractName": "RewardVault",
+  "constructorInputs": [
+    { "name": "rallyCategory", "type": "bytes32" },
+    { "name": "needed", "type": "int" },
+    { "name": "reward", "type": "int" },
+    { "name": "organizer", "type": "pubkey" },
+    { "name": "endTime", "type": "int" }
+  ],
+  "abi": [
+    { "name": "claim", "inputs": [] },
+    {
+      "name": "reclaim",
+      "inputs": [
+        { "name": "organizerSig", "type": "sig" }
+      ]
+    }
+  ],
+  "bytecode": "OP_5 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_1 OP_UTXOTOKENCOMMITMENT OP_1 OP_SPLIT OP_NIP OP_0 OP_1 OP_BEGIN OP_DUP OP_5 OP_PICK OP_LESSTHANOREQUAL OP_DUP OP_TOALTSTACK OP_IF OP_DUP OP_UTXOTOKENCATEGORY OP_4 OP_PICK OP_EQUALVERIFY OP_DUP OP_UTXOTOKENCOMMITMENT OP_SIZE 15 OP_NUMEQUALVERIFY OP_DUP OP_1 OP_SPLIT OP_DROP OP_BIN2NUM OP_DUP OP_4 OP_PICK OP_GREATERTHAN OP_VERIFY OP_DUP OP_4 OP_ROLL OP_DROP OP_SWAP OP_2SWAP OP_ROT OP_OVER OP_1 OP_SPLIT OP_NIP OP_5 OP_PICK OP_EQUALVERIFY OP_ROT OP_1ADD OP_NIP OP_NIP OP_ENDIF OP_FROMALTSTACK OP_NOT OP_UNTIL OP_DROP OP_0 OP_OUTPUTBYTECODE OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_0 OP_UTXOTOKENCOMMITMENT OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_0 OP_UTXOVALUE OP_6 OP_PICK OP_SUB OP_NUMEQUALVERIFY 76a914 OP_2 OP_PICK OP_CAT 88ac OP_CAT OP_1 OP_OUTPUTBYTECODE OP_OVER OP_EQUALVERIFY OP_1 OP_OUTPUTVALUE OP_6 OP_ROLL OP_GREATERTHANOREQUAL OP_VERIFY OP_1 OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_2 OP_OUTPUTBYTECODE OP_EQUALVERIFY OP_2 OP_OUTPUTTOKENCATEGORY OP_3 OP_ROLL OP_EQUALVERIFY OP_2 OP_OUTPUTTOKENCOMMITMENT 00 OP_3 OP_ROLL OP_CAT OP_EQUALVERIFY OP_3 OP_BEGIN OP_DUP OP_TXOUTPUTCOUNT OP_LESSTHAN OP_DUP OP_TOALTSTACK OP_IF OP_DUP OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_1ADD OP_ENDIF OP_FROMALTSTACK OP_NOT OP_UNTIL OP_2DROP OP_2DROP OP_2DROP OP_1 OP_ELSE OP_5 OP_ROLL OP_1 OP_NUMEQUALVERIFY OP_4 OP_ROLL OP_CHECKLOCKTIMEVERIFY OP_DROP OP_4 OP_ROLL OP_4 OP_ROLL OP_CHECKSIG OP_NIP OP_NIP OP_NIP OP_ENDIF",
+  "source": "pragma cashscript ^0.14.0;\n\n// Holds a rally's BCH reward pool plus one minting NFT of the rally category.\n// Burn a full set of stamps -> get the reward and a Trophy NFT (same category, merchant id 0x00).\n//\n//   in[0]          this vault     -> out[0] this vault: same token, value minus exactly one reward\n//   in[1..needed]  stamps, merchant ids strictly increasing (= all different),\n//                  all minted to the same buyer pkh (bought, not traded)\n//                                 -> out[1] reward, to the stamps' original buyer\n//                                 -> out[2] Trophy NFT (commitment 0x00 + buyer pkh), to the same buyer\n//   in[needed+1+]  fee coins      -> out[3+] BCH-only change\n// Stamps are burned: no other output may carry any token.\n// Anti-farming invariant, checked by the deploy script: reward < sum of every merchant's price.\ncontract RewardVault(bytes32 rallyCategory, int needed, int reward, pubkey organizer, int endTime) {\n    function claim() {\n        require(this.activeInputIndex == 0);\n\n        bytes20 buyer = unsafe_bytes20(tx.inputs[1].nftCommitment.split(1)[1]);\n        int prev = 0;\n        for (int i = 1; i <= needed; i++) {\n            require(tx.inputs[i].tokenCategory == rallyCategory);\n            bytes commitment = tx.inputs[i].nftCommitment;\n            require(commitment.length == 21);\n            int id = int(commitment.split(1)[0]);\n            require(id > prev);\n            prev = id;\n            require(unsafe_bytes20(commitment.split(1)[1]) == buyer);\n        }\n\n        // vault continues with its minting NFT, paying out exactly one reward\n        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);\n        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);\n        require(tx.outputs[0].nftCommitment == tx.inputs[0].nftCommitment);\n        require(tx.outputs[0].value == tx.inputs[0].value - reward);\n\n        bytes buyerLock = new LockingBytecodeP2PKH(buyer);\n        require(tx.outputs[1].lockingBytecode == buyerLock);\n        require(tx.outputs[1].value >= reward);\n        require(tx.outputs[1].tokenCategory == 0x);\n\n        require(tx.outputs[2].lockingBytecode == buyerLock);\n        require(tx.outputs[2].tokenCategory == rallyCategory);\n        require(tx.outputs[2].nftCommitment == 0x00 + buyer);\n\n        for (int o = 3; o < tx.outputs.length; o++) {\n            require(tx.outputs[o].tokenCategory == 0x);\n        }\n    }\n\n    // after the rally ends the organizer takes back what is left\n    function reclaim(sig organizerSig) {\n        require(tx.time >= endTime);\n        require(checkSig(organizerSig, organizer));\n    }\n}\n",
+  "fingerprint": "0fac11f05394da38ef5939ed553354a846f878949e74729f417562a9cd2e076a",
+  "debug": {
+    "bytecode": "5579009c63c0009d51cf517f77005165765579a1766b6376ce54798876cf8201159d76517f7581765479a06976547a757c727b78517f775579887b8b7777686c91667500cd00c78800d100ce8800d200cf8800cc00c65679949d0376a91452797e0288ac7e51cd788851cc567aa26951d1008852cd8852d1537a8852d20100537a7e88536576c49f766b6376d100888b686c91666d6d6d5167557a519d547ab175547a547aac77777768",
+    "sourceMap": "15:4:48:5;;;;;16:16:16:37;:41::42;:8::44:1;18:49:18:50:0;:39::65:1;:72::73:0;:39::74:1;:::77;19:19:19:20:0;20:21:20:22;:8:28:9;:24:20:25;:29::35;;:24:::1;;;:42:28:9:0;21:30:21:31;:20::46:1;:50::63:0;;:12::65:1;22:41:22:42:0;:31::57:1;23:20:23:37;:41::43:0;:12::45:1;24:25:24:35:0;:42::43;:25::44:1;:::47;:21::48;25:20:25:22:0;:25::29;;:20:::1;:12::31;26:19:26:21:0;:12::22:1;;;;;;27:35:27:45:0;:52::53;:35::54:1;:::57;:62::67:0;;:12::69:1;20:37:20:40;;::28:9;;:42;;:8;;;31:27:31:28:0;:16::45:1;:59::60:0;:49::77:1;:8::79;32:27:32:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;33:27:33:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;34:27:34:28:0;:16::35:1;:49::50:0;:39::57:1;:60::66:0;;:39:::1;:8::68;36:26:36:57:0;:51::56;;:26::57:1;;;37:27:37:28:0;:16::45:1;:49::58:0;:8::60:1;38:27:38:28:0;:16::35:1;:39::45:0;;:16:::1;:8::47;39:27:39:28:0;:16::43:1;:47::49:0;:8::51:1;41:27:41:28:0;:16::45:1;:8::60;42:27:42:28:0;:16::43:1;:47::60:0;;:8::62:1;43:27:43:28:0;:16::43:1;:47::51:0;:54::59;;:47:::1;:8::61;45:21:45:22:0;:8:47:9;:24:45:25;:28::45;:24:::1;;;:52:47:9:0;46:31:46:32;:20::47:1;:51::53:0;:12::55:1;45:47:45:50;:52:47:9;;:8;;15:21:48:5;;;;:4;51::54::0;;;;52:27:52:34;;:8::36:1;;53:25:53:37:0;;:39::48;;:8::51:1;51:39:54:5;;;14:0:55:1",
+    "logs": [],
+    "requires": [
+      { "ip": 12, "line": 16 },
+      { "ip": 32, "line": 21 },
+      { "ip": 37, "line": 23 },
+      { "ip": 47, "line": 25 },
+      { "ip": 61, "line": 27 },
+      { "ip": 75, "line": 31 },
+      { "ip": 80, "line": 32 },
+      { "ip": 85, "line": 33 },
+      { "ip": 93, "line": 34 },
+      { "ip": 103, "line": 37 },
+      { "ip": 109, "line": 38 },
+      { "ip": 113, "line": 39 },
+      { "ip": 116, "line": 41 },
+      { "ip": 121, "line": 42 },
+      { "ip": 128, "line": 43 },
+      { "ip": 140, "line": 46 },
+      { "ip": 157, "line": 52 },
+      { "ip": 164, "line": 53 }
+    ],
+    "sourceTags": "57:59:fu;60:60:sc;61:64:lc;65:65:sc;136:136:fu;137:140:lc;141:141:sc;159:161:sc"
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.14.0",
+    "options": {
+      "enforceFunctionParameterTypes": true,
+      "enforceLocktimeGuard": true
+    }
+  },
+  "updatedAt": "2026-11-17T04:11:44.614Z"
+}

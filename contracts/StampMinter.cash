@@ -1,0 +1,40 @@
+pragma cashscript ^0.14.0;
+
+// One instance per merchant per rally. Holds a minting NFT of the rally category.
+// Anyone who pays the merchant at least minPrice gets a stamp NFT in the same transaction.
+//   in[0]  this minter            -> out[0] this minter, unchanged
+//   in[1+] buyer's coins          -> out[1] payment to merchant
+//                                    out[2] stamp NFT to buyer (P2PKH)
+//                                    out[3] optional BCH-only change
+contract StampMinter(bytes merchantLock, int minPrice, bytes1 merchantId) {
+    function stamp() {
+        require(this.activeInputIndex == 0);
+
+        // minter continues unchanged
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
+        require(tx.outputs[0].nftCommitment == tx.inputs[0].nftCommitment);
+        require(tx.outputs[0].value == tx.inputs[0].value);
+
+        // merchant gets paid, BCH only
+        require(tx.outputs[1].lockingBytecode == merchantLock);
+        require(tx.outputs[1].value >= minPrice);
+        require(tx.outputs[1].tokenCategory == 0x);
+
+        // stamp: immutable NFT (32-byte category, no capability), bound to the buyer's pkh
+        bytes rallyCategory = tx.inputs[0].tokenCategory.split(32)[0];
+        require(tx.outputs[2].tokenCategory == rallyCategory);
+        bytes buyerLock = tx.outputs[2].lockingBytecode;
+        require(buyerLock.length == 25);
+        bytes20 buyerPkh = unsafe_bytes20(buyerLock.split(3)[1].split(20)[0]);
+        require(buyerLock == new LockingBytecodeP2PKH(buyerPkh));
+        require(tx.outputs[2].nftCommitment == merchantId + buyerPkh);
+        require(tx.outputs[2].tokenAmount == 0);
+
+        // nothing else may leave with tokens (no extra mints)
+        require(tx.outputs.length <= 4);
+        if (tx.outputs.length == 4) {
+            require(tx.outputs[3].tokenCategory == 0x);
+        }
+    }
+}
