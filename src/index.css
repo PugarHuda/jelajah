@@ -120,3 +120,5 @@ footer { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size:
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 @media print { .banner, .poster a { display: none; } }
+.art { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 1.5rem; padding: 3rem 1rem; max-width: 1300px; }
+.stall button { font-size: .9rem; white-space: nowrap; padding-inline: .6rem; }

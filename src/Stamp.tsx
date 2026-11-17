@@ -13,16 +13,16 @@ export function Stamp({ m, inked, size = 132 }: { m: Merchant; inked: boolean; s
         <path id={path} d="M60,60 m-40,0 a40,40 0 1,1 80,0 a40,40 0 1,1 -80,0" />
         <filter id={`grain-${m.id}`}>
           <feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="1" seed={m.id} />
-          <feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.4 1.15" />
+          <feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -0.55 1.2" />
           <feComposite in="SourceGraphic" operator="in" />
         </filter>
       </defs>
       <g filter={inked ? `url(#grain-${m.id})` : undefined} opacity={inked ? 0.92 : 1}>
         <circle cx="60" cy="60" r="55" fill="none" stroke={ink} strokeWidth="3.5" strokeDasharray={inked ? undefined : '5 5'} />
         <circle cx="60" cy="60" r="31" fill="none" stroke={ink} strokeWidth="1.8" />
-        <text fill={ink} fontSize="11" fontWeight="800" letterSpacing="2.2" fontFamily="var(--font-display)">
-          <textPath href={`#${path}`} startOffset="50%" textAnchor="middle">
-            {m.name.toUpperCase()} · JELAJAH · {m.name.toUpperCase()} ·
+        <text fill={ink} fontSize="10.5" fontWeight="800" fontFamily="var(--font-display)">
+          <textPath href={`#${path}`} textLength="247" lengthAdjust="spacingAndGlyphs">
+            {`${m.name.toUpperCase()} · JELAJAH · ${m.name.toUpperCase()} · JELAJAH ·`}
           </textPath>
         </text>
         <text x="60" y="71" textAnchor="middle" fontSize="30" opacity={inked ? 1 : 0.25}

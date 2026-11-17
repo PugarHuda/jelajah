@@ -13,6 +13,9 @@ const stallOf = (c: Coin) => parseInt(c.utxo.token!.nft!.commitment.slice(0, 2),
 export default function App() {
   const stallFromHash = window.location.hash.match(/^#\/stall\/(\d+)/)?.[1];
   if (stallFromHash) return <StallPoster m={rally.merchants.find((x) => x.id === Number(stallFromHash))} />;
+  if (window.location.hash === '#/art') return ( // press image: every stamp + the trophy
+    <main className="art">{rally.merchants.map((m) => <Stamp key={m.id} m={m} inked size={220} />)}<Trophy name={rally.name} size={220} /></main>
+  );
   return <Rally />;
 }
 
@@ -58,20 +61,25 @@ function Rally() {
     try {
       const txid = await fn();
       setLog((l) => [{ label, txid }, ...l]);
-      setTimeout(refresh, 1500);
+      [1500, 5000].forEach((ms) => setTimeout(refresh, ms)); // the indexer can lag the broadcast
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally { setBusy(null); }
   }
 
   const buy = (m: Merchant) => run(`${m.emoji} Stamped at ${m.name}`, async () => {
-    const { builder, inputs } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: lock!, coins });
+    const fresh = await walletCoins(wc.manager!); // never build on a stale or not-yet-loaded coin list
+    const { builder, inputs } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: lock!, coins: fresh });
     return signAndSend(wc.manager!, builder, inputs, `Pay ${m.name} ${sats(m.price)} and get its Jelajah stamp`);
   });
 
   const claim = () => run('🏆 Set claimed: reward + trophy', async () => {
+    const fresh = await walletCoins(wc.manager!);
+    const hexPkh = hex(lock!.slice(3, 23));
     const { builder, inputs } = await buildClaim({
-      rally, provider, vault, buyerLock: lock!, stamps, coins: coins.filter((c) => !c.utxo.token),
+      rally, provider, vault, buyerLock: lock!,
+      stamps: fresh.filter((c) => isRallyNft(rally, c.utxo) && stallOf(c) > 0 && c.utxo.token!.nft!.commitment.slice(2) === hexPkh),
+      coins: fresh.filter((c) => !c.utxo.token),
     });
     return signAndSend(wc.manager!, builder, inputs, `Burn ${rally.needed} stamps for ${sats(rally.reward)} + a trophy`);
   });
