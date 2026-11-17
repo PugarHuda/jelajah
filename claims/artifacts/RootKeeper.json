@@ -9,27 +9,32 @@
     { "name": "claim", "inputs": [] },
     { "name": "activate", "inputs": [] }
   ],
-  "bytecode": "OP_3 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_1 OP_NUMEQUALVERIFY OP_0 OP_UTXOBYTECODE OP_EQUAL OP_NIP OP_NIP OP_NIP OP_ELSE OP_3 OP_ROLL OP_1 OP_NUMEQUALVERIFY OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_1 OP_UTXOBYTECODE OP_ROT OP_EQUALVERIFY OP_1 OP_UTXOTOKENCATEGORY OP_ROT OP_EQUALVERIFY OP_1 OP_UTXOTOKENCOMMITMENT OP_SIZE 20 OP_NUMEQUALVERIFY OP_0 OP_OUTPUTBYTECODE OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_SWAP OP_0 OP_UTXOTOKENCOMMITMENT 20 OP_SPLIT OP_NIP OP_CAT OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_0 OP_UTXOVALUE OP_NUMEQUALVERIFY OP_1 OP_BEGIN OP_DUP OP_TXOUTPUTCOUNT OP_LESSTHAN OP_DUP OP_TOALTSTACK OP_IF OP_DUP OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_1ADD OP_ENDIF OP_FROMALTSTACK OP_NOT OP_UNTIL OP_2DROP OP_1 OP_ENDIF",
-  "source": "pragma cashscript ^0.14.0;\r\n\r\n// Holds THE mutable NFT of the keeper category; commitment = earnedRoot[32] ‖ claimedRoot[32].\r\n// That category is created with no minting authority, so this NFT can never be duplicated:\r\n// a fake keeper is impossible even for the operator. Root changes arrive as NFTs of a separate\r\n// proposal category (minted by the operator) and only after the proposal's delay.\r\ncontract RootKeeper(bytes poolLock, bytes proposalLock, bytes32 proposalCategory) {\r\n    // spent next to the pool, which verifies the new claimedRoot\r\n    function claim() {\r\n        require(this.activeInputIndex == 1);\r\n        require(tx.inputs[0].lockingBytecode == poolLock);\r\n    }\r\n\r\n    // swap in a new earned root that has waited out the proposal delay; claimed totals carry over\r\n    //   in[0] keeper, in[1] matured proposal (immutable NFT, commitment = new earned root) -> out[0] keeper\r\n    function activate() {\r\n        require(this.activeInputIndex == 0);\r\n        require(tx.inputs[1].lockingBytecode == proposalLock);\r\n        require(tx.inputs[1].tokenCategory == proposalCategory);\r\n        bytes newRoot = tx.inputs[1].nftCommitment;\r\n        require(newRoot.length == 32);\r\n\r\n        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);\r\n        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);\r\n        require(tx.outputs[0].nftCommitment == newRoot + tx.inputs[0].nftCommitment.split(32)[1]);\r\n        require(tx.outputs[0].value == tx.inputs[0].value);\r\n        for (int o = 1; o < tx.outputs.length; o++) {\r\n            require(tx.outputs[o].tokenCategory == 0x); // the proposal is burned\r\n        }\r\n    }\r\n}\r\n",
-  "fingerprint": "b65c240df416cc3e5cd43ad57ba7fa808f38ca970da2d6f54ace36162f6564db",
+  "bytecode": "OP_3 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_1 OP_NUMEQUALVERIFY OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_1 OP_OUTPUTBYTECODE OP_1 OP_UTXOBYTECODE OP_EQUALVERIFY OP_1 OP_OUTPUTTOKENCATEGORY OP_1 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_1 OP_OUTPUTVALUE OP_1 OP_UTXOVALUE OP_NUMEQUALVERIFY OP_1 OP_OUTPUTTOKENCOMMITMENT OP_SIZE OP_NIP 44 OP_NUMEQUAL OP_NIP OP_NIP OP_NIP OP_ELSE OP_3 OP_ROLL OP_1 OP_NUMEQUALVERIFY OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_1 OP_UTXOBYTECODE OP_ROT OP_EQUALVERIFY OP_1 OP_UTXOTOKENCATEGORY OP_ROT OP_EQUALVERIFY OP_1 OP_UTXOTOKENCOMMITMENT OP_SIZE 24 OP_NUMEQUALVERIFY OP_0 OP_UTXOTOKENCOMMITMENT OP_OVER 20 OP_SPLIT OP_NIP OP_BIN2NUM OP_OVER 40 OP_SPLIT OP_NIP OP_BIN2NUM OP_GREATERTHAN OP_VERIFY OP_0 OP_OUTPUTBYTECODE OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_2 OP_PICK 20 OP_SPLIT OP_DROP OP_ROT 20 OP_SPLIT OP_NIP 20 OP_SPLIT OP_DROP OP_CAT OP_ROT 20 OP_SPLIT OP_NIP OP_CAT OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_0 OP_UTXOVALUE OP_NUMEQUALVERIFY OP_1 OP_BEGIN OP_DUP OP_TXOUTPUTCOUNT OP_LESSTHAN OP_DUP OP_TOALTSTACK OP_IF OP_DUP OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_1ADD OP_ENDIF OP_FROMALTSTACK OP_NOT OP_UNTIL OP_2DROP OP_1 OP_ENDIF",
+  "source": "pragma cashscript ^0.14.0;\n\n// Holds THE mutable NFT of the keeper category; commitment = earnedRoot[32] ‖ claimedRoot[32] ‖ epoch[4 LE].\n// That category is created with no minting authority, so this NFT can never be duplicated:\n// a fake keeper is impossible even for the operator. Root changes arrive as NFTs of a separate\n// proposal category (minted by the operator), only after the proposal's delay, only for a newer epoch.\ncontract RootKeeper(bytes poolLock, bytes proposalLock, bytes32 proposalCategory) {\n    // spent next to the pool's claim(), which checks the new claimedRoot; the keeper itself must stay put\n    function claim() {\n        require(this.activeInputIndex == 1);\n        require(tx.inputs[0].lockingBytecode == poolLock);\n        require(tx.outputs[1].lockingBytecode == tx.inputs[1].lockingBytecode);\n        require(tx.outputs[1].tokenCategory == tx.inputs[1].tokenCategory);\n        require(tx.outputs[1].value == tx.inputs[1].value);\n        require(tx.outputs[1].nftCommitment.length == 68);\n    }\n\n    // swap in a new earned root that has waited out the proposal delay; claimed totals carry over\n    //   in[0] keeper, in[1] matured proposal (commitment = new root[32] ‖ epoch[4]) -> out[0] keeper\n    function activate() {\n        require(this.activeInputIndex == 0);\n        require(tx.inputs[1].lockingBytecode == proposalLock);\n        require(tx.inputs[1].tokenCategory == proposalCategory);\n        bytes proposed = tx.inputs[1].nftCommitment;\n        require(proposed.length == 36);\n        bytes current = tx.inputs[0].nftCommitment;\n        int newEpoch = int(proposed.split(32)[1]);\n        require(newEpoch > int(current.split(64)[1])); // no rollback to an older root\n\n        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);\n        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);\n        require(tx.outputs[0].nftCommitment == proposed.split(32)[0] + current.split(32)[1].split(32)[0] + proposed.split(32)[1]);\n        require(tx.outputs[0].value == tx.inputs[0].value);\n        for (int o = 1; o < tx.outputs.length; o++) {\n            require(tx.outputs[o].tokenCategory == 0x); // the proposal is burned\n        }\n    }\n}\n",
+  "fingerprint": "181ed92b515cfaf5982cac607e6bf0e9522764671a71ecc5a8f6899050ac2b5a",
   "debug": {
-    "bytecode": "5379009c63c0519d00c78777777767537a519dc0009d51c77b8851ce7b8851cf8201209d00cd00c78800d100ce8800d27c00cf01207f777e8800cc00c69d516576c49f766b6376d100888b686c91666d5168",
-    "sourceMap": "9:4:12:5;;;;;10:16:10:37;:41::42;:8::44:1;11:26:11:27:0;:16::44:1;:8::58;9:21:12:5;;;:4;16::30::0;;;;17:16:17:37;:41::42;:8::44:1;18:26:18:27:0;:16::44:1;:48::60:0;:8::62:1;19:26:19:27:0;:16::42:1;:46::62:0;:8::64:1;20:34:20:35:0;:24::50:1;21:16:21:30;:34::36:0;:8::38:1;23:27:23:28:0;:16::45:1;:59::60:0;:49::77:1;:8::79;24:27:24:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;25:27:25:28:0;:16::43:1;:47::54:0;:67::68;:57::83:1;:90::92:0;:57::93:1;:::96;:47;:8::98;26:27:26:28:0;:16::35:1;:49::50:0;:39::57:1;:8::59;27:21:27:22:0;:8:29:9;:24:27:25;:28::45;:24:::1;;;:52:29:9:0;28:31:28:32;:20::47:1;:51::53:0;:12::55:1;27:47:27:50;:52:29:9;;:8;;16:24:30:5;;7:0:31:1",
+    "bytecode": "5379009c63c0519d00c78851cd51c78851d151ce8851cc51c69d51d2827701449c77777767537a519dc0009d51c77b8851ce7b8851cf8201249d00cf7801207f77817801407f7781a06900cd00c78800d100ce8800d2527901207f757b01207f7701207f757e7b01207f777e8800cc00c69d516576c49f766b6376d100888b686c91666d5168",
+    "sourceMap": "9:4:16:5;;;;;10:16:10:37;:41::42;:8::44:1;11:26:11:27:0;:16::44:1;:8::58;12:27:12:28:0;:16::45:1;:59::60:0;:49::77:1;:8::79;13:27:13:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;14:27:14:28:0;:16::35:1;:49::50:0;:39::57:1;:8::59;15:27:15:28:0;:16::43:1;:::50;;:54::56:0;:8::58:1;9:21:16:5;;;:4;20::37::0;;;;21:16:21:37;:41::42;:8::44:1;22:26:22:27:0;:16::44:1;:48::60:0;:8::62:1;23:26:23:27:0;:16::42:1;:46::62:0;:8::64:1;24:35:24:36:0;:25::51:1;25:16:25:31;:35::37:0;:8::39:1;26:34:26:35:0;:24::50:1;27:27:27:35:0;:42::44;:27::45:1;:::48;:23::49;28:31:28:38:0;:45::47;:31::48:1;:::51;:27::52;:16;:8::54;30:27:30:28:0;:16::45:1;:59::60:0;:49::77:1;:8::79;31:27:31:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;32:27:32:28:0;:16::43:1;:47::55:0;;:62::64;:47::65:1;:::68;:71::78:0;:85::87;:71::88:1;:::91;:98::100:0;:71::101:1;:::104;:47;:107::115:0;:122::124;:107::125:1;:::128;:47;:8::130;33:27:33:28:0;:16::35:1;:49::50:0;:39::57:1;:8::59;34:21:34:22:0;:8:36:9;:24:34:25;:28::45;:24:::1;;;:52:36:9:0;35:31:35:32;:20::47:1;:51::53:0;:12::55:1;34:47:34:50;:52:36:9;;:8;;20:24:37:5;;7:0:38:1",
     "logs": [],
     "requires": [
       { "ip": 10, "line": 10 },
-      { "ip": 14, "line": 11 },
-      { "ip": 24, "line": 17 },
-      { "ip": 28, "line": 18 },
-      { "ip": 32, "line": 19 },
-      { "ip": 37, "line": 21 },
-      { "ip": 42, "line": 23 },
-      { "ip": 47, "line": 24 },
-      { "ip": 57, "line": 25 },
-      { "ip": 62, "line": 26 },
-      { "ip": 74, "line": 28 }
+      { "ip": 13, "line": 11 },
+      { "ip": 18, "line": 12 },
+      { "ip": 23, "line": 13 },
+      { "ip": 28, "line": 14 },
+      { "ip": 35, "line": 15 },
+      { "ip": 45, "line": 21 },
+      { "ip": 49, "line": 22 },
+      { "ip": 53, "line": 23 },
+      { "ip": 58, "line": 25 },
+      { "ip": 72, "line": 28 },
+      { "ip": 77, "line": 30 },
+      { "ip": 82, "line": 31 },
+      { "ip": 103, "line": 32 },
+      { "ip": 108, "line": 33 },
+      { "ip": 120, "line": 35 }
     ],
-    "sourceTags": "11:13:sc;72:72:fu;73:76:lc;77:77:sc"
+    "sourceTags": "32:34:sc;118:118:fu;119:122:lc;123:123:sc"
   },
   "compiler": {
     "name": "cashc",
@@ -39,5 +44,5 @@
       "enforceLocktimeGuard": true
     }
   },
-  "updatedAt": "2026-11-17T05:58:52.084Z"
+  "updatedAt": "2026-11-17T06:07:14.226Z"
 }

@@ -27,3 +27,4 @@ dist-ssr
 scripts/.organizer.*.json
 
 .vercel
+claims/.demo.*.json

@@ -18,7 +18,7 @@ const key = (n) => {
 const operator = key(9), alice = key(1), bob = key(2), mallory = key(3);
 const rand32 = () => binToHex(crypto.getRandomValues(new Uint8Array(32)));
 const FLDCH = rand32(), KEEPER = rand32(), PROPOSAL = rand32();
-const cfg = { keeperCategory: KEEPER, proposalCategory: PROPOSAL, depth: 16, delay: 6, operatorPub: binToHex(operator.pub) };
+const cfg = { keeperCategory: KEEPER, proposalCategory: PROPOSAL, rewardCategory: FLDCH, depth: 16, delay: 6, operatorPub: binToHex(operator.pub) };
 const { pool, keeper, proposal } = claimContracts(cfg, provider);
 
 // epoch 1: real October distro + alice/bob + filler up to 300 leaves
@@ -32,7 +32,8 @@ let claimed = {};
 const total = dist.entries.reduce((s, e) => s + BigInt(e.cumulative), 0n);
 
 // setup: keeper NFT (no minting authority ever), pool funded with every folder's total
-const roots = (d, c) => { const t = buildTrees(d.depth, d.entries, c); return rootsCommitment(t.earned.root(), t.claimed.root()); };
+let epoch = 0;
+const roots = (d, c) => { const t = buildTrees(d.depth, d.entries, c); return rootsCommitment(t.earned.root(), t.claimed.root(), epoch); };
 provider.addUtxo(keeper.address, randomUtxo({ satoshis: DUST, token: { category: KEEPER, amount: 0n, nft: { capability: 'mutable', commitment: roots(dist, claimed) } } }));
 provider.addUtxo(pool.address, randomUtxo({ satoshis: DUST, token: { category: FLDCH, amount: total * 2n } }));
 const authority = { utxo: provider.addUtxo(binToHex(operator.lock), randomUtxo({ satoshis: DUST, token: { category: PROPOSAL, amount: 0n, nft: { capability: 'minting', commitment: '' } } })), unlocker: operator.sig.unlockP2PKH() };
@@ -114,14 +115,26 @@ await fails('payout to an address other than the leaf owner', async () => {
 // --- epoch 2: alice earns more; root goes through a proposal and its delay
 const next = { ...dist, entries: dist.entries.map((e) => (e.pkh === alice.pkh ? { ...e, cumulative: '800000000' } : e)) };
 const newRoot = buildTrees(next.depth, next.entries).earned.root();
-await buildPropose({ proposal, authority, root: newRoot, coins: coins(operator), changeLock: operator.lock }).send();
+await buildPropose({ proposal, authority, root: newRoot, epoch: 1, coins: coins(operator), changeLock: operator.lock }).send();
 await fails('activating a proposal before its delay', async () => {
   const b = await buildActivate({ keeper, proposal, delay: cfg.delay - 1, coin: coins(operator)[0], changeLock: operator.lock });
   return b.send();
 });
 await (await buildActivate({ keeper, proposal, delay: cfg.delay, coin: coins(operator)[0], changeLock: operator.lock })).send();
-dist = next;
+dist = next; epoch = 1;
 console.log('PASS new earned root activated after the delay; claimed totals carried over');
+
+await fails('rollback: activating a proposal for an epoch that is not newer', async () => {
+  const old = buildTrees(dist.depth, dist.entries.map((e) => (e.pkh === alice.pkh ? { ...e, cumulative: '500000000' } : e))).earned.root();
+  await buildPropose({ proposal, authority: { utxo: (await provider.getUtxosForLockingBytecode(binToHex(operator.lock))).find((u) => u.token?.category === PROPOSAL), unlocker: operator.sig.unlockP2PKH() }, root: old, epoch: 1, coins: coins(operator), changeLock: operator.lock }).send();
+  return (await buildActivate({ keeper, proposal, delay: cfg.delay, coin: coins(operator)[0], changeLock: operator.lock })).send();
+});
+{ // clear the rejected proposal so the next steps see a clean state
+  const [stale] = await proposal.getUtxos();
+  const c = coins(operator)[0];
+  await new TransactionBuilder({ provider }).addInput(stale, proposal.unlock.cancel(operator.sig)).addInput(c.utxo, c.unlocker)
+    .addOutput({ to: operator.lock, amount: c.utxo.satoshis }).send();
+}
 
 r = await claim(alice);
 assert.equal(r.payout, 300000000n);
@@ -131,7 +144,7 @@ console.log('PASS alice claimed only the difference (300000000) after the new ro
 await fails('fake keeper with a different category', async () => {
   const FAKE = rand32();
   const t = buildTrees(dist.depth, dist.entries, claimed);
-  const forgedRoots = rootsCommitment(t.earned.root(), t.claimed.root());
+  const forgedRoots = rootsCommitment(t.earned.root(), t.claimed.root(), epoch);
   const fake = provider.addUtxo(binToHex(mallory.lock), randomUtxo({ satoshis: DUST, token: { category: FAKE, amount: 0n, nft: { capability: 'mutable', commitment: forgedRoots } } }));
   const bobE = dist.entries.find((e) => e.pkh === bob.pkh);
   const [p] = await pool.getUtxos();
@@ -142,6 +155,37 @@ await fails('fake keeper with a different category', async () => {
     .addOutput({ to: pool.tokenAddress, amount: p.satoshis, token: { ...p.token, amount: p.token.amount - BigInt(bobE.cumulative) } })
     .addOutput({ to: mallory.lock, amount: DUST, token: fake.token })
     .addOutput({ to: bob.lock, amount: DUST, token: { category: FLDCH, amount: BigInt(bobE.cumulative) } })
+    .send();
+});
+
+await fails('hijacking the keeper next to a pool topUp', async () => {
+  const [p] = await pool.getUtxos(); const [k] = await keeper.getUtxos();
+  const c = coins(mallory)[0];
+  const t = buildTrees(dist.depth, dist.entries.map((e) => (e.pkh === mallory.pkh ? e : e)), {});
+  return new TransactionBuilder({ provider })
+    .addInput(p, pool.unlock.topUp())
+    .addInput(k, keeper.unlock.claim())
+    .addInput(c.utxo, c.unlocker)
+    .addOutput({ to: pool.tokenAddress, amount: p.satoshis, token: { ...p.token, amount: p.token.amount + 1n } })
+    .addOutput({ to: keeper.tokenAddress, amount: k.satoshis, token: { ...k.token, nft: { ...k.token.nft, commitment: rootsCommitment(t.earned.root(), t.claimed.root(), epoch) } } })
+    .send();
+});
+
+await fails('claiming for a victim out of junk tokens sent to the pool address', async () => {
+  const JUNK = rand32();
+  const junk = provider.addUtxo(pool.address, randomUtxo({ satoshis: DUST, token: { category: JUNK, amount: 10n ** 15n } }));
+  const victim = dist.entries[1];
+  const t = buildTrees(dist.depth, dist.entries, claimed);
+  const after = buildTrees(dist.depth, [], { ...claimed, [victim.index]: victim.cumulative }).claimed;
+  const [k] = await keeper.getUtxos();
+  const c = coins(mallory)[0];
+  return new TransactionBuilder({ provider })
+    .addInput(junk, pool.unlock.claim(victim.pkh, BigInt(victim.cumulative), 0n, BigInt(victim.index), t.earned.proof(victim.index), t.claimed.proof(victim.index)))
+    .addInput(k, keeper.unlock.claim())
+    .addInput(c.utxo, c.unlocker)
+    .addOutput({ to: pool.tokenAddress, amount: junk.satoshis, token: { ...junk.token, amount: junk.token.amount - BigInt(victim.cumulative) } })
+    .addOutput({ to: keeper.tokenAddress, amount: k.satoshis, token: { ...k.token, nft: { ...k.token.nft, commitment: rootsCommitment(t.earned.root(), after.root(), epoch) } } })
+    .addOutput({ to: encodeLockingBytecodeP2pkh(Uint8Array.from(Buffer.from(victim.pkh, 'hex'))), amount: DUST, token: { category: JUNK, amount: BigInt(victim.cumulative) } })
     .send();
 });
 

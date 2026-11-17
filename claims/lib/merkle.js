@@ -62,4 +62,12 @@ export function buildTrees(depth, entries, claimed = {}) {
   return { earned, claimed: claimedTree };
 }
 
-export const rootsCommitment = (earnedRoot, claimedRoot) => binToHex(flattenBinArray([earnedRoot, claimedRoot]));
+/** keeper commitment: earnedRoot[32] ‖ claimedRoot[32] ‖ epoch[4 LE] */
+export const rootsCommitment = (earnedRoot, claimedRoot, epoch = 0) => binToHex(flattenBinArray([earnedRoot, claimedRoot, le4(epoch)]));
+/** proposal commitment: newEarnedRoot[32] ‖ epoch[4 LE] */
+export const proposalCommitment = (root, epoch) => binToHex(flattenBinArray([root, le4(epoch)]));
+export function le4(n) {
+  if (n < 0 || n >= 2 ** 31) throw new Error(`epoch out of range: ${n}`);
+  return Uint8Array.of(n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >> 24) & 255);
+}
+export const epochOf = (commitmentHex) => { const b = hexToBin(commitmentHex.slice(128)); return b[0] | (b[1] << 8) | (b[2] << 16) | (b[3] << 24); };

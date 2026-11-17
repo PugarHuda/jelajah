@@ -1,28 +1,35 @@
 pragma cashscript ^0.14.0;
 
-// Holds THE mutable NFT of the keeper category; commitment = earnedRoot[32] ‖ claimedRoot[32].
+// Holds THE mutable NFT of the keeper category; commitment = earnedRoot[32] ‖ claimedRoot[32] ‖ epoch[4 LE].
 // That category is created with no minting authority, so this NFT can never be duplicated:
 // a fake keeper is impossible even for the operator. Root changes arrive as NFTs of a separate
-// proposal category (minted by the operator) and only after the proposal's delay.
+// proposal category (minted by the operator), only after the proposal's delay, only for a newer epoch.
 contract RootKeeper(bytes poolLock, bytes proposalLock, bytes32 proposalCategory) {
-    // spent next to the pool, which verifies the new claimedRoot
+    // spent next to the pool's claim(), which checks the new claimedRoot; the keeper itself must stay put
     function claim() {
         require(this.activeInputIndex == 1);
         require(tx.inputs[0].lockingBytecode == poolLock);
+        require(tx.outputs[1].lockingBytecode == tx.inputs[1].lockingBytecode);
+        require(tx.outputs[1].tokenCategory == tx.inputs[1].tokenCategory);
+        require(tx.outputs[1].value == tx.inputs[1].value);
+        require(tx.outputs[1].nftCommitment.length == 68);
     }
 
     // swap in a new earned root that has waited out the proposal delay; claimed totals carry over
-    //   in[0] keeper, in[1] matured proposal (immutable NFT, commitment = new earned root) -> out[0] keeper
+    //   in[0] keeper, in[1] matured proposal (commitment = new root[32] ‖ epoch[4]) -> out[0] keeper
     function activate() {
         require(this.activeInputIndex == 0);
         require(tx.inputs[1].lockingBytecode == proposalLock);
         require(tx.inputs[1].tokenCategory == proposalCategory);
-        bytes newRoot = tx.inputs[1].nftCommitment;
-        require(newRoot.length == 32);
+        bytes proposed = tx.inputs[1].nftCommitment;
+        require(proposed.length == 36);
+        bytes current = tx.inputs[0].nftCommitment;
+        int newEpoch = int(proposed.split(32)[1]);
+        require(newEpoch > int(current.split(64)[1])); // no rollback to an older root
 
         require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
         require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
-        require(tx.outputs[0].nftCommitment == newRoot + tx.inputs[0].nftCommitment.split(32)[1]);
+        require(tx.outputs[0].nftCommitment == proposed.split(32)[0] + current.split(32)[1].split(32)[0] + proposed.split(32)[1]);
         require(tx.outputs[0].value == tx.inputs[0].value);
         for (int o = 1; o < tx.outputs.length; o++) {
             require(tx.outputs[o].tokenCategory == 0x); // the proposal is burned

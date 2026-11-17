@@ -4,14 +4,14 @@ import { binToHex, hexToBin, encodeLockingBytecodeP2pkh } from '@bitauth/libauth
 import ClaimPool from '../artifacts/ClaimPool.json' with { type: 'json' };
 import RootKeeper from '../artifacts/RootKeeper.json' with { type: 'json' };
 import RootProposal from '../artifacts/RootProposal.json' with { type: 'json' };
-import { buildTrees, claimedLeaf, rootsCommitment } from './merkle.js';
+import { buildTrees, claimedLeaf, rootsCommitment, proposalCommitment, epochOf } from './merkle.js';
 
 export const DUST = 1000n;
 const vm = (category) => binToHex(hexToBin(category).reverse()); // introspection byte order
 
-/** cfg: { keeperCategory, proposalCategory, depth, delay, operatorPub } (categories in display order) */
+/** cfg: { keeperCategory, proposalCategory, rewardCategory, depth, delay, operatorPub } (categories in display order) */
 export function claimContracts(cfg, provider) {
-  const pool = new Contract(ClaimPool, [vm(cfg.keeperCategory), BigInt(cfg.depth)], { provider });
+  const pool = new Contract(ClaimPool, [vm(cfg.keeperCategory), vm(cfg.rewardCategory), BigInt(cfg.depth)], { provider });
   const proposal = new Contract(RootProposal, [BigInt(cfg.delay), cfg.operatorPub, vm(cfg.keeperCategory)], { provider });
   const keeper = new Contract(RootKeeper, [pool.lockingBytecode, proposal.lockingBytecode, vm(cfg.proposalCategory)], { provider });
   return { pool, keeper, proposal };
@@ -34,7 +34,8 @@ export async function buildClaim({ pool, keeper, dist, claimed, pkh, coins, fee 
   const [poolUtxo] = await pool.getUtxos();
   const [keeperUtxo] = await keeper.getUtxos();
   if (!poolUtxo || !keeperUtxo) throw new Error('pool or keeper not found');
-  const want = rootsCommitment(trees.earned.root(), trees.claimed.root());
+  const epoch = epochOf(keeperUtxo.token.nft.commitment);
+  const want = rootsCommitment(trees.earned.root(), trees.claimed.root(), epoch);
   if (keeperUtxo.token.nft.commitment !== want) throw new Error('local trees do not match the on-chain roots (sync first)');
 
   const payout = cumulative - before;
@@ -49,21 +50,21 @@ export async function buildClaim({ pool, keeper, dist, claimed, pkh, coins, fee 
     .addInput(keeperUtxo, keeper.unlock.claim());
   picked.forEach((c) => tb.addInput(c.utxo, c.unlocker));
   tb.addOutput({ to: pool.tokenAddress, amount: poolUtxo.satoshis, token: { ...poolUtxo.token, amount: poolUtxo.token.amount - payout } })
-    .addOutput({ to: keeper.tokenAddress, amount: keeperUtxo.satoshis, token: { ...keeperUtxo.token, nft: { ...keeperUtxo.token.nft, commitment: rootsCommitment(trees.earned.root(), after.root()) } } })
+    .addOutput({ to: keeper.tokenAddress, amount: keeperUtxo.satoshis, token: { ...keeperUtxo.token, nft: { ...keeperUtxo.token.nft, commitment: rootsCommitment(trees.earned.root(), after.root(), epoch) } } })
     .addOutput({ to: owner, amount: DUST, token: { category: poolUtxo.token.category, amount: payout } });
   const change = sum - DUST - fee;
   if (change >= DUST) tb.addOutput({ to: owner, amount: change });
   return { builder: tb, payout, index: entry.index, inputs: picked, newClaimedLeaf: claimedLeaf(cumulative) };
 }
 
-/** Operator: mint a proposal NFT (proposal category) holding a new earned root. authority: { utxo, unlocker } minting NFT */
-export function buildPropose({ proposal, authority, root, coins, changeLock, fee = 1500n }) {
+/** Operator: mint a proposal NFT (proposal category) holding a new earned root for a newer epoch. authority: { utxo, unlocker } minting NFT */
+export function buildPropose({ proposal, authority, root, epoch, coins, changeLock, fee = 1500n }) {
   const tb = new TransactionBuilder({ provider: proposal.provider }).addInput(authority.utxo, authority.unlocker);
   coins.forEach((c) => tb.addInput(c.utxo, c.unlocker));
   const sum = coins.reduce((s, c) => s + c.utxo.satoshis, authority.utxo.satoshis);
   return tb
     .addOutput({ to: changeLock, amount: authority.utxo.satoshis, token: authority.utxo.token })
-    .addOutput({ to: proposal.tokenAddress, amount: DUST, token: { category: authority.utxo.token.category, amount: 0n, nft: { capability: 'none', commitment: binToHex(root) } } })
+    .addOutput({ to: proposal.tokenAddress, amount: DUST, token: { category: authority.utxo.token.category, amount: 0n, nft: { capability: 'none', commitment: proposalCommitment(root, epoch) } } })
     .addOutput({ to: changeLock, amount: sum - authority.utxo.satoshis - DUST - fee });
 }
 
@@ -72,11 +73,11 @@ export async function buildActivate({ keeper, proposal, delay, coin, changeLock,
   const [keeperUtxo] = await keeper.getUtxos();
   const [prop] = await proposal.getUtxos();
   if (!prop) throw new Error('no proposal waiting');
-  const claimedRoot = keeperUtxo.token.nft.commitment.slice(64);
+  const claimedRoot = keeperUtxo.token.nft.commitment.slice(64, 128);
   return new TransactionBuilder({ provider: keeper.provider })
     .addInput(keeperUtxo, keeper.unlock.activate())
     .addInput(prop, proposal.unlock.activate(), { sequence: Number(delay) })
     .addInput(coin.utxo, coin.unlocker)
-    .addOutput({ to: keeper.tokenAddress, amount: keeperUtxo.satoshis, token: { ...keeperUtxo.token, nft: { ...keeperUtxo.token.nft, commitment: prop.token.nft.commitment + claimedRoot } } })
+    .addOutput({ to: keeper.tokenAddress, amount: keeperUtxo.satoshis, token: { ...keeperUtxo.token, nft: { ...keeperUtxo.token.nft, commitment: prop.token.nft.commitment.slice(0, 64) + claimedRoot + prop.token.nft.commitment.slice(64) } } })
     .addOutput({ to: changeLock, amount: coin.utxo.satoshis + prop.satoshis - fee });
 }
