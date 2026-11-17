@@ -1,8 +1,8 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-// served from https://pugarhuda.github.io/jelajah/
+// Vercel serves from "/", GitHub Pages from "/jelajah/" (set VITE_BASE in the Pages workflow)
 export default defineConfig({
-  base: '/jelajah/',
+  base: process.env.VITE_BASE ?? '/',
   plugins: [react()],
 })
