@@ -1,0 +1,41 @@
+{
+  "contractName": "RootProposal",
+  "constructorInputs": [
+    { "name": "delay", "type": "int" },
+    { "name": "operator", "type": "pubkey" },
+    { "name": "keeperCategory", "type": "bytes32" }
+  ],
+  "abi": [
+    { "name": "activate", "inputs": [] },
+    {
+      "name": "cancel",
+      "inputs": [
+        { "name": "operatorSig", "type": "sig" }
+      ]
+    }
+  ],
+  "bytecode": "OP_3 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_CHECKSEQUENCEVERIFY OP_DROP OP_INPUTINDEX OP_1 OP_NUMEQUALVERIFY OP_0 OP_UTXOTOKENCATEGORY OP_ROT OP_1 OP_CAT OP_EQUAL OP_NIP OP_NIP OP_ELSE OP_3 OP_ROLL OP_1 OP_NUMEQUALVERIFY OP_3 OP_ROLL OP_ROT OP_CHECKSIG OP_NIP OP_NIP OP_ENDIF",
+  "source": "pragma cashscript ^0.14.0;\r\n\r\n// A proposed earned root waits here (an immutable NFT of the proposal category, commitment = root)\r\n// for `delay` blocks, so watchers can recompute it from the public F@H data and raise the alarm.\r\ncontract RootProposal(int delay, pubkey operator, bytes32 keeperCategory) {\r\n    // only next to the keeper (the sole mutable NFT of this category), only after the delay\r\n    function activate() {\r\n        require(this.age >= delay);\r\n        require(this.activeInputIndex == 1);\r\n        require(tx.inputs[0].tokenCategory == keeperCategory + 0x01);\r\n    }\r\n\r\n    // the operator withdraws a bad proposal before it matures\r\n    function cancel(sig operatorSig) {\r\n        require(checkSig(operatorSig, operator));\r\n    }\r\n}\r\n",
+  "fingerprint": "f95af0fbe6d981fbb7d452dbe3a33fb1ede1e6dc0f6fe5c2799fe92c31455684",
+  "debug": {
+    "bytecode": "5379009c63b275c0519d00ce7b517e87777767537a519d537a7bac777768",
+    "sourceMap": "7:4:11:5;;;;;8:8:8:35:1;;9:16:9:37:0;:41::42;:8::44:1;10:26:10:27:0;:16::42:1;:46::60:0;:63::67;:46:::1;:8::69;7:24:11:5;;:4;14::16::0;;;;15:25:15:36;;:38::46;:8::49:1;14:37:16:5;;5:0:17:1",
+    "logs": [],
+    "requires": [
+      { "ip": 8, "line": 8 },
+      { "ip": 12, "line": 9 },
+      { "ip": 19, "line": 10 },
+      { "ip": 30, "line": 15 }
+    ],
+    "sourceTags": "16:17:sc;27:28:sc"
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.14.0",
+    "options": {
+      "enforceFunctionParameterTypes": true,
+      "enforceLocktimeGuard": true
+    }
+  },
+  "updatedAt": "2026-11-17T05:58:52.531Z"
+}

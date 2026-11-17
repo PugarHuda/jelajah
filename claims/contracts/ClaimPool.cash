@@ -1,0 +1,75 @@
+pragma cashscript ^0.14.0;
+
+// Holds the reward tokens (FLDCH). Anyone can submit a claim for a folder; the tokens can only go to that folder.
+//
+// Two Merkle trees share the same leaf indices (depth `depth`, sha256d, fixed size, empty leaves = zero leaves):
+//   earned  leaf = hash256(pkh ‖ cumulativeEarned[8 LE])   published by the operator, cumulative only
+//   claimed leaf = hash256(claimedSoFar[8 LE])              updated on chain by every claim
+// Their roots live in the keeper's NFT commitment: earnedRoot[32] ‖ claimedRoot[32].
+// Proving the claimed leaf (instead of trusting a receipt the claimer may hide) is what stops double claims.
+//
+//   in[0]  this pool           -> out[0] this pool, minus exactly the payout
+//   in[1]  RootKeeper (mutable)-> out[1] RootKeeper, claimedRoot updated
+//   in[2+] claimer's BCH       -> out[2] payout tokens to P2PKH(pkh), dust paid by the claimer
+//                                 out[3+] change
+contract ClaimPool(bytes32 keeperCategory, int depth) {
+    function claim(bytes20 pkh, int cumulative, int claimedBefore, int index, bytes earnedProof, bytes claimedProof) {
+        require(this.activeInputIndex == 0);
+        require(tx.inputs[1].tokenCategory == keeperCategory + 0x01); // the mutable keeper NFT
+        bytes roots = tx.inputs[1].nftCommitment;
+        require(roots.length == 64);
+        bytes earnedRoot = roots.split(32)[0];
+        bytes claimedRoot = roots.split(32)[1];
+
+        require(earnedProof.length == depth * 32);
+        require(claimedProof.length == depth * 32);
+        require(cumulative > claimedBefore);
+        require(claimedBefore >= 0);
+
+        bytes earned = hash256(pkh + toPaddedBytes(cumulative, 8));
+        bytes claimed = hash256(toPaddedBytes(claimedBefore, 8));
+        bytes updated = hash256(toPaddedBytes(cumulative, 8));
+        int idx = index;
+        for (int i = 0; i < depth; i++) {
+            bytes e = earnedProof.split(i * 32)[1].split(32)[0];
+            bytes c = claimedProof.split(i * 32)[1].split(32)[0];
+            if (idx % 2 == 0) {
+                earned = hash256(earned + e);
+                claimed = hash256(claimed + c);
+                updated = hash256(updated + c);
+            } else {
+                earned = hash256(e + earned);
+                claimed = hash256(c + claimed);
+                updated = hash256(c + updated);
+            }
+            idx = idx / 2;
+        }
+        require(idx == 0);
+        require(earned == earnedRoot);
+        require(claimed == claimedRoot);
+
+        int payout = cumulative - claimedBefore;
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
+        require(tx.outputs[0].tokenAmount == tx.inputs[0].tokenAmount - payout);
+        require(tx.outputs[0].value == tx.inputs[0].value);
+
+        require(tx.outputs[1].lockingBytecode == tx.inputs[1].lockingBytecode);
+        require(tx.outputs[1].tokenCategory == tx.inputs[1].tokenCategory);
+        require(tx.outputs[1].nftCommitment == earnedRoot + updated);
+        require(tx.outputs[1].value == tx.inputs[1].value);
+
+        require(tx.outputs[2].lockingBytecode == new LockingBytecodeP2PKH(pkh));
+        require(tx.outputs[2].tokenCategory == tx.inputs[0].tokenCategory);
+        require(tx.outputs[2].tokenAmount == payout);
+    }
+
+    // anyone may add tokens; nothing can leave this way
+    function topUp() {
+        require(this.activeInputIndex == 0);
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
+        require(tx.outputs[0].tokenAmount > tx.inputs[0].tokenAmount);
+        require(tx.outputs[0].value >= tx.inputs[0].value);
+    }
+}

@@ -9,7 +9,9 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "contracts": "cashc contracts/StampMinter.cash -o src/contracts/StampMinter.json && cashc contracts/RewardVault.cash -o src/contracts/RewardVault.json",
-    "check": "npm run contracts && node test/check.mjs"
+    "check": "npm run contracts && node test/check.mjs",
+    "claims:contracts": "cashc claims/contracts/ClaimPool.cash -o claims/artifacts/ClaimPool.json && cashc claims/contracts/RootKeeper.cash -o claims/artifacts/RootKeeper.json && cashc claims/contracts/RootProposal.cash -o claims/artifacts/RootProposal.json",
+    "claims:check": "npm run claims:contracts && node claims/test/check.mjs"
   },
   "dependencies": {
     "@bitauth/libauth": "^3.1.0-next.8",
