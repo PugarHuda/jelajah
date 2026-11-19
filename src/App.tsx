@@ -149,7 +149,7 @@ function Rally() {
 
       <main>
         <section className="hero">
-          <p className="eyebrow">{rally.name} · {tr('a stamp rally on Bitcoin Cash', 'stamp rally di Bitcoin Cash')}{fromLink && tr(' · opened from a share link', ' · dibuka dari link')}</p>
+          <p className="eyebrow">{rally.name} · {tr('a stamp rally on Bitcoin Cash', 'stamp rally di Bitcoin Cash')}</p>
           {ID
             ? <h1>Jajan di {rally.needed} warung.<br />Kumpulkan {rally.needed} stamp.<br /><em>Uangmu kembali.</em></h1>
             : <h1>Eat at {rally.needed} stalls.<br />Collect {rally.needed} stamps.<br /><em>Get paid back.</em></h1>}
@@ -165,6 +165,15 @@ function Rally() {
             </p>
           )}
         </section>
+
+        {fromLink && (
+          <section className="warn" role="note">
+            <b>⚠ {tr('Community rally from a link: not the official Jelajah demo.', 'Rally komunitas dari sebuah link: bukan demo resmi Jelajah.')}</b>{' '}
+            {tr('Anyone can create one. Only buy if you trust whoever shared it. Your payments go to:', 'Siapa pun bisa membuatnya. Beli hanya kalau kamu percaya pada yang membagikannya. Pembayaranmu masuk ke:')}
+            <ul>{rally.merchants.map((m) => <li key={m.id}>{m.emoji} {m.name}: <code>{addressOf(hexToBin(m.lock))}</code></li>)}</ul>
+            <a href={location.pathname}>{tr('Go to the official rally', 'Ke rally resmi')}</a>
+          </section>
+        )}
 
         <section className="board" aria-label={tr('Stalls', 'Warung')}>
           <div className="board-head">

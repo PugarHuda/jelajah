@@ -138,3 +138,7 @@ footer { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size:
 .organize label.wide { grid-column: 1 / -1; }
 .organize input { font: inherit; font-size: 1rem; padding: .55rem .7rem; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); min-width: 0; }
 .organize .row { display: flex; gap: .6rem; flex-wrap: wrap; }
+
+.warn { margin: 0 0 1.25rem; padding: 1rem 1.25rem; border-radius: 16px; border: 2px solid #b45309; background: color-mix(in srgb, #f59e0b 14%, var(--card)); font-size: .92rem; }
+.warn ul { margin: .5rem 0; padding-left: 1.1rem; }
+.warn code { word-break: break-all; }
