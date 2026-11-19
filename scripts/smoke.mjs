@@ -24,10 +24,12 @@ const buyer = wallet(generatePrivateKey());
 
 // fund the buyer
 const fund = (await organizer.coins()).filter((c) => !c.utxo.token).sort((a, b) => Number(b.utxo.satoshis - a.utxo.satoshis))[0];
+// each stamp: price + stamp dust + change dust + fee; plus the claim fee. Leftovers are swept back below.
+const need = rally.merchants.slice(0, rally.needed).reduce((s, m) => s + BigInt(m.price) + 3500n, 0n) + 5000n;
 const funded = await new TransactionBuilder({ provider })
   .addInput(fund.utxo, fund.unlocker)
-  .addOutput({ to: buyer.lock, amount: 20_000n }) // 3 stamps (price + dust + fee) + claim fee
-  .addOutput({ to: organizer.lock, amount: fund.utxo.satoshis - 20_000n - 1000n })
+  .addOutput({ to: buyer.lock, amount: need })
+  .addOutput({ to: organizer.lock, amount: fund.utxo.satoshis - need - 1000n })
   .send();
 console.log('funded buyer      ', explorer + funded.txid);
 
@@ -48,3 +50,12 @@ const { txid } = await builder.send();
 console.log('claim + trophy    ', explorer + txid);
 const left = (await buyer.coins()).filter((c) => isRallyNft(rally, c.utxo)).map((c) => c.utxo.token.nft.commitment.slice(0, 2));
 console.log('buyer NFTs now    ', left, '(expect ["00"] = trophy)');
+
+// the buyer key is throwaway: sweep the change and the trophy back to the organizer
+const rest = await buyer.coins();
+const sweep = new TransactionBuilder({ provider });
+rest.forEach((c) => sweep.addInput(c.utxo, c.unlocker));
+rest.filter((c) => c.utxo.token).forEach((c) => sweep.addOutput({ to: organizer.lock, amount: c.utxo.satoshis, token: c.utxo.token }));
+const bchLeft = rest.filter((c) => !c.utxo.token).reduce((s, c) => s + c.utxo.satoshis, 0n);
+sweep.addOutput({ to: organizer.lock, amount: bchLeft - 1000n });
+console.log('swept back        ', explorer + (await sweep.send()).txid);

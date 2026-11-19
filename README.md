@@ -61,7 +61,8 @@ node scripts/rally.mjs bcmr    --network chipnet --registry https://<host>/bcmr.
 The live demo runs **Jelajah Jogja on BCH mainnet** (add `?net=chipnet` for the test rally). Pool: 30,000 sats = 5 claimable rewards of 5,000 sats (the vault must keep 1,000 sats dust under its minting NFT, so the 6th reward is returned by `reclaim`; the deploy script now adds that dust on top). Open for 60 days.
 - Genesis: [`47f7df27…`](https://blockchair.com/bitcoin-cash/transaction/47f7df27c3142503911eee2fcd76199be91d64fbae0b4fa621041268a65b7f34) · category `026421ea8dc5944c03a0b2151f3c44a89ae307adc0cb828cc25ead05a4c5494f`
 - Reward vault: `bitcoincash:r057jerhmlqvykrwg9h8s6y4z8cuzc6856hf7k2n3kagwaz7p5w86nxj262cl`
-- BCMR metadata, hash-committed in the genesis OP_RETURN: [`bcmr.json`](https://pugarhuda.github.io/jelajah/bcmr.json)
+- BCMR metadata with stamp and trophy icons: [`bcmr.json`](https://pugarhuda.github.io/jelajah/bcmr.json), revision 1.1 published along the authchain in [`85ccbf71…`](https://blockchair.com/bitcoin-cash/transaction/85ccbf7111bd700c9f8ebf899934dd7b26091dc90f05149316137ab019057395)
+- **End to end on mainnet** (`smoke.mjs`, 19 Nov 2026): stamps [`60513b45…`](https://blockchair.com/bitcoin-cash/transaction/60513b45ff9fd8be183710554b3707ee3d6f2a71cb963ec025a8a921918c7bba) · [`196503e3…`](https://blockchair.com/bitcoin-cash/transaction/196503e31c0b09f6fdb605c361280b4a2ca4fc263dedca5c9beec7c7371f72e0) · [`a7fb6db1…`](https://blockchair.com/bitcoin-cash/transaction/a7fb6db15732b5c015c59fac9dd5ac8116919b8b17d49591120700c682174521) · claim + trophy [`0e071a46…`](https://blockchair.com/bitcoin-cash/transaction/0e071a4648f8ac6ab48bf97f48e72ff473dfd5af3fa3bc6a131e5974ab528b33)
 
 ## Chipnet run (17 Nov 2026)
 - Genesis: [`aa5c20f5…`](https://chipnet.imaginary.cash/tx/aa5c20f53240528ab3fd4ea581cf6a8a42c28cdbdc2a43ffe3035239478dbffc)
