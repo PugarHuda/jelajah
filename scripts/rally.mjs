@@ -1,7 +1,7 @@
 // Organizer CLI: create a key, then deploy a rally (genesis + minters + vault) on chipnet or mainnet.
 //   node scripts/rally.mjs address  --network chipnet          print the organizer funding address
 //   node scripts/rally.mjs deploy   --network chipnet [--registry https://host/bcmr.json]
-//   node scripts/rally.mjs reclaim  --network chipnet          take back the pool after the rally ends
+//   node scripts/rally.mjs reclaim  --network chipnet [--rally file]   take back the pool after the rally ends
 // Merchants are paid at --merchant-address (default: the organizer) — set real stall addresses for a real rally.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
@@ -18,7 +18,7 @@ const write = (p, v) => writeFileSync(new URL(p, root), JSON.stringify(v, null, 
 
 const { positionals: [cmd], values: opt } = parseArgs({
   allowPositionals: true,
-  options: { network: { type: 'string', default: 'chipnet' }, registry: { type: 'string' }, 'merchant-address': { type: 'string' } },
+  options: { network: { type: 'string', default: 'chipnet' }, registry: { type: 'string' }, rally: { type: 'string' }, 'merchant-address': { type: 'string' } },
 });
 const network = opt.network;
 if (!['chipnet', 'mainnet'].includes(network)) throw new Error('--network must be chipnet or mainnet');
@@ -47,7 +47,7 @@ const StampMinter2 = read('src/contracts/StampMinter2.json'); // new rallies: me
 const RewardVault = read('src/contracts/RewardVault.json');
 
 if (cmd === 'reclaim') {
-  const rally = read(`src/rally.${network}.json`);
+  const rally = read(opt.rally ?? `src/rally.${network}.json`); // --rally scripts/rally.mainnet-v1.json for a retired rally
   const vault = new Contract(RewardVault, vaultArgs(rally), { provider });
   const [v] = await vault.getUtxos();
   const { txid } = await new TransactionBuilder({ provider })

@@ -2,10 +2,10 @@
   "$schema": "https://cashtokens.org/bcmr-v2.schema.json",
   "version": {
     "major": 1,
-    "minor": 1,
+    "minor": 0,
     "patch": 0
   },
-  "latestRevision": "2026-11-19T01:42:19.197Z",
+  "latestRevision": "2026-11-19T01:59:09.875Z",
   "registryIdentity": {
     "name": "Jelajah",
     "description": "Stamp rallies on Bitcoin Cash",
@@ -15,12 +15,12 @@
     }
   },
   "identities": {
-    "026421ea8dc5944c03a0b2151f3c44a89ae307adc0cb828cc25ead05a4c5494f": {
-      "2026-11-19T01:42:19.197Z": {
+    "082ad61858ea6ad7c75c7f2b1d2cbf8293a61e91fa46464b2e66c0dadcec24ad": {
+      "2026-11-19T01:59:09.875Z": {
         "name": "Jelajah Jogja stamps",
         "description": "Stamp rally across Yogyakarta street-food stalls. Buy at any 3 stalls, burn the stamps, get paid back and keep a trophy.",
         "token": {
-          "category": "026421ea8dc5944c03a0b2151f3c44a89ae307adc0cb828cc25ead05a4c5494f",
+          "category": "082ad61858ea6ad7c75c7f2b1d2cbf8293a61e91fa46464b2e66c0dadcec24ad",
           "symbol": "JELAJAH",
           "nfts": {
             "parse": {

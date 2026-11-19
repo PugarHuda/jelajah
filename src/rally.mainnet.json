@@ -2,12 +2,14 @@
   "network": "mainnet",
   "name": "Jelajah Jogja",
   "description": "Stamp rally across Yogyakarta street-food stalls. Buy at any 3 stalls, burn the stamps, get paid back and keep a trophy.",
-  "category": "026421ea8dc5944c03a0b2151f3c44a89ae307adc0cb828cc25ead05a4c5494f",
-  "vmCategory": "4f49c5a405ad5ec28c82cbc0ad07e39aa8443c1f15b2a0034c94c58dea216402",
+  "category": "082ad61858ea6ad7c75c7f2b1d2cbf8293a61e91fa46464b2e66c0dadcec24ad",
+  "vmCategory": "ad24ecdcdac0662e4b4646fa911ea69382bf2c1d2b7f5cc7d76aea5818d62a08",
   "needed": 3,
   "reward": 5000,
-  "endTime": 1800234749,
+  "endTime": 1800237549,
   "organizerPub": "027128dba06986defcfda3297557c35e2ff71b77c06d8d0da638553b5ef8290943",
+  "minter": 2,
+  "lanes": 2,
   "merchants": [
     {
       "id": 1,
@@ -16,8 +18,9 @@
       "emoji": "☕",
       "color": "#7a4a2b",
       "price": 2000,
-      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac",
-      "taglineId": "Kopi arang dekat stasiun"
+      "taglineId": "Kopi arang dekat stasiun",
+      "memberPrice": 1800,
+      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac"
     },
     {
       "id": 2,
@@ -26,8 +29,9 @@
       "emoji": "🍜",
       "color": "#c2410c",
       "price": 2000,
-      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac",
-      "taglineId": "Mi godhog masak tungku"
+      "taglineId": "Mi godhog masak tungku",
+      "memberPrice": 1800,
+      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac"
     },
     {
       "id": 3,
@@ -36,8 +40,9 @@
       "emoji": "🍢",
       "color": "#b91c1c",
       "price": 2000,
-      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac",
-      "taglineId": "Sate kambing tusuk jeruji sepeda"
+      "taglineId": "Sate kambing tusuk jeruji sepeda",
+      "memberPrice": 1800,
+      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac"
     },
     {
       "id": 4,
@@ -46,11 +51,10 @@
       "emoji": "🥥",
       "color": "#15803d",
       "price": 2000,
-      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac",
-      "taglineId": "Es kelapa dan gula aren"
+      "taglineId": "Es kelapa dan gula aren",
+      "memberPrice": 1800,
+      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac"
     }
   ],
-  "genesisTx": "47f7df27c3142503911eee2fcd76199be91d64fbae0b4fa621041268a65b7f34",
-  "authHead": "85ccbf7111bd700c9f8ebf899934dd7b26091dc90f05149316137ab019057395",
-  "bcmrMinor": 1
+  "genesisTx": "4c96cba232afc690f841ffa7b4e10680de7b3123df4836da50700fa208a2601d"
 }
