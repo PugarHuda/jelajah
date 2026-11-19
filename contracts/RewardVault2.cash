@@ -1,0 +1,75 @@
+pragma cashscript ^0.14.0;
+
+// RewardVault2 = RewardVault + merge(): levy coins that StampMinter3 sends to this address are folded into the pool.
+// Holds a rally's BCH reward pool plus one minting NFT of the rally category.
+// Burn a full set of stamps -> get the reward and a Trophy NFT (same category, merchant id 0x00).
+//
+//   in[0]          this vault     -> out[0] this vault: same token, value minus exactly one reward
+//   in[1..needed]  stamps, merchant ids strictly increasing (= all different),
+//                  all minted to the same buyer pkh (bought, not traded)
+//                                 -> out[1] reward, to the stamps' original buyer
+//                                 -> out[2] Trophy NFT (commitment 0x00 + buyer pkh), to the same buyer
+//   in[needed+1+]  fee coins      -> out[3+] BCH-only change
+// Stamps are burned: no other output may carry any token.
+// Anti-farming invariant, checked by the deploy script: reward < sum of every merchant's price.
+contract RewardVault2(bytes32 rallyCategory, int needed, int reward, pubkey organizer, int endTime) {
+    function claim() {
+        require(this.activeInputIndex == 0);
+
+        bytes20 buyer = unsafe_bytes20(tx.inputs[1].nftCommitment.split(1)[1]);
+        int prev = 0;
+        for (int i = 1; i <= needed; i++) {
+            require(tx.inputs[i].tokenCategory == rallyCategory);
+            bytes commitment = tx.inputs[i].nftCommitment;
+            require(commitment.length == 21);
+            int id = int(commitment.split(1)[0]);
+            require(id > prev);
+            prev = id;
+            require(unsafe_bytes20(commitment.split(1)[1]) == buyer);
+        }
+
+        // vault continues with its minting NFT, paying out exactly one reward
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
+        require(tx.outputs[0].nftCommitment == tx.inputs[0].nftCommitment);
+        require(tx.outputs[0].value == tx.inputs[0].value - reward);
+
+        bytes buyerLock = new LockingBytecodeP2PKH(buyer);
+        require(tx.outputs[1].lockingBytecode == buyerLock);
+        require(tx.outputs[1].value >= reward);
+        require(tx.outputs[1].tokenCategory == 0x);
+
+        require(tx.outputs[2].lockingBytecode == buyerLock);
+        require(tx.outputs[2].tokenCategory == rallyCategory);
+        require(tx.outputs[2].nftCommitment == 0x00 + buyer);
+
+        for (int o = 3; o < tx.outputs.length; o++) {
+            require(tx.outputs[o].tokenCategory == 0x);
+        }
+    }
+
+    // Anyone can fold the levy coins sitting at this address into the vault coin, no signature needed.
+    // Every input runs this: all inputs are this vault, in[0] is the vault coin with the minting NFT, and the
+    // single output is the vault again, holding everything minus a small per-input fee. So levies can only grow the pool.
+    function merge() {
+        bytes vaultLock = tx.inputs[this.activeInputIndex].lockingBytecode;
+        require(tx.inputs[0].lockingBytecode == vaultLock);
+        require(tx.inputs[0].tokenCategory == rallyCategory + 0x02);
+        require(tx.outputs.length == 1);
+        require(tx.outputs[0].lockingBytecode == vaultLock);
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
+        require(tx.outputs[0].nftCommitment == tx.inputs[0].nftCommitment);
+        int total = 0;
+        for (int i = 0; i < tx.inputs.length; i++) {
+            require(tx.inputs[i].lockingBytecode == vaultLock);
+            total = total + tx.inputs[i].value;
+        }
+        require(tx.outputs[0].value >= total - 600 * tx.inputs.length);
+    }
+
+    // after the rally ends the organizer takes back what is left
+    function reclaim(sig organizerSig) {
+        require(tx.time >= endTime);
+        require(checkSig(organizerSig, organizer));
+    }
+}

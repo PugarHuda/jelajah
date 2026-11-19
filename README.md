@@ -31,6 +31,7 @@ There is no server and no database. State lives in UTXOs and NFT commitments, an
 - `StampMinter.cash`, 94 bytes: `stamp()`.
 - `RewardVault.cash`, 170 bytes: `claim()` (uses the 2026 VM's loops) and `reclaim()`.
 - `StampMinter2.cash`, 152 bytes, used by new rallies: `StampMinter` plus a **member price**. Your trophy becomes a membership card. Show it as input 1 and every stall charges you its `memberPrice`, as long as the trophy (commitment `00 ‖ your pkh`) goes straight back to you at output 3. Only the vault can mint `00`, a traded trophy doesn't match your pkh, and keeping the discount while sending the trophy elsewhere is rejected.
+- `StampMinter3.cash` (167 bytes) + `RewardVault2.cash` (247 bytes), **levy rallies**. Every stamp must also pay `levy` sats to the vault address in the same transaction (output 3). The levy coins pile up next to the vault, so buyers never race for the vault coin. `merge()` lets **anyone, without a signature** fold them into the vault coin. Every input checks that the only output is the vault itself, still carrying its minting NFT and holding everything minus at most 600 sats per input, so levies can only ever grow the pool. The deploy script requires `needed × (levy − 600) − 600 ≥ reward`, so each set's reward is paid by the levies of the stamps it burns. Config: `scripts/rally.levy.config.json`.
 - **Lanes:** each stall gets several minter coins at the same covenant address (`lanes` in the config), and the app picks one at random, so two people buying at the same stall in the same second don't fight over one coin. The contract needed no change, because each lane hands its minting NFT back to itself.
 
 ### Threat model
@@ -42,7 +43,7 @@ There is no server and no database. State lives in UTXOs and NFT commitments, an
 | Extra stamps minted / a minter drained | Minter value and token must come back unchanged, and no other output may carry tokens. |
 | A trophy reused as a stamp | Trophy id `00` can never satisfy `id > prev` starting from 0. |
 | Member discount without a trophy, with someone else's trophy, or while keeping the trophy away from its owner | `StampMinter2` only lowers the price when input 1 is a rally trophy whose commitment is `00 ‖ buyer pkh`, and it requires that exact trophy back at the buyer's address. The anti-farming check uses the member price. |
-| **Every stall in a set colludes** with a buyer and refunds them off-chain | **Not prevented on chain.** The buyer pays only fees, so the pool can be drained one reward at a time. The price rule only stops a single cheater. A merchant co-signature doesn't help (the merchants are the colluders), and one claim per pkh is beaten by using many addresses. The real fix is governance: **the stalls fund the pool themselves** in proportion, so colluding only drains their own money. (In the demo every stall payment goes to the organizer, who also funds the pool, so the risk is zero.) An optional organizer co-signature on each stamp is the centralized alternative. |
+| **Every stall in a set colludes** with a buyer and refunds them off-chain | **Closed by levy rallies (`StampMinter3` + `RewardVault2`).** Each stamp pays a levy into the pool and the levies of one set cover its reward, so the colluding stalls fund the payout themselves and nothing is gained. VM test: `carol's set was paid from its own levies`. Levy coins can't be redirected, burned as fee, skimmed or pocketed inside a claim (5 attack tests). **In the original StampMinter / StampMinter2 rallies, this is not prevented on chain.** The buyer pays only fees, so the pool can be drained one reward at a time. The price rule only stops a single cheater. A merchant co-signature doesn't help (the merchants are the colluders), and one claim per pkh is beaten by using many addresses. The real fix is governance: **the stalls fund the pool themselves** in proportion, so colluding only drains their own money. (In the demo every stall payment goes to the organizer, who also funds the pool, so the risk is zero.) An optional organizer co-signature on each stamp is the centralized alternative. |
 
 ## Try it
 Open the demo, press **Connect wallet**, and scan the code with Selene or Paytaca (WizardConnect). Buy at 3 stalls, then claim.
@@ -55,6 +56,7 @@ npm run dev       # web app
 node scripts/rally.mjs address --network chipnet                 # organizer funding address
 node scripts/rally.mjs deploy  --network chipnet [--registry https://<host>/bcmr.json]
 node scripts/smoke.mjs --network chipnet                         # real-network end to end: 3 stamps + claim
+node scripts/rally.mjs deploy  --network chipnet --config scripts/rally.levy.config.json   # levy rally (anti-collusion)
 node scripts/rally.mjs bcmr    --network chipnet --registry https://<host>/bcmr.json   # new BCMR revision (icons) via the authchain, no redeploy
 ```
 **Stall dashboard:** open `#/stats` in the app. Stamps sold, unique buyers, sats paid to each stall and sets claimed, all recomputed in the browser from each covenant's history. A transaction only counts if it really spent the covenant (the rally's minting NFT goes back to it at out[0]), so nobody can inflate the numbers by sending junk to a minter address.
@@ -72,6 +74,12 @@ The first mainnet rally, on the original `StampMinter`. It is no longer the demo
 - Reward vault: `bitcoincash:r057jerhmlqvykrwg9h8s6y4z8cuzc6856hf7k2n3kagwaz7p5w86nxj262cl`
 - BCMR revision 1.1 (icons) published along its authchain in [`85ccbf71…`](https://blockchair.com/bitcoin-cash/transaction/85ccbf7111bd700c9f8ebf899934dd7b26091dc90f05149316137ab019057395)
 - **End to end on mainnet** (`smoke.mjs`, 19 Nov 2026): stamps [`60513b45…`](https://blockchair.com/bitcoin-cash/transaction/60513b45ff9fd8be183710554b3707ee3d6f2a71cb963ec025a8a921918c7bba) · [`196503e3…`](https://blockchair.com/bitcoin-cash/transaction/196503e31c0b09f6fdb605c361280b4a2ca4fc263dedca5c9beec7c7371f72e0) · [`a7fb6db1…`](https://blockchair.com/bitcoin-cash/transaction/a7fb6db15732b5c015c59fac9dd5ac8116919b8b17d49591120700c682174521) · claim + trophy [`0e071a46…`](https://blockchair.com/bitcoin-cash/transaction/0e071a4648f8ac6ab48bf97f48e72ff473dfd5af3fa3bc6a131e5974ab528b33)
+
+## Chipnet run, levy rally: StampMinter3 + RewardVault2 (19 Nov 2026, current `?net=chipnet`)
+Price 4,000 sats (member 3,600) + a 2,200 sats levy per stamp. Reward 4,000. The vault was seeded with just one reward.
+- Genesis: [`03fc4476…`](https://chipnet.imaginary.cash/tx/03fc4476175838e6bb6062fff70dc554985cbf9f757b88f97375b670f0ae1b27)
+- Stamps with levy [`5551a98b…`](https://chipnet.imaginary.cash/tx/5551a98b0d2a8089fa32b89625c732a60bb5fb760f5721ada094d7aed24928a5) · [`d50cc607…`](https://chipnet.imaginary.cash/tx/d50cc6078710203fcf6c98f06c893615cb1b214d670759a70b37917ed6165c6c) · [`e306e9db…`](https://chipnet.imaginary.cash/tx/e306e9db516d9c62a43371fb82911737cfd1e830a7345aaf117edcf3d73aaaf1)
+- **Unsigned merge** of the levy coins into the vault: [`aae8c91e…`](https://chipnet.imaginary.cash/tx/aae8c91ec05e58cbaf78d237a78218757ee125c82cc09c2150f18b933d455e96) · claim + trophy [`55412765…`](https://chipnet.imaginary.cash/tx/55412765d8cc3752abda03643ab2da50e3dea0f0c045f7a96d3a2ab39a4a28ce) · member stamp [`892b9dfc…`](https://chipnet.imaginary.cash/tx/892b9dfcb02e739a1b6500220278afe3799b541d840f7c4c0b8f5edc6b6b340c)
 
 ## Chipnet run, StampMinter2 + 2 lanes per stall (19 Nov 2026)
 - Genesis: [`c8f9be79…`](https://chipnet.imaginary.cash/tx/c8f9be79320fe95370fc4a88ad7d2b5f5bf2b0b1fbbcc195fdd5923a2fe05ccc) (8 minter coins + vault)

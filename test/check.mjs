@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Contract, MockNetworkProvider, SignatureTemplate, TransactionBuilder, randomUtxo } from 'cashscript';
-import { secp256k1, hash160, binToHex, hexToBin, encodeLockingBytecodeP2pkh } from '@bitauth/libauth';
+import { secp256k1, hash160, binToHex, hexToBin, encodeLockingBytecodeP2pkh, cashAddressToLockingBytecode } from '@bitauth/libauth';
 
 const artifact = (n) => JSON.parse(readFileSync(new URL(`../src/contracts/${n}.json`, import.meta.url)));
 const StampMinter = artifact('StampMinter');
@@ -137,3 +137,86 @@ console.log('PASS trophy holder bought at the member price and kept the trophy')
 await buy2(bob, { lane: 0 }); await buy2(bob, { lane: 1 });
 assert.equal((await m2.getUtxos()).filter((u) => u.token).length, 2);
 console.log('PASS two lanes of one stall both mint, and both lanes stay open');
+
+// ---- StampMinter3 + RewardVault2: every stamp pays a levy into the vault, so a set funds its own reward
+const StampMinter3 = artifact('StampMinter3'), RewardVault2 = artifact('RewardVault2');
+const LEVY = 7_500n; // 3 x 7,500 covers REWARD 20,000 + merge fees + vault dust: colluding stalls pay the reward themselves
+const vault2 = new Contract(RewardVault2, [vmCategory, 3n, REWARD, binToHex(organizer.pub), END], { provider });
+const vault2Lock = binToHex(cashAddressToLockingBytecode(vault2.address).bytecode);
+provider.addUtxo(vault2.address, randomUtxo({ satoshis: DUST, token: minting })); // seeded with dust only: no organizer money
+const m3 = merchants.map((m, i) => {
+  const c = new Contract(StampMinter3, [m.lock, PRICE, MEMBER, `0${i + 1}`, vault2Lock, LEVY], { provider });
+  provider.addUtxo(c.address, randomUtxo({ satoshis: DUST, token: minting }));
+  return c;
+});
+const carol = key(3);
+
+async function buy3(i, buyer, { levy = LEVY, levyTo = vault2Lock } = {}) {
+  const [minterUtxo] = (await m3[i].getUtxos()).filter((u) => u.token);
+  const coin = fund(buyer);
+  return new TransactionBuilder({ provider })
+    .addInput(minterUtxo, m3[i].unlock.stamp())
+    .addInput(coin, buyer.sig.unlockP2PKH())
+    .addOutput({ to: m3[i].tokenAddress, amount: DUST, token: minterUtxo.token })
+    .addOutput({ to: hexToBin(merchants[i].lock), amount: PRICE })
+    .addOutput(nftOut(buyer, `0${i + 1}` + binToHex(buyer.pkh)))
+    .addOutput({ to: hexToBin(levyTo), amount: levy })
+    .addOutput({ to: hexToBin(buyer.lock), amount: coin.satoshis - PRICE - DUST - levy - 2_000n })
+    .send();
+}
+const vaultCoins = async () => {
+  const all = await vault2.getUtxos();
+  return { vaultCoin: all.find((u) => u.token), levies: all.filter((u) => !u.token) };
+};
+async function merge({ to = vault2.tokenAddress, keep = 0n, first = 'vault', extraOut = false } = {}) {
+  const { vaultCoin, levies } = await vaultCoins();
+  const ins = first === 'vault' ? [vaultCoin, ...levies] : [...levies, vaultCoin];
+  const total = ins.reduce((s, u) => s + u.satoshis, 0n);
+  const tb = new TransactionBuilder({ provider });
+  ins.forEach((u) => tb.addInput(u, vault2.unlock.merge()));
+  tb.addOutput({ to, amount: total - 500n * BigInt(ins.length) - keep, token: ins[0].token });
+  if (extraOut) tb.addOutput({ to: hexToBin(carol.lock), amount: keep });
+  return tb.send();
+}
+
+await fails('stamp without paying the levy', () => buy3(0, carol, { levy: LEVY - 1n }));
+await fails('levy paid somewhere other than the vault', () => buy3(0, carol, { levyTo: carol.lock }));
+for (const i of [0, 1, 2]) await buy3(i, carol);
+assert.equal((await vaultCoins()).levies.length, 3);
+console.log('PASS 3 stamps each paid a levy coin into the vault address');
+
+await fails('merge that sends the pool elsewhere', () => merge({ to: hexToBin(carol.lock) }));
+await fails('merge that burns the minting NFT (a levy coin first)', () => merge({ first: 'levy' }));
+await fails('merge that skims levies into a second output', () => merge({ keep: 5_000n, extraOut: true }));
+await fails('merge that burns levies as fee', () => merge({ keep: 5_000n }));
+await merge();
+const pooled = (await vaultCoins()).vaultCoin.satoshis;
+assert.ok(pooled >= DUST + 3n * LEVY - 2_000n);
+console.log('PASS anyone merged the levies into the vault coin, unsigned:', pooled, 'sats');
+
+await buy3(0, bob); // a fresh levy coin for the next attack
+{
+  const { vaultCoin, levies } = await vaultCoins();
+  const stamps = await stampsOf(carol);
+  const tb = new TransactionBuilder({ provider }).addInput(vaultCoin, vault2.unlock.claim());
+  stamps.forEach((s) => tb.addInput(s, carol.sig.unlockP2PKH()));
+  tb.addInput(levies[0], vault2.unlock.merge()); // a levy coin smuggled in as a "fee coin"
+  await fails('claim that pockets a levy coin as change', () => tb
+    .addOutput({ to: vault2.tokenAddress, amount: vaultCoin.satoshis - REWARD, token: vaultCoin.token })
+    .addOutput({ to: hexToBin(carol.lock), amount: REWARD })
+    .addOutput(nftOut(carol, '00' + binToHex(carol.pkh)))
+    .addOutput({ to: hexToBin(carol.lock), amount: levies[0].satoshis })
+    .send());
+}
+
+{
+  const { vaultCoin } = await vaultCoins();
+  const tb = new TransactionBuilder({ provider }).addInput(vaultCoin, vault2.unlock.claim());
+  for (const s of await stampsOf(carol)) tb.addInput(s, carol.sig.unlockP2PKH());
+  await tb
+    .addOutput({ to: vault2.tokenAddress, amount: vaultCoin.satoshis - REWARD, token: vaultCoin.token })
+    .addOutput({ to: hexToBin(carol.lock), amount: REWARD + DUST * 2n - 2_000n })
+    .addOutput(nftOut(carol, '00' + binToHex(carol.pkh)))
+    .send();
+}
+console.log(`PASS carol's set was paid from its own levies (paid ${3n * LEVY} in levies, got ${REWARD} back): collusion earns nothing`);

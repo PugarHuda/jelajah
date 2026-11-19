@@ -1,15 +1,16 @@
 {
   "network": "chipnet",
   "name": "Jelajah Jogja",
-  "description": "Stamp rally across Yogyakarta street-food stalls. Buy at any 3 stalls, burn the stamps, get paid back and keep a trophy.",
-  "category": "f41eb6f0fe87ca3cda541726829adfbfd24b80c7e94ce9507142ce37c4675681",
-  "vmCategory": "815667c437ce427150e94ce9c7804bd2bfdf9a82261754da3cca87fef0b61ef4",
+  "description": "Stamp rally across Yogyakarta street-food stalls. Every stamp pays a levy into the pool, so each set funds its own reward.",
+  "category": "20c0084d2829d116a66e01838ee48b764be67d0c3e0078631b0a7d123a811ec9",
+  "vmCategory": "c91e813a127d0a1b6378003e0c7de64b768be48e83016ea616d129284d08c020",
   "needed": 3,
-  "reward": 5000,
-  "endTime": 1800237307,
+  "reward": 4000,
+  "endTime": 1800238615,
   "organizerPub": "033f41a2eaf9fa8a2d9a21ada58031094cdce2981627120f09ac80332a32b693cd",
-  "minter": 2,
   "lanes": 2,
+  "minter": 3,
+  "levy": 2200,
   "merchants": [
     {
       "id": 1,
@@ -17,9 +18,9 @@
       "tagline": "Charcoal coffee by the station",
       "emoji": "☕",
       "color": "#7a4a2b",
-      "price": 2000,
+      "price": 4000,
       "taglineId": "Kopi arang dekat stasiun",
-      "memberPrice": 1800,
+      "memberPrice": 3600,
       "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
     },
     {
@@ -28,9 +29,9 @@
       "tagline": "Wood-fire noodles",
       "emoji": "🍜",
       "color": "#c2410c",
-      "price": 2000,
+      "price": 4000,
       "taglineId": "Mi godhog masak tungku",
-      "memberPrice": 1800,
+      "memberPrice": 3600,
       "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
     },
     {
@@ -39,9 +40,9 @@
       "tagline": "Goat satay on bicycle spokes",
       "emoji": "🍢",
       "color": "#b91c1c",
-      "price": 2000,
+      "price": 4000,
       "taglineId": "Sate kambing tusuk jeruji sepeda",
-      "memberPrice": 1800,
+      "memberPrice": 3600,
       "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
     },
     {
@@ -50,11 +51,11 @@
       "tagline": "Iced coconut and palm sugar",
       "emoji": "🥥",
       "color": "#15803d",
-      "price": 2000,
+      "price": 4000,
       "taglineId": "Es kelapa dan gula aren",
-      "memberPrice": 1800,
+      "memberPrice": 3600,
       "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
     }
   ],
-  "genesisTx": "c8f9be79320fe95370fc4a88ad7d2b5f5bf2b0b1fbbcc195fdd5923a2fe05ccc"
+  "genesisTx": "03fc4476175838e6bb6062fff70dc554985cbf9f757b88f97375b670f0ae1b27"
 }

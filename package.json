@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "contracts": "cashc contracts/StampMinter.cash -o src/contracts/StampMinter.json && cashc contracts/RewardVault.cash -o src/contracts/RewardVault.json && cashc contracts/StampMinter2.cash -o src/contracts/StampMinter2.json",
+    "contracts": "cashc contracts/StampMinter.cash -o src/contracts/StampMinter.json && cashc contracts/RewardVault.cash -o src/contracts/RewardVault.json && cashc contracts/StampMinter2.cash -o src/contracts/StampMinter2.json && cashc contracts/StampMinter3.cash -o src/contracts/StampMinter3.json && cashc contracts/RewardVault2.cash -o src/contracts/RewardVault2.json",
     "check": "npm run contracts && node test/check.mjs && npm run claims:check",
     "claims:contracts": "cashc claims/contracts/ClaimPool.cash -o claims/artifacts/ClaimPool.json && cashc claims/contracts/RootKeeper.cash -o claims/artifacts/RootKeeper.json && cashc claims/contracts/RootProposal.cash -o claims/artifacts/RootProposal.json",
     "claims:check": "npm run claims:contracts && node claims/test/check.mjs"

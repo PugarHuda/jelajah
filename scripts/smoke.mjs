@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { ElectrumNetworkProvider, SignatureTemplate, TransactionBuilder } from 'cashscript';
 import { secp256k1, hash160, encodeLockingBytecodeP2pkh, lockingBytecodeToCashAddress, decodePrivateKeyWif, generatePrivateKey } from '@bitauth/libauth';
-import { rallyContracts, buildStamp, buildClaim, isRallyNft } from '../src/lib/tx.js';
+import { rallyContracts, buildStamp, buildClaim, isRallyNft, mergeLevies } from '../src/lib/tx.js';
 
 const { values: { network } } = parseArgs({ options: { network: { type: 'string', default: 'chipnet' } } });
 const rally = JSON.parse(readFileSync(new URL(`../src/rally.${network}.json`, import.meta.url)));
@@ -25,7 +25,7 @@ const buyer = wallet(generatePrivateKey());
 // fund the buyer
 const fund = (await organizer.coins()).filter((c) => !c.utxo.token).sort((a, b) => Number(b.utxo.satoshis - a.utxo.satoshis))[0];
 // each stamp: price + stamp dust + change dust + fee; plus the claim fee. Leftovers are swept back below.
-const need = rally.merchants.slice(0, rally.needed).reduce((s, m) => s + BigInt(m.price) + 3500n, 0n) + 5000n;
+const need = rally.merchants.slice(0, rally.needed).reduce((s, m) => s + BigInt(m.price) + BigInt(rally.levy ?? 0) + 3500n, 0n) + 5000n + BigInt(rally.levy ?? 0);
 const funded = await new TransactionBuilder({ provider })
   .addInput(fund.utxo, fund.unlocker)
   .addOutput({ to: buyer.lock, amount: need })
@@ -40,9 +40,11 @@ for (const m of rally.merchants.slice(0, rally.needed)) {
   console.log(`stamp ${m.emoji} ${m.name.padEnd(12)}`, explorer + txid);
 }
 
+const merged = await mergeLevies({ rally, provider, vault }); // levy rallies: fold levies into the pool, unsigned
+if (merged) console.log('merge levies      ', explorer + merged.txid);
 const all = await buyer.coins();
 const { builder } = await buildClaim({
-  rally, provider, vault, buyerLock: buyer.lock,
+  rally, provider, vault, buyerLock: buyer.lock, vaultUtxo: merged ?? undefined,
   stamps: all.filter((c) => isRallyNft(rally, c.utxo)),
   coins: all.filter((c) => !c.utxo.token),
 });
@@ -52,7 +54,7 @@ const left = (await buyer.coins()).filter((c) => isRallyNft(rally, c.utxo)).map(
 console.log('buyer NFTs now    ', left, '(expect ["00"] = trophy)');
 
 // StampMinter2 rallies: the fresh trophy is a membership card -> one more stamp at the member price, trophy comes back
-if (rally.minter === 2) {
+if ((rally.minter ?? 1) >= 2) {
   const coins = await buyer.coins();
   const trophy = coins.find((c) => isRallyNft(rally, c.utxo) && c.utxo.token.nft.commitment.startsWith('00'));
   const m = rally.merchants[0];

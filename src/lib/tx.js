@@ -4,6 +4,8 @@ import { Contract, TransactionBuilder } from 'cashscript';
 import { hexToBin, binToHex, decodeTransaction, cashAddressToLockingBytecode } from '@bitauth/libauth';
 import StampMinter from '../contracts/StampMinter.json' with { type: 'json' };
 import StampMinter2 from '../contracts/StampMinter2.json' with { type: 'json' };
+import StampMinter3 from '../contracts/StampMinter3.json' with { type: 'json' };
+import RewardVault2 from '../contracts/RewardVault2.json' with { type: 'json' };
 import RewardVault from '../contracts/RewardVault.json' with { type: 'json' };
 
 export const DUST = 1000n;
@@ -13,13 +15,17 @@ const CLAIM_FEE = 2500n;
 const hex2 = (n) => n.toString(16).padStart(2, '0');
 
 export function rallyContracts(rally, provider) {
-  // rally.minter: 2 = StampMinter2 (member price); older rallies use the original StampMinter
+  // rally.minter: 3 = StampMinter3 + RewardVault2 (levy), 2 = StampMinter2 (member price), else the original StampMinter
+  const vault = new Contract(rally.minter === 3 ? RewardVault2 : RewardVault,
+    [rally.vmCategory, BigInt(rally.needed), BigInt(rally.reward), rally.organizerPub, BigInt(rally.endTime)], { provider });
+  const vaultLock = binToHex(cashAddressToLockingBytecode(vault.address).bytecode);
   const minters = Object.fromEntries(rally.merchants.map((m) => [
-    m.id, rally.minter === 2
-      ? new Contract(StampMinter2, [m.lock, BigInt(m.price), BigInt(m.memberPrice), hex2(m.id)], { provider })
-      : new Contract(StampMinter, [m.lock, BigInt(m.price), hex2(m.id)], { provider }),
+    m.id, rally.minter === 3
+      ? new Contract(StampMinter3, [m.lock, BigInt(m.price), BigInt(m.memberPrice), hex2(m.id), vaultLock, BigInt(rally.levy)], { provider })
+      : rally.minter === 2
+        ? new Contract(StampMinter2, [m.lock, BigInt(m.price), BigInt(m.memberPrice), hex2(m.id)], { provider })
+        : new Contract(StampMinter, [m.lock, BigInt(m.price), hex2(m.id)], { provider }),
   ]));
-  const vault = new Contract(RewardVault, [rally.vmCategory, BigInt(rally.needed), BigInt(rally.reward), rally.organizerPub, BigInt(rally.endTime)], { provider });
   return { minters, vault };
 }
 
@@ -46,27 +52,29 @@ export async function buildStamp({ rally, provider, minters, merchantId, buyerLo
   const lanes = (await minter.getUtxos()).filter((u) => u.token?.category === rally.category && u.token.nft?.capability === 'minting');
   const minterUtxo = lanes[Math.floor(Math.random() * lanes.length)];
   if (!minterUtxo) throw new Error('This stall is not open (minter not found)');
-  const member = !!trophy && rally.minter === 2;
+  const member = !!trophy && rally.minter >= 2;
   const price = BigInt(member ? merchant.memberPrice : merchant.price);
-  const { picked, sum } = pickCoins(coins, price + DUST + STAMP_FEE + DUST);
+  const levy = rally.minter === 3 ? BigInt(rally.levy) : 0n;
+  const { picked, sum } = pickCoins(coins, price + levy + DUST + STAMP_FEE + DUST);
   const tb = new TransactionBuilder({ provider }).addInput(minterUtxo, minter.unlock.stamp());
   if (member) tb.addInput(trophy.utxo, trophy.unlocker);
   picked.forEach((c) => tb.addInput(c.utxo, c.unlocker));
   tb.addOutput({ to: minter.tokenAddress, amount: minterUtxo.satoshis, token: minterUtxo.token })
     .addOutput({ to: hexToBin(merchant.lock), amount: price })
     .addOutput({ to: buyerLock, amount: DUST, token: stampToken(rally, merchantId, buyerLock) });
+  if (levy) tb.addOutput({ to: rallyVaultAddress(rally, provider), amount: levy });
   if (member) tb.addOutput({ to: buyerLock, amount: trophy.utxo.satoshis, token: trophy.utxo.token });
   return {
     inputs: member ? [trophy, ...picked] : picked,
-    builder: tb.addOutput({ to: buyerLock, amount: sum - price - DUST - STAMP_FEE }),
+    builder: tb.addOutput({ to: buyerLock, amount: sum - price - levy - DUST - STAMP_FEE }),
   };
 }
 
 /** Burn `needed` stamps from distinct stalls for the reward + a Trophy NFT.
  *  stamps, coins: [{ utxo, unlocker }] — coins top up the fee when the stamps' dust is not enough.
- *  @param {{ rally: any, provider: any, vault: any, buyerLock: Uint8Array, stamps: any[], coins?: any[] }} args */
-export async function buildClaim({ rally, provider, vault, buyerLock, stamps, coins = [] }) {
-  const [vaultUtxo] = await vault.getUtxos();
+ *  @param {{ rally: any, provider: any, vault: any, buyerLock: Uint8Array, stamps: any[], coins?: any[], vaultUtxo?: any }} args */
+export async function buildClaim({ rally, provider, vault, buyerLock, stamps, coins = [], vaultUtxo = undefined }) {
+  vaultUtxo ??= (await vault.getUtxos()).find((u) => u.token); // levy coins share the vault's address
   if (!vaultUtxo) throw new Error('This rally is over (vault not found)');
   const reward = BigInt(rally.reward);
   if (vaultUtxo.satoshis - reward < DUST) throw new Error('The reward pool is empty');
@@ -85,6 +93,26 @@ export async function buildClaim({ rally, provider, vault, buyerLock, stamps, co
       .addOutput({ to: buyerLock, amount: DUST, token: nft(rally, '00' + pkhOf(buyerLock)) }),
   };
 }
+
+const MERGE_FEE = 500n; // per input; RewardVault2.merge allows up to 600
+
+/** Levy rallies: fold the levy coins at the vault address into the vault coin. Needs no signature, anyone can send it.
+ *  Returns the new vault coin, or null when there is nothing worth merging. */
+export async function mergeLevies({ rally, provider, vault }) {
+  if (rally.minter !== 3) return null;
+  const all = await vault.getUtxos();
+  const vaultCoin = all.find((u) => u.token);
+  const levies = all.filter((u) => !u.token && u.satoshis > MERGE_FEE);
+  if (!vaultCoin || !levies.length) return null;
+  const ins = [vaultCoin, ...levies];
+  const amount = ins.reduce((s, u) => s + u.satoshis, 0n) - MERGE_FEE * BigInt(ins.length);
+  const tb = new TransactionBuilder({ provider });
+  ins.forEach((u) => tb.addInput(u, vault.unlock.merge()));
+  const { txid } = await tb.addOutput({ to: vault.tokenAddress, amount, token: vaultCoin.token }).send();
+  return { ...vaultCoin, txid, vout: 0, satoshis: amount };
+}
+
+const rallyVaultAddress = (rally, provider) => rallyContracts(rally, provider).vault.address;
 
 /** One stamp per stall, lowest stall ids first, ordered as the vault requires. */
 export function pickSet(rally, stamps) {

@@ -1,0 +1,52 @@
+{
+  "name": "Jelajah Jogja",
+  "description": "Stamp rally across Yogyakarta street-food stalls. Every stamp pays a levy into the pool, so each set funds its own reward.",
+  "needed": 3,
+  "reward": 4000,
+  "rewardsInPool": 1,
+  "durationDays": 60,
+  "merchants": [
+    {
+      "id": 1,
+      "name": "Kopi Joss",
+      "tagline": "Charcoal coffee by the station",
+      "emoji": "☕",
+      "color": "#7a4a2b",
+      "price": 4000,
+      "taglineId": "Kopi arang dekat stasiun",
+      "memberPrice": 3600
+    },
+    {
+      "id": 2,
+      "name": "Bakmi Jawa",
+      "tagline": "Wood-fire noodles",
+      "emoji": "🍜",
+      "color": "#c2410c",
+      "price": 4000,
+      "taglineId": "Mi godhog masak tungku",
+      "memberPrice": 3600
+    },
+    {
+      "id": 3,
+      "name": "Sate Klathak",
+      "tagline": "Goat satay on bicycle spokes",
+      "emoji": "🍢",
+      "color": "#b91c1c",
+      "price": 4000,
+      "taglineId": "Sate kambing tusuk jeruji sepeda",
+      "memberPrice": 3600
+    },
+    {
+      "id": 4,
+      "name": "Es Dawet",
+      "tagline": "Iced coconut and palm sugar",
+      "emoji": "🥥",
+      "color": "#15803d",
+      "price": 4000,
+      "taglineId": "Es kelapa dan gula aren",
+      "memberPrice": 3600
+    }
+  ],
+  "lanes": 2,
+  "levy": 2200
+}

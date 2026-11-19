@@ -6,7 +6,8 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { createHash } from 'node:crypto';
-import { Contract, ElectrumNetworkProvider, SignatureTemplate, TransactionBuilder } from 'cashscript';
+import { ElectrumNetworkProvider, SignatureTemplate, TransactionBuilder } from 'cashscript';
+import { rallyContracts } from '../src/lib/tx.js'; // one place that knows which contract version a rally uses
 import {
   secp256k1, hash160, binToHex, hexToBin, encodeLockingBytecodeP2pkh, lockingBytecodeToCashAddress,
   encodePrivateKeyWif, decodePrivateKeyWif, cashAddressToLockingBytecode, generatePrivateKey,
@@ -18,7 +19,7 @@ const write = (p, v) => writeFileSync(new URL(p, root), JSON.stringify(v, null, 
 
 const { positionals: [cmd], values: opt } = parseArgs({
   allowPositionals: true,
-  options: { network: { type: 'string', default: 'chipnet' }, registry: { type: 'string' }, rally: { type: 'string' }, 'merchant-address': { type: 'string' } },
+  options: { network: { type: 'string', default: 'chipnet' }, registry: { type: 'string' }, rally: { type: 'string' }, config: { type: 'string' }, 'merchant-address': { type: 'string' } },
 });
 const network = opt.network;
 if (!['chipnet', 'mainnet'].includes(network)) throw new Error('--network must be chipnet or mainnet');
@@ -43,16 +44,15 @@ if (cmd === 'address') {
   process.exit(0);
 }
 
-const StampMinter2 = read('src/contracts/StampMinter2.json'); // new rallies: member price for trophy holders
-const RewardVault = read('src/contracts/RewardVault.json');
-
 if (cmd === 'reclaim') {
   const rally = read(opt.rally ?? `src/rally.${network}.json`); // --rally scripts/rally.mainnet-v1.json for a retired rally
-  const vault = new Contract(RewardVault, vaultArgs(rally), { provider });
-  const [v] = await vault.getUtxos();
-  const { txid } = await new TransactionBuilder({ provider })
-    .addInput(v, vault.unlock.reclaim(signer))
-    .addOutput({ to: organizerLock, amount: v.satoshis - 2000n, token: v.token })
+  const { vault } = rallyContracts(rally, provider);
+  const coins = await vault.getUtxos(); // the vault coin, plus any unmerged levy coins on levy rallies
+  const v = coins.find((u) => u.token);
+  const tb = new TransactionBuilder({ provider });
+  coins.forEach((u) => tb.addInput(u, vault.unlock.reclaim(signer)));
+  const { txid } = await tb
+    .addOutput({ to: organizerLock, amount: coins.reduce((s, u) => s + u.satoshis, 0n) - 600n * BigInt(coins.length), token: v.token })
     .setLocktime(rally.endTime)
     .send();
   console.log('reclaimed', txid);
@@ -86,13 +86,17 @@ if (cmd === 'bcmr') {
 
 if (cmd !== 'deploy') throw new Error('usage: rally.mjs address|deploy|reclaim|bcmr --network chipnet|mainnet');
 
-const cfg = read('scripts/rally.config.json');
+const cfg = read(opt.config ?? 'scripts/rally.config.json');
 // a trophy holder pays memberPrice, so that is the cheapest way to a full set
 const cheapest = cfg.merchants.map((m) => m.memberPrice ?? m.price).sort((a, b) => a - b).slice(0, cfg.needed).reduce((a, b) => a + b, 0);
 if (!(cfg.reward < cheapest)) throw new Error(`anti-farming: reward ${cfg.reward} must be < cheapest set ${cheapest}`);
 if (cfg.merchants.some((m) => m.id < 1 || m.id > 127)) throw new Error('merchant ids must be 1..127');
 if (cfg.merchants.some((m) => (m.memberPrice ?? m.price) > m.price)) throw new Error('memberPrice must be <= price');
 const lanes = cfg.lanes ?? 1; // minter coins per stall, so simultaneous buyers rarely race for one coin
+// levy rallies (StampMinter3 + RewardVault2): each set must fund its own reward, or colluding stalls can drain the pool.
+// A merge costs up to 600 sats per coin, so count that against the levies of one set (plus the vault coin's merge).
+if (cfg.levy !== undefined && cfg.needed * (cfg.levy - 600) - 600 < cfg.reward)
+  throw new Error(`anti-collusion: ${cfg.needed} levies of ${cfg.levy} (minus merge fees) must cover the reward ${cfg.reward}`);
 
 let merchantLock = organizerLock;
 if (opt['merchant-address']) {
@@ -125,11 +129,13 @@ const vmCategory = binToHex(hexToBin(category).reverse());
 const endTime = Math.floor(Date.now() / 1000) + cfg.durationDays * 86400;
 const rally = {
   network, name: cfg.name, description: cfg.description, category, vmCategory,
-  needed: cfg.needed, reward: cfg.reward, endTime, organizerPub: binToHex(pub), minter: 2, lanes,
+  needed: cfg.needed, reward: cfg.reward, endTime, organizerPub: binToHex(pub), lanes,
+  ...(cfg.levy !== undefined ? { minter: 3, levy: cfg.levy } : { minter: 2 }),
   merchants: cfg.merchants.map((m) => ({ ...m, memberPrice: m.memberPrice ?? m.price, lock: binToHex(merchantLock) })),
 };
-const minters = rally.merchants.map((m) => new Contract(StampMinter2, minterArgs(m), { provider }));
-const vault = new Contract(RewardVault, vaultArgs(rally), { provider });
+const contracts = rallyContracts(rally, provider);
+const minters = Object.values(contracts.minters);
+const { vault } = contracts;
 
 // 3. optional BCMR registry so wallets show names: stamp type = first commitment byte
 let bcmr;
@@ -193,6 +199,3 @@ function registry(rally, registryUrl, minor = 0) {
   }, null, 2) + '\n';
   return { body, hash: createHash('sha256').update(body).digest('hex'), uri: registryUrl.replace(/^https:\/\//, '') };
 }
-
-function minterArgs(m) { return [m.lock, BigInt(m.price), BigInt(m.memberPrice), m.id.toString(16).padStart(2, '0')]; }
-function vaultArgs(r) { return [r.vmCategory, BigInt(r.needed), BigInt(r.reward), r.organizerPub, BigInt(r.endTime)]; }

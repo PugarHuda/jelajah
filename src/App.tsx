@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
 import qrcode from 'qrcode-generator';
 import { rally, provider, minters, vault, type Merchant } from './chain';
-import { buildStamp, buildClaim, isRallyNft, rallyStats } from './lib/tx.js';
+import { buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies } from './lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, type Coin } from './wallet';
 import { Stamp, Trophy } from './Stamp';
 import { SLIDES_URL, REPO_URL, VOTE_ADDRESS } from './links';
@@ -25,6 +25,8 @@ function switchLang() {
   location.href = u.href;
   if (u.hash) setTimeout(() => location.reload());
 }
+// what the buyer pays for one stamp: the stall's (member) price plus the levy that goes to the pool
+const cost = (m: Merchant, member: boolean) => (member ? m.memberPrice! : m.price) + (rally.levy ?? 0);
 const stallOf = (c: Coin) => parseInt(c.utxo.token!.nft!.commitment.slice(0, 2), 16);
 
 export default function App() {
@@ -55,7 +57,8 @@ function Rally() {
   }, [wc.state, connected]);
 
   const refresh = useCallback(async () => {
-    vault.getUtxos().then((u) => setPool(u[0]?.satoshis ?? 0n)).catch(() => {});
+    // levy rallies keep unmerged levy coins next to the vault coin; count them, they merge before a claim
+    vault.getUtxos().then((u) => setPool(u.reduce((s, x) => s + x.satoshis, 0n))).catch(() => {});
     if (connected) setCoins(await walletCoins(wc.manager!));
   }, [connected, wc.manager]);
 
@@ -69,7 +72,7 @@ function Rally() {
   const mine = (c: Coin) => lock && c.utxo.token!.nft!.commitment.slice(2) === hex(lock.slice(3, 23));
   const stamps = nfts.filter((c) => stallOf(c) > 0 && mine(c));
   const trophies = nfts.filter((c) => stallOf(c) === 0);
-  const member = rally.minter === 2 && trophies.some(mine); // own trophy -> member price at every stall
+  const member = (rally.minter ?? 1) >= 2 && trophies.some(mine); // own trophy -> member price at every stall
   const collected = new Set(stamps.map(stallOf));
   const bch = coins.filter((c) => !c.utxo.token).reduce((s, c) => s + c.utxo.satoshis, 0n);
   const ready = collected.size >= rally.needed;
@@ -88,8 +91,8 @@ function Rally() {
 
   const buy = (m: Merchant) => run(`${m.emoji} ${tr('Stamped at', 'Dapat stamp di')} ${m.name}`, async () => {
     const fresh = await walletCoins(wc.manager!); // never build on a stale or not-yet-loaded coin list
-    const myTrophy = rally.minter === 2 ? fresh.find((c) => isRallyNft(rally, c.utxo) && stallOf(c) === 0 && mine(c)) : undefined;
-    const price = sats(myTrophy ? m.memberPrice! : m.price);
+    const myTrophy = (rally.minter ?? 1) >= 2 ? fresh.find((c) => isRallyNft(rally, c.utxo) && stallOf(c) === 0 && mine(c)) : undefined;
+    const price = sats(cost(m, !!myTrophy));
     const { builder, inputs } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: lock!, coins: fresh, trophy: myTrophy });
     return signAndSend(wc.manager!, builder, inputs, myTrophy
       ? tr(`Show your trophy, pay ${m.name} the member price ${price} and get its stamp`, `Tunjukkan trofimu, bayar ${m.name} harga member ${price} dan dapat stamp-nya`)
@@ -99,8 +102,9 @@ function Rally() {
   const claim = () => run(tr('🏆 Set claimed: reward + trophy', '🏆 Set diklaim: hadiah + trofi'), async () => {
     const fresh = await walletCoins(wc.manager!);
     const hexPkh = hex(lock!.slice(3, 23));
+    const vaultUtxo = (await mergeLevies({ rally, provider, vault })) ?? undefined; // unsigned, so no wallet prompt
     const { builder, inputs } = await buildClaim({
-      rally, provider, vault, buyerLock: lock!,
+      rally, provider, vault, buyerLock: lock!, vaultUtxo,
       stamps: fresh.filter((c) => isRallyNft(rally, c.utxo) && stallOf(c) > 0 && c.utxo.token!.nft!.commitment.slice(2) === hexPkh),
       coins: fresh.filter((c) => !c.utxo.token),
     });
@@ -171,7 +175,7 @@ function Rally() {
                   <button className={have ? 'ghost' : 'primary'} disabled={!connected || !!busy}
                     onClick={() => buy(m)} title={connected ? undefined : tr('Connect your wallet first', 'Hubungkan wallet dulu')}>
                     {busy?.endsWith(` ${m.name}`) ? tr('Approve in wallet…', 'Setujui di wallet…')
-                      : `${have ? tr('Again', 'Lagi') : tr('Buy', 'Beli')} · ${sats(member ? m.memberPrice! : m.price)}${member ? ' ★' : ''}`}
+                      : `${have ? tr('Again', 'Lagi') : tr('Buy', 'Beli')} · ${sats(cost(m, member))}${member ? ' ★' : ''}`}
                   </button>
                 </article>
               );
@@ -192,12 +196,16 @@ function Rally() {
             </button>
           </div>
           {!connected && <p className="hint">{tr("Connect a wallet (Selene, Paytaca, Cashonize) to start. Each stamp costs the stall's price plus a tiny network fee.", 'Hubungkan wallet (Selene, Paytaca, Cashonize) untuk mulai. Tiap stamp seharga warungnya ditambah biaya jaringan yang sangat kecil.')}</p>}
-          {rally.minter === 2 && (
+          {(rally.minter ?? 1) >= 2 && (
             <p className="hint">{member
               ? tr('★ You hold a trophy: every stall gives you its member price. Your trophy is shown to the stall\'s covenant and comes straight back.',
                 '★ Kamu punya trofi: semua warung memberimu harga member. Trofimu ditunjukkan ke covenant warung lalu langsung kembali.')
               : tr('★ Finish a set and your trophy becomes a membership card: a lower price at every stall, enforced on chain.',
                 '★ Selesaikan satu set dan trofimu jadi kartu member: harga lebih murah di semua warung, dijamin di chain.')}</p>
+          )}
+          {rally.minter === 3 && (
+            <p className="hint">{tr(`Each stamp includes a ${sats(rally.levy!)} levy that goes straight into the reward pool, so every set funds its own reward and colluding stalls can't drain it.`,
+              `Tiap stamp sudah termasuk levy ${sats(rally.levy!)} yang langsung masuk pool hadiah, jadi setiap set membiayai hadiahnya sendiri dan warung yang berkolusi tidak bisa mengurasnya.`)}</p>
           )}
           {error && <p className="error" role="alert">{error}</p>}
         </section>
