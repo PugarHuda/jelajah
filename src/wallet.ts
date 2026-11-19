@@ -3,14 +3,14 @@
 import type { DappConnectionManager } from '@wizardconnect/dapp';
 import { hash160, encodeLockingBytecodeP2pkh, lockingBytecodeToCashAddress, hexToBin, binToHex, encodeTransaction } from '@bitauth/libauth';
 import { sourceOutputToRelay } from '@wizardconnect/core/hdwalletv1-serialize';
-import { placeholderP2PKHUnlocker, type TransactionBuilder, type Utxo, type Unlocker } from 'cashscript';
+import { placeholderP2PKHUnlocker, type TransactionBuilder, type SpendableUtxo, type Unlocker } from 'cashscript';
 import { provider, rally } from './chain';
 
 const SCAN = 10; // addresses per branch; stamps always go to receive/0
 const prefix = rally.network === 'mainnet' ? 'bitcoincash' : 'bchtest';
 const BRANCHES = [['receive', 0], ['change', 1]] as const;
 
-export interface Coin { utxo: Utxo; unlocker: Unlocker; path: [string, number] }
+export interface Coin { utxo: SpendableUtxo; unlocker: Unlocker; path: [string, number] }
 
 /** Stamps always go to receive/0. Null until the wallet has shared its xpubs (wallet_ready can lag "connected"). */
 export function buyerLock(manager: DappConnectionManager | null): Uint8Array | null {
@@ -35,8 +35,15 @@ export async function walletCoins(manager: DappConnectionManager): Promise<Coin[
   return (await Promise.all(jobs)).flat();
 }
 
-/** Ask the wallet to sign its inputs (input 0 is always the rally contract), then broadcast ourselves. */
-export async function signAndSend(manager: DappConnectionManager, builder: TransactionBuilder, inputs: Coin[], userPrompt: string) {
+/** A coin at the wallet's receive/0 address that we just created ourselves (not yet seen by the indexer). */
+export function receiveZeroCoin(manager: DappConnectionManager, utxo: { txid: string; vout: number; satoshis: bigint }): Coin {
+  const lock = buyerLock(manager)!;
+  return { utxo: { ...utxo, lockingBytecode: binToHex(lock) }, unlocker: placeholderP2PKHUnlocker(addressOf(lock)), path: ['receive', 0] };
+}
+
+/** Ask the wallet to sign its inputs, then broadcast ourselves. The wallet's inputs start at `firstInput`:
+ *  1 when input 0 is a rally contract (stamp, claim), 0 when every input is the wallet's (opening a rally). */
+export async function signAndSend(manager: DappConnectionManager, builder: TransactionBuilder, inputs: Coin[], userPrompt: string, firstInput = 1) {
   const wc = builder.generateWcTransactionObject({ broadcast: false, userPrompt });
   // the relay carries JSON: tx as hex, source outputs with hex bytes and "<bigint: Xn>" values
   const transaction = {
@@ -45,7 +52,7 @@ export async function signAndSend(manager: DappConnectionManager, builder: Trans
     broadcast: false,
     userPrompt,
   };
-  const inputPaths = inputs.map((c, i) => [i + 1, c.path[0], c.path[1]] as [number, string, number]);
+  const inputPaths = inputs.map((c, i) => [i + firstInput, c.path[0], c.path[1]] as [number, string, number]);
   const res = await manager.signTransaction({ transaction: transaction as never, inputPaths });
   if (res.error) throw new Error(res.error);
   return provider.sendRawTransaction(res.signedTransaction);

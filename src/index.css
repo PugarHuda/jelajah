@@ -130,3 +130,11 @@ footer { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size:
 .stats td:not(:first-child), .stats th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
 .stats tfoot td { font-weight: 700; border-bottom: 0; }
 @media (max-width: 520px) { .stats th, .stats td { padding: .55rem .5rem; font-size: .88rem; } }
+
+.organize { padding-top: 2.5rem; max-width: 860px; }
+.organize .form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .8rem 1rem; margin: 1rem 0; }
+.organize .stall-row { padding: 1rem; border: 1.5px dashed var(--line); border-radius: 16px; background: var(--card); }
+.organize label { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; color: var(--muted); }
+.organize label.wide { grid-column: 1 / -1; }
+.organize input { font: inherit; font-size: 1rem; padding: .55rem .7rem; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); min-width: 0; }
+.organize .row { display: flex; gap: .6rem; flex-wrap: wrap; }

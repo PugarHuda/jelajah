@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
 import qrcode from 'qrcode-generator';
-import { rally, provider, minters, vault, type Merchant } from './chain';
-import { buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies } from './lib/tx.js';
-import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, type Coin } from './wallet';
+import { hexToBin, binToHex, cashAddressToLockingBytecode } from '@bitauth/libauth';
+import { TransactionBuilder } from 'cashscript';
+import { rally, provider, minters, vault, rallyLink, fromLink, type Merchant, type Rally } from './chain';
+import { buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis } from './lib/tx.js';
+import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, receiveZeroCoin, type Coin } from './wallet';
 import { Stamp, Trophy } from './Stamp';
 import { SLIDES_URL, REPO_URL, VOTE_ADDRESS } from './links';
 
 const sats = (n: number | bigint) => `${Number(n).toLocaleString('en-US')} sats`;
+
+// Rupiah hint next to sat prices. One public price lookup, nothing about the user is sent; no rate -> no hint.
+let idrPerBch: number | null = null;
+const idrRate = fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash&vs_currencies=idr')
+  .then((r) => r.json()).then((j) => { idrPerBch = j['bitcoin-cash']?.idr ?? null; }).catch(() => {});
+const rupiah = (n: number | bigint) => idrPerBch === null ? ''
+  : ` ≈ Rp${Math.round(Number(n) / 1e8 * idrPerBch).toLocaleString('id-ID')}`;
 
 // UI language: ?lang=id|en, then the saved choice, then the browser. ponytail: inline pairs, no i18n lib for two languages.
 const ID = (() => {
@@ -33,6 +42,7 @@ export default function App() {
   const stallFromHash = window.location.hash.match(/^#\/stall\/(\d+)/)?.[1];
   if (stallFromHash) return <StallPoster m={rally.merchants.find((x) => x.id === Number(stallFromHash))} />;
   if (window.location.hash === '#/stats') return <Stats />;
+  if (window.location.hash === '#/organize') return <Organize />;
   if (window.location.hash === '#/art') return ( // press image: every stamp + the trophy
     <main className="art">{rally.merchants.map((m) => <Stamp key={m.id} m={m} inked size={220} />)}<Trophy name={rally.name} size={220} /></main>
   );
@@ -46,6 +56,8 @@ function Rally() {
   const [error, setError] = useState<string | null>(null);
   const [log, setLog] = useState<{ label: string; txid: string }[]>([]);
   const [pool, setPool] = useState<bigint | null>(null);
+  const [idr, setIdr] = useState(idrPerBch !== null);
+  useEffect(() => { idrRate.then(() => setIdr(idrPerBch !== null)); }, []); // re-render once the rate lands
   if (import.meta.env.DEV) (window as unknown as { __wc: unknown }).__wc = wc; // debugging aid in dev only
   const lock = wc.state === 'connected' ? buyerLock(wc.manager) : null;
   const connected = !!lock; // connected AND the wallet shared its keys
@@ -137,7 +149,7 @@ function Rally() {
 
       <main>
         <section className="hero">
-          <p className="eyebrow">{rally.name} · {tr('a stamp rally on Bitcoin Cash', 'stamp rally di Bitcoin Cash')}</p>
+          <p className="eyebrow">{rally.name} · {tr('a stamp rally on Bitcoin Cash', 'stamp rally di Bitcoin Cash')}{fromLink && tr(' · opened from a share link', ' · dibuka dari link')}</p>
           {ID
             ? <h1>Jajan di {rally.needed} warung.<br />Kumpulkan {rally.needed} stamp.<br /><em>Uangmu kembali.</em></h1>
             : <h1>Eat at {rally.needed} stalls.<br />Collect {rally.needed} stamps.<br /><em>Get paid back.</em></h1>}
@@ -173,6 +185,7 @@ function Rally() {
                   <Stamp m={m} inked={have} />
                   <h3>{m.name}</h3>
                   <p className="muted small">{ID ? m.taglineId ?? m.tagline : m.tagline}</p>
+                  {idr && <p className="muted small idr">{sats(cost(m, member))}{rupiah(cost(m, member))}</p>}
                   <button className={have ? 'ghost' : 'primary'} disabled={!connected || !!busy}
                     onClick={() => buy(m)} title={connected ? undefined : tr('Connect your wallet first', 'Hubungkan wallet dulu')}>
                     {busy?.endsWith(` ${m.name}`) ? tr('Approve in wallet…', 'Setujui di wallet…')
@@ -187,8 +200,8 @@ function Rally() {
             <div>
               <h3>{ready ? tr('Your set is complete', 'Set kamu sudah lengkap') : tr('Complete the set', 'Lengkapi set')}</h3>
               <p className="muted small">
-                {tr(`Burns one stamp from each of ${rally.needed} stalls → ${sats(rally.reward)} + a ${rally.name} Trophy NFT.`,
-                  `Membakar satu stamp dari tiap ${rally.needed} warung → ${sats(rally.reward)} + NFT Trofi ${rally.name}.`)}
+                {tr(`Burns one stamp from each of ${rally.needed} stalls → ${sats(rally.reward)}${rupiah(rally.reward)} + a ${rally.name} Trophy NFT.`,
+                  `Membakar satu stamp dari tiap ${rally.needed} warung → ${sats(rally.reward)}${rupiah(rally.reward)} + NFT Trofi ${rally.name}.`)}
                 {rewardsLeft !== null && tr(` ${Math.max(rewardsLeft, 0)} rewards left in the pool.`, ` Sisa ${Math.max(rewardsLeft, 0)} hadiah di pool.`)}
               </p>
             </div>
@@ -249,6 +262,7 @@ function Rally() {
             <dt>{tr('Reward vault', 'Vault hadiah')}</dt><dd><code>{vault.tokenAddress}</code></dd>
             <dt>Genesis</dt><dd><a href={explorerTx(rally.genesisTx)} target="_blank" rel="noreferrer">{rally.genesisTx.slice(0, 16)}…</a></dd>
             <dt>{tr('Stall dashboard', 'Dasbor warung')}</dt><dd><a href="#/stats" onClick={() => setTimeout(() => location.reload())}>{tr('Sales per stall, from the chain', 'Penjualan tiap warung, langsung dari chain')}</a></dd>
+            <dt>{tr('Organizers', 'Penyelenggara')}</dt><dd><a href="#/organize" onClick={() => setTimeout(() => location.reload())}>{tr('Open your own rally →', 'Buka rally-mu sendiri →')}</a></dd>
             <dt>{tr('Stall posters', 'Poster warung')}</dt><dd>{rally.merchants.map((m) => <a key={m.id} href={`#/stall/${m.id}`}>{m.emoji} {m.name}</a>)}</dd>
           </dl>
         </section>
@@ -289,7 +303,139 @@ function StallPoster({ m }: { m?: Merchant }) {
   );
 }
 
-type StatsData = { stalls: { id: number; stamps: number; buyers: number; revenue: bigint }[]; claims: number };
+// ---- #/organize: open your own rally from the browser. The genesis is the same code the CLI uses (src/lib/tx.js),
+// signed by the organizer's wallet over WizardConnect; the finished rally travels in its share link.
+const PALETTE = ['#7a4a2b', '#c2410c', '#b91c1c', '#15803d', '#1d4ed8', '#7e22ce'];
+type StallRow = { name: string; emoji: string; price: string; memberPrice: string; address: string };
+
+function Organize() {
+  const wc = useWizardConnect({ dappName: 'Jelajah', dappIcon: new URL('favicon.svg', location.origin + import.meta.env.BASE_URL).href });
+  const lock = wc.state === 'connected' ? buyerLock(wc.manager) : null;
+  const [, tick] = useState(0);
+  useEffect(() => { // xpubs can land after "connected"
+    if (wc.state !== 'connected' || lock) return;
+    const t = setInterval(() => tick((n) => n + 1), 500);
+    return () => clearInterval(t);
+  }, [wc.state, lock]);
+  const [f, setF] = useState({ name: '', needed: '3', reward: '4000', rewardsInPool: '2', durationDays: '30', levy: '' });
+  const [stalls, setStalls] = useState<StallRow[]>([
+    { name: '', emoji: '🍜', price: '5000', memberPrice: '4500', address: '' },
+    { name: '', emoji: '☕', price: '5000', memberPrice: '4500', address: '' },
+    { name: '', emoji: '🍢', price: '5000', memberPrice: '4500', address: '' },
+  ]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [link, setLink] = useState<string | null>(null);
+
+  const payout = (address: string) => {
+    if (!address.trim()) return lock ? binToHex(lock) : '76a914' + '00'.repeat(20) + '88ac'; // default: the organizer
+    const r = cashAddressToLockingBytecode(address.trim());
+    if (typeof r === 'string') throw new Error(tr(`Not a valid address: ${address}`, `Alamat tidak valid: ${address}`));
+    return binToHex(r.bytecode);
+  };
+  const cfg = () => ({
+    name: f.name.trim() || 'My rally', description: '', needed: Number(f.needed), reward: Number(f.reward),
+    rewardsInPool: Number(f.rewardsInPool), durationDays: Number(f.durationDays), lanes: 2,
+    ...(f.levy.trim() ? { levy: Number(f.levy) } : {}),
+    merchants: stalls.map((s, i) => ({
+      id: i + 1, name: s.name.trim() || `Stall ${i + 1}`, emoji: s.emoji || '⭐', tagline: '', color: PALETTE[i % PALETTE.length],
+      price: Number(s.price), memberPrice: Number(s.memberPrice || s.price), lock: payout(s.address),
+    })),
+  });
+  let problem: string | null = null;
+  let need = 0n;
+  try { const c = cfg(); checkRallyConfig(c); need = genesisNeed(c); } catch (e) { problem = e instanceof Error ? e.message : String(e); }
+
+  async function open() {
+    setErr(null);
+    try {
+      const m = wc.manager!;
+      const c = cfg();
+      const coins = (await walletCoins(m)).filter((x) => !x.utxo.token);
+      let base = coins.find((x) => x.utxo.vout === 0 && x.utxo.satoshis >= need);
+      if (!base) { // the category id is the txid of a vout-0 coin: make one with a single send-to-self
+        const total = coins.reduce((s, x) => s + x.utxo.satoshis, 0n);
+        const fee = 200n + 160n * BigInt(coins.length);
+        if (total - fee < need) throw new Error(tr(`Your wallet needs at least ${sats(need)} (has ${sats(total)})`, `Wallet-mu perlu minimal ${sats(need)} (ada ${sats(total)})`));
+        setBusy(tr('Approve the preparation in your wallet…', 'Setujui transaksi persiapan di wallet…'));
+        const tb = new TransactionBuilder({ provider });
+        coins.forEach((x) => tb.addInput(x.utxo, x.unlocker));
+        tb.addOutput({ to: lock!, amount: total - fee });
+        const txid = await signAndSend(m, tb, coins, tr('Prepare one coin to open your Jelajah rally', 'Siapkan satu koin untuk membuka rally Jelajah'), 0);
+        base = receiveZeroCoin(m, { txid, vout: 0, satoshis: total - fee });
+      }
+      const r = planRally({ network: rally.network, cfg: c, organizerPub: binToHex(m.getPubkey(0, 0n)!), baseTxid: base.utxo.txid });
+      const { builder } = buildGenesis({ provider, rally: r, rewardsInPool: c.rewardsInPool, base, organizerLock: lock! });
+      const prize = sats(BigInt(r.reward) * BigInt(c.rewardsInPool));
+      setBusy(tr('Approve the rally in your wallet…', 'Setujui pembukaan rally di wallet…'));
+      const txid = await signAndSend(m, builder, [base], tr(`Open the rally "${r.name}" and lock ${prize} of prizes`, `Buka rally "${r.name}" dan kunci hadiah ${prize}`), 0);
+      setLink(rallyLink({ ...r, genesisTx: txid } as Rally));
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); }
+  }
+
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  const setStall = (i: number, k: keyof StallRow) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setStalls(stalls.map((s, j) => (j === i ? { ...s, [k]: e.target.value } : s)));
+  return (
+    <main className="organize">
+      <p className="eyebrow">{rally.network === 'mainnet' ? 'BCH mainnet' : 'chipnet (test)'} · {tr('for organizers', 'untuk penyelenggara')}</p>
+      <h1>{tr('Open your own rally', 'Buka rally-mu sendiri')}</h1>
+      <p className="lede">{tr('Name the stalls, set prices and the prize. Your wallet signs one transaction that locks the prize pool in a covenant and gives every stall its stamp minter. Share the link it gives you.',
+        'Isi warung, harga, dan hadiah. Wallet-mu menandatangani satu transaksi yang mengunci pool hadiah di covenant dan memberi tiap warung minter stamp-nya. Bagikan link yang muncul.')}</p>
+      {link ? (
+        <div className="claim ready">
+          <div>
+            <h3>{tr('Your rally is live', 'Rally-mu sudah live')} 🎉</h3>
+            <p className="small" style={{ wordBreak: 'break-all' }}><a href={link}>{link}</a></p>
+            <p className="muted small">{tr('The rally lives in this link: save it. Stall posters: open the link and add #/stall/1, #/stall/2, …', 'Rally ada di dalam link ini, simpan baik-baik. Poster warung: buka link lalu tambahkan #/stall/1, #/stall/2, …')}</p>
+          </div>
+        </div>
+      ) : (<>
+        <div className="form">
+          <label>{tr('Rally name', 'Nama rally')}<input value={f.name} onChange={set('name')} placeholder="Jelajah Malioboro" maxLength={40} /></label>
+          <label>{tr('Stamps for a set', 'Stamp untuk satu set')}<input type="number" min={1} value={f.needed} onChange={set('needed')} /></label>
+          <label>{tr('Reward per set (sats)', 'Hadiah per set (sats)')}<input type="number" min={1} value={f.reward} onChange={set('reward')} /></label>
+          <label>{tr('Rewards to fund now', 'Jumlah hadiah didanai')}<input type="number" min={1} value={f.rewardsInPool} onChange={set('rewardsInPool')} /></label>
+          <label>{tr('Days open', 'Lama (hari)')}<input type="number" min={1} value={f.durationDays} onChange={set('durationDays')} /></label>
+          <label>{tr('Levy per stamp (sats, optional)', 'Levy per stamp (sats, opsional)')}<input type="number" min={0} value={f.levy} onChange={set('levy')} placeholder={tr('none', 'tanpa')} /></label>
+        </div>
+        <h2>{tr('Stalls', 'Warung')}</h2>
+        {stalls.map((s, i) => (
+          <div className="form stall-row" key={i}>
+            <label>{tr('Name', 'Nama')}<input value={s.name} onChange={setStall(i, 'name')} placeholder={`Stall ${i + 1}`} maxLength={40} /></label>
+            <label>Emoji<input value={s.emoji} onChange={setStall(i, 'emoji')} maxLength={4} /></label>
+            <label>{tr('Price', 'Harga')}<input type="number" min={546} value={s.price} onChange={setStall(i, 'price')} /></label>
+            <label>{tr('Member price', 'Harga member')}<input type="number" min={546} value={s.memberPrice} onChange={setStall(i, 'memberPrice')} /></label>
+            <label className="wide">{tr("Stall's BCH address (empty = yours)", 'Alamat BCH warung (kosong = milikmu)')}<input value={s.address} onChange={setStall(i, 'address')} placeholder="bitcoincash:q…" /></label>
+          </div>
+        ))}
+        <p className="row">
+          <button className="ghost" onClick={() => setStalls([...stalls, { name: '', emoji: '⭐', price: '5000', memberPrice: '4500', address: '' }])} disabled={stalls.length >= 12}>+ {tr('Add a stall', 'Tambah warung')}</button>
+          {stalls.length > 1 && <button className="ghost" onClick={() => setStalls(stalls.slice(0, -1))}>− {tr('Remove the last', 'Hapus yang terakhir')}</button>}
+        </p>
+        {problem ? <p className="error" role="alert">{problem}</p>
+          : <p className="hint">{tr(`Your wallet will lock about ${sats(need)} (prize pool, one coin per stall lane, fees).`, `Wallet-mu akan mengunci sekitar ${sats(need)} (pool hadiah, satu koin per jalur warung, fee).`)}</p>}
+        {lock
+          ? <button className="primary big" disabled={!!problem || !!busy} onClick={open}>{busy ?? tr('Open the rally', 'Buka rally')}</button>
+          : <button className="primary big" onClick={wc.connect} disabled={wc.state === 'connecting' || wc.state === 'connected'}>{wc.state === 'connected' ? tr('Loading wallet…', 'Memuat wallet…') : tr('Connect wallet', 'Hubungkan wallet')}</button>}
+        {err && <p className="error" role="alert">{err}</p>}
+        <p className="muted small">{tr('Anti-farming (reward below the cheapest set at member price) and, with a levy, anti-collusion are checked before your wallet is asked. Reclaiming the leftover pool after the rally ends is done with the CLI for now.',
+          'Anti-farming (hadiah di bawah set termurah dengan harga member) dan, bila ada levy, anti-kolusi dicek sebelum wallet diminta tanda tangan. Mengambil sisa pool setelah rally berakhir saat ini lewat CLI.')}</p>
+      </>)}
+      {wc.uri && wc.qrUri && (
+        <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri}
+          title={tr('Connect with WizardConnect', 'Hubungkan lewat WizardConnect')} subtitle={tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca')} />
+      )}
+      <p><a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
+    </main>
+  );
+}
+
+type StatsData = {
+  stalls: { id: number; stamps: number; buyers: number; revenue: bigint }[]; claims: number;
+  collectors: { pkh: string; stalls: number; stamps: number; trophies: number }[];
+};
+const shortAddr = (pkh: string) => { const a = addressOf(hexToBin(`76a914${pkh}88ac`)); return `${a.slice(0, a.indexOf(':') + 7)}…${a.slice(-5)}`; };
 
 // Every number here is recomputed from minter and vault history: no server, no database.
 function Stats() {
@@ -318,6 +464,13 @@ function Stats() {
         </table>
       )}
       {s && <p>{tr('Sets completed', 'Set selesai')}: <b>{s.claims}</b> · {tr('rewards paid', 'hadiah dibayar')}: <b>{sats(BigInt(s.claims) * BigInt(rally.reward))}</b></p>}
+      {s && s.collectors.length > 0 && (<>
+        <h2>{tr('Top collectors', 'Kolektor teratas')}</h2>
+        <table>
+          <thead><tr><th>{tr('Collector', 'Kolektor')}</th><th>{tr('Stalls visited', 'Warung dikunjungi')}</th><th>Stamp{ID ? '' : 's'}</th><th>{tr('Trophies', 'Trofi')}</th></tr></thead>
+          <tbody>{s.collectors.map((c) => <tr key={c.pkh}><td><code>{shortAddr(c.pkh)}</code></td><td>{c.stalls}/{rally.merchants.length}</td><td>{c.stamps}</td><td>{'🏆'.repeat(Math.min(c.trophies, 5))}{c.trophies > 5 ? ` ×${c.trophies}` : ''}</td></tr>)}</tbody>
+        </table>
+      </>)}
       <a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a>
     </main>
   );

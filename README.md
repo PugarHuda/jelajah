@@ -59,7 +59,9 @@ node scripts/smoke.mjs --network chipnet                         # real-network 
 node scripts/rally.mjs deploy  --network chipnet --config scripts/rally.levy.config.json   # levy rally (anti-collusion)
 node scripts/rally.mjs bcmr    --network chipnet --registry https://<host>/bcmr.json   # new BCMR revision (icons) via the authchain, no redeploy
 ```
-**Stall dashboard:** open `#/stats` in the app. Stamps sold, unique buyers, sats paid to each stall and sets claimed, all recomputed in the browser from each covenant's history. A transaction only counts if it really spent the covenant (the rally's minting NFT goes back to it at out[0]), so nobody can inflate the numbers by sending junk to a minter address.
+**Open your own rally:** `#/organize`. Fill in stalls, prices, the prize and an optional levy. The same rule checks and genesis builder as the CLI (`checkRallyConfig`, `planRally`, `buildGenesis` in `src/lib/tx.js`) run in the browser, and the organizer's wallet signs over WizardConnect. If no vout-0 coin exists, it first signs one send-to-self. The finished rally travels in its share link (`?rally=<base64url JSON>`), so there is still no server. The link is treated as untrusted input: it is shape-checked, and stall colours and text are sanitised.
+
+**Stall dashboard:** open `#/stats` in the app. Stamps sold, unique buyers, sats paid to each stall and sets claimed, all recomputed in the browser from each covenant's history, plus a **top-collectors** board (stalls visited, stamps, trophies per address). Prices also show a rupiah estimate (a CoinGecko rate, nothing about the user is sent). A transaction only counts if it really spent the covenant (the rally's minting NFT goes back to it at out[0]), so nobody can inflate the numbers by sending junk to a minter address.
 `scripts/rally.config.json` sets the stalls, prices, reward and duration. `--merchant-address` pays real stall wallets.
 
 ## Mainnet rally v2 (19 Nov 2026, live demo)
@@ -77,9 +79,9 @@ The first mainnet rally, on the original `StampMinter`. It is no longer the demo
 
 ## Chipnet run, levy rally: StampMinter3 + RewardVault2 (19 Nov 2026, current `?net=chipnet`)
 Price 4,000 sats (member 3,600) + a 2,200 sats levy per stamp. Reward 4,000. The vault was seeded with just one reward.
-- Genesis: [`ed030de0…`](https://chipnet.imaginary.cash/tx/ed030de0416fbd805cd05f96c06636634c1be8d6103fb182c39acbeae1b9aa0a)
-- Stamps with levy [`d8dba19e…`](https://chipnet.imaginary.cash/tx/d8dba19ed2ea0aa5162d73c0e98e9c29b06215a1a77b4c0c7098f3de9b781b23) · [`8b3d7c5d…`](https://chipnet.imaginary.cash/tx/8b3d7c5dcd230db0ef38bce66735f5f9d124b4b58e5f2c0af6de13c9f5989f23) · [`ca907b67…`](https://chipnet.imaginary.cash/tx/ca907b67f083ac7252670176127644b6249e3ae71b1045f502cf8df4da6a3b82)
-- **Unsigned merge** of the levy coins into the vault: [`3c5c9ac8…`](https://chipnet.imaginary.cash/tx/3c5c9ac8a0692793d34a3b04958010e42500cea08cae6b814cbf1f9512144611) · claim + trophy [`6c4f285d…`](https://chipnet.imaginary.cash/tx/6c4f285de512d0dac0e60df99aa6a1c9a5b48ad2d18f3ad7b6792d9061e03ed3) · member stamp [`8e69688…`](https://chipnet.imaginary.cash/tx/8e69688244de9dc8f01dbc9bd9a387cc0f1dd34ce573c2d6aaa61cd88238628d)
+- Genesis: [`390bfc24…`](https://chipnet.imaginary.cash/tx/390bfc2485fe96e4f940c2a6393de93f0072ded9f92ed0898d7404be5fb59dd1)
+- Stamps with levy [`7aa91943…`](https://chipnet.imaginary.cash/tx/7aa91943ff39b05c6aa558ce68fc8eb764807c8e86623c2f2203babe113d2634) · [`9e3ede6a…`](https://chipnet.imaginary.cash/tx/9e3ede6a014a27f174fe60fa5e7a365a69cb87814f1f1e39c63ec102b4446623) · [`d815b64c…`](https://chipnet.imaginary.cash/tx/d815b64c416727b51429df9be4ddcc94f64b4c2f7a366880abe5efe79b23365c)
+- **Unsigned merge** of the levy coins into the vault: [`fc19c31f…`](https://chipnet.imaginary.cash/tx/fc19c31f3f47997f4a762f3db1a6e996067d195cb9ae9268fcf8e27642258532) · claim + trophy [`bd57a15b…`](https://chipnet.imaginary.cash/tx/bd57a15bced2a3663567852f3c7214715372a733997c470116c4d305d88260f3) · member stamp [`634bc7e0…`](https://chipnet.imaginary.cash/tx/634bc7e0acf7c641ce3ad25b005fa6afcab26aa7043dc46cc4c42ea4b1c3818f)
 
 ## Chipnet run, StampMinter2 + 2 lanes per stall (19 Nov 2026)
 - Genesis: [`c8f9be79…`](https://chipnet.imaginary.cash/tx/c8f9be79320fe95370fc4a88ad7d2b5f5bf2b0b1fbbcc195fdd5923a2fe05ccc) (8 minter coins + vault)

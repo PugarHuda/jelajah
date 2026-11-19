@@ -7,9 +7,9 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { createHash } from 'node:crypto';
 import { ElectrumNetworkProvider, SignatureTemplate, TransactionBuilder } from 'cashscript';
-import { rallyContracts, isMintingCoin } from '../src/lib/tx.js'; // one place that knows which contract version a rally uses
+import { rallyContracts, isMintingCoin, checkRallyConfig, genesisNeed, planRally, buildGenesis } from '../src/lib/tx.js'; // one place that knows which contract version a rally uses
 import {
-  secp256k1, hash160, binToHex, hexToBin, encodeLockingBytecodeP2pkh, lockingBytecodeToCashAddress,
+  secp256k1, hash160, binToHex, encodeLockingBytecodeP2pkh, lockingBytecodeToCashAddress,
   encodePrivateKeyWif, decodePrivateKeyWif, cashAddressToLockingBytecode, generatePrivateKey,
 } from '@bitauth/libauth';
 
@@ -87,16 +87,7 @@ if (cmd === 'bcmr') {
 if (cmd !== 'deploy') throw new Error('usage: rally.mjs address|deploy|reclaim|bcmr --network chipnet|mainnet');
 
 const cfg = read(opt.config ?? 'scripts/rally.config.json');
-// a trophy holder pays memberPrice, so that is the cheapest way to a full set
-const cheapest = cfg.merchants.map((m) => m.memberPrice ?? m.price).sort((a, b) => a - b).slice(0, cfg.needed).reduce((a, b) => a + b, 0);
-if (!(cfg.reward < cheapest)) throw new Error(`anti-farming: reward ${cfg.reward} must be < cheapest set ${cheapest}`);
-if (cfg.merchants.some((m) => m.id < 1 || m.id > 127)) throw new Error('merchant ids must be 1..127');
-if (cfg.merchants.some((m) => (m.memberPrice ?? m.price) > m.price)) throw new Error('memberPrice must be <= price');
-const lanes = cfg.lanes ?? 1; // minter coins per stall, so simultaneous buyers rarely race for one coin
-// levy rallies (StampMinter3 + RewardVault2): each set must fund its own reward, or colluding stalls can drain the pool.
-// A merge costs up to 600 sats per coin, so count that against the levies of one set (plus the vault coin's merge).
-if (cfg.levy !== undefined && cfg.needed * (cfg.levy - 600) - 600 < cfg.reward)
-  throw new Error(`anti-collusion: ${cfg.needed} levies of ${cfg.levy} (minus merge fees) must cover the reward ${cfg.reward}`);
+checkRallyConfig(cfg);
 
 let merchantLock = organizerLock;
 if (opt['merchant-address']) {
@@ -104,14 +95,13 @@ if (opt['merchant-address']) {
   if (typeof r === 'string') throw new Error(r);
   merchantLock = r.bytecode;
 }
+cfg.merchants = cfg.merchants.map((m) => ({ ...m, lock: binToHex(merchantLock) }));
 
 // 1. genesis needs an outpoint with vout 0: consolidate into one if there is none
 let coins = await provider.getUtxos(addr(organizerLock));
 coins = coins.filter((u) => !u.token);
 const total = coins.reduce((s, u) => s + u.satoshis, 0n);
-// + DUST: the vault UTXO carries the minting NFT, so it must keep dust after the last claim
-const pool = BigInt(cfg.reward) * BigInt(cfg.rewardsInPool) + DUST;
-const need = pool + DUST * BigInt(cfg.merchants.length * lanes + 2) + 5_000n; // + fees (genesis ~3k)
+const need = genesisNeed(cfg);
 if (total < need) throw new Error(`fund ${addr(organizerLock, true)} with at least ${need} sats (has ${total})`);
 let base = coins.find((u) => u.vout === 0 && u.satoshis >= need);
 if (!base) {
@@ -123,42 +113,21 @@ if (!base) {
   base = { txid, vout: 0, satoshis: total - fee, lockingBytecode: binToHex(organizerLock) };
 }
 
-// 2. category = txid of the spent vout-0 outpoint; the vault is parameterised with it (internal byte order)
-const category = base.txid;
-const vmCategory = binToHex(hexToBin(category).reverse());
-const endTime = Math.floor(Date.now() / 1000) + cfg.durationDays * 86400;
-const rally = {
-  network, name: cfg.name, description: cfg.description, category, vmCategory,
-  needed: cfg.needed, reward: cfg.reward, endTime, organizerPub: binToHex(pub), lanes,
-  ...(cfg.levy !== undefined ? { minter: 3, levy: cfg.levy } : { minter: 2 }),
-  merchants: cfg.merchants.map((m) => ({ ...m, memberPrice: m.memberPrice ?? m.price, lock: binToHex(merchantLock) })),
-};
-const contracts = rallyContracts(rally, provider);
-const minters = Object.values(contracts.minters);
-const { vault } = contracts;
-
-// 3. optional BCMR registry so wallets show names: stamp type = first commitment byte
+// 2. the rally record, then the optional BCMR registry so wallets show names (stamp type = first commitment byte)
+const rally = planRally({ network, cfg, organizerPub: binToHex(pub), baseTxid: base.txid });
 let bcmr;
 if (opt.registry) {
   bcmr = registry(rally, opt.registry);
   writeFileSync(new URL('public/bcmr.json', root), bcmr.body);
 }
 
-// 4. genesis: out[0] identity (plain BCH, stays with organizer), `lanes` minting NFTs per minter, one for the vault
-const minting = { category, amount: 0n, nft: { capability: 'minting', commitment: '' } };
-const tb = new TransactionBuilder({ provider })
-  .addInput(base, signer.unlockP2PKH())
-  .addOutput({ to: organizerLock, amount: DUST });
-minters.forEach((c) => { for (let l = 0; l < lanes; l++) tb.addOutput({ to: c.tokenAddress, amount: DUST, token: minting }); });
-tb.addOutput({ to: vault.tokenAddress, amount: pool, token: minting });
-if (bcmr) tb.addOpReturnOutput(['BCMR', `0x${bcmr.hash}`, bcmr.uri]);
-const spent = DUST * BigInt(minters.length * lanes + 1) + pool;
-tb.addOutput({ to: organizerLock, amount: base.satoshis - spent - 3000n });
-const { txid } = await tb.send();
+// 3. genesis
+const { builder, vault } = buildGenesis({ provider, rally, rewardsInPool: cfg.rewardsInPool, base: { utxo: base, unlocker: signer.unlockP2PKH() }, organizerLock, bcmr });
+const { txid } = await builder.send();
 
 write(`src/rally.${network}.json`, { ...rally, genesisTx: txid });
 console.log(`rally "${cfg.name}" live on ${network}`);
-console.log('category', category);
+console.log('category', rally.category);
 console.log('genesis ', txid);
 console.log('vault   ', vault.tokenAddress);
 

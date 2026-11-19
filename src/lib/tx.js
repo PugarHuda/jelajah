@@ -147,17 +147,24 @@ export async function rallyStats({ rally, provider, minters, vault }) {
   // covenant holds that NFT, so junk sent to its address (or a fake NFT of another category) never counts.
   const spends = (c) => ({ tx }) => ofRally(tx.outputs[0]) && tx.outputs[0].token.nft?.capability === 'minting'
     && binToHex(tx.outputs[0].lockingBytecode) === lockOf(c);
+  // collectors: pkh -> stalls visited, stamps bought, trophies won (every stamp and trophy commits to its owner's pkh)
+  const people = new Map();
+  const who = (pkh) => people.get(pkh) ?? people.set(pkh, { pkh, stalls: new Set(), stamps: 0, trophies: 0 }).get(pkh);
   const stalls = await Promise.all(rally.merchants.map(async (m) => {
     const sales = (await txsOf(minters[m.id])).filter(spends(minters[m.id]))
       .filter(({ tx }) => ofRally(tx.outputs[2]) && tx.outputs[2].token.nft?.commitment[0] === m.id);
     const buyers = new Set(sales.map(({ tx }) => binToHex(tx.outputs[2].token.nft.commitment.slice(1))));
+    sales.forEach(({ tx }) => { const p = who(binToHex(tx.outputs[2].token.nft.commitment.slice(1))); p.stamps++; p.stalls.add(m.id); });
     const revenue = sales.reduce((s, { tx }) => s + tx.outputs[1].valueSatoshis, 0n);
     return { id: m.id, stamps: sales.length, buyers: buyers.size, revenue };
   }));
   // claims mint a trophy (commitment 0x00 + pkh) at out[2]; reclaim does not
-  const claims = (await txsOf(vault)).filter(spends(vault))
-    .filter(({ tx }) => ofRally(tx.outputs[2]) && tx.outputs[2].token.nft?.commitment[0] === 0).length;
-  return { stalls, claims };
+  const claimTxs = (await txsOf(vault)).filter(spends(vault))
+    .filter(({ tx }) => ofRally(tx.outputs[2]) && tx.outputs[2].token.nft?.commitment[0] === 0);
+  claimTxs.forEach(({ tx }) => who(binToHex(tx.outputs[2].token.nft.commitment.slice(1))).trophies++);
+  const collectors = [...people.values()].map((p) => ({ ...p, stalls: p.stalls.size }))
+    .sort((a, b) => b.trophies - a.trophies || b.stalls - a.stalls || b.stamps - a.stamps).slice(0, 10);
+  return { stalls, claims: claimTxs.length, collectors };
 }
 
 /** The coin that holds this rally's minting NFT (a minter lane or the vault), not junk sent to the same address. */
@@ -167,3 +174,55 @@ export const isRallyNft = (rally, utxo) => utxo.token?.category === rally.catego
 const pkhOf = (lock) => Array.from(lock.slice(3, 23), (b) => b.toString(16).padStart(2, '0')).join('');
 const nft = (rally, commitment) => ({ category: rally.category, amount: 0n, nft: { capability: 'none', commitment } });
 const stampToken = (rally, id, buyerLock) => nft(rally, hex2(id) + pkhOf(buyerLock));
+
+// ---- opening a rally: shared by scripts/rally.mjs (local key) and the organizer page (WizardConnect)
+
+/** Rule checks on a rally config ({ needed, reward, rewardsInPool, lanes?, levy?, merchants: [{ id, price, memberPrice? }] }). */
+export function checkRallyConfig(cfg) {
+  if (!(cfg.needed >= 1 && cfg.needed <= cfg.merchants.length)) throw new Error(`needed must be 1..${cfg.merchants.length}`);
+  if (cfg.merchants.some((m) => !(m.id >= 1 && m.id <= 127))) throw new Error('merchant ids must be 1..127');
+  if (new Set(cfg.merchants.map((m) => m.id)).size !== cfg.merchants.length) throw new Error('merchant ids must be unique');
+  if (cfg.merchants.some((m) => !(m.price >= 546))) throw new Error('every price must be at least 546 sats');
+  if (cfg.merchants.some((m) => (m.memberPrice ?? m.price) > m.price)) throw new Error('memberPrice must be <= price');
+  // a trophy holder pays memberPrice, so that is the cheapest way to a full set
+  const cheapest = cfg.merchants.map((m) => m.memberPrice ?? m.price).sort((a, b) => a - b).slice(0, cfg.needed).reduce((a, b) => a + b, 0);
+  if (!(cfg.reward < cheapest)) throw new Error(`anti-farming: reward ${cfg.reward} must be < cheapest set ${cheapest}`);
+  if (!(cfg.rewardsInPool >= 1)) throw new Error('fund at least one reward');
+  // levy rallies: each set must fund its own reward, or colluding stalls can drain the pool.
+  // A merge costs up to 600 sats per coin, so count that against the levies of one set (plus the vault coin's merge).
+  if (cfg.levy !== undefined && cfg.needed * (cfg.levy - 600) - 600 < cfg.reward)
+    throw new Error(`anti-collusion: ${cfg.needed} levies of ${cfg.levy} (minus merge fees) must cover the reward ${cfg.reward}`);
+}
+
+/** Sats the genesis needs: the pool (+ dust the vault keeps after its last claim), a coin per minter lane, identity, fees. */
+export const genesisNeed = (cfg) => BigInt(cfg.reward) * BigInt(cfg.rewardsInPool) + DUST
+  + DUST * BigInt(cfg.merchants.length * (cfg.lanes ?? 1) + 2) + 5_000n;
+
+/** The rally record. category = txid of the vout-0 coin the genesis spends; merchants need their payout `lock` (hex). */
+export function planRally({ network, cfg, organizerPub, baseTxid }) {
+  checkRallyConfig(cfg);
+  return {
+    network, name: cfg.name, description: cfg.description ?? '', category: baseTxid,
+    vmCategory: binToHex(hexToBin(baseTxid).reverse()), // the VM sees the category in internal byte order
+    needed: cfg.needed, reward: cfg.reward, endTime: Math.floor(Date.now() / 1000) + cfg.durationDays * 86400,
+    organizerPub, lanes: cfg.lanes ?? 1,
+    ...(cfg.levy !== undefined ? { minter: 3, levy: cfg.levy } : { minter: 2 }),
+    merchants: cfg.merchants.map((m) => ({ ...m, memberPrice: m.memberPrice ?? m.price })),
+  };
+}
+
+/** Genesis: out[0] identity (back to the organizer), `lanes` minting NFTs per stall minter, the vault with the pool,
+ *  optional BCMR OP_RETURN, change. base: { utxo (vout 0), unlocker }.
+ *  @param {{ provider: any, rally: any, rewardsInPool: number, base: any, organizerLock: Uint8Array, bcmr?: { hash: string, uri: string } }} args */
+export function buildGenesis({ provider, rally, rewardsInPool, base, organizerLock, bcmr }) {
+  if (base.utxo.vout !== 0 || base.utxo.txid !== rally.category) throw new Error('genesis must spend the vout-0 coin named by the category');
+  const { minters, vault } = rallyContracts(rally, provider);
+  const pool = BigInt(rally.reward) * BigInt(rewardsInPool) + DUST;
+  const minting = { category: rally.category, amount: 0n, nft: { capability: 'minting', commitment: '' } };
+  const tb = new TransactionBuilder({ provider }).addInput(base.utxo, base.unlocker).addOutput({ to: organizerLock, amount: DUST });
+  Object.values(minters).forEach((c) => { for (let l = 0; l < rally.lanes; l++) tb.addOutput({ to: c.tokenAddress, amount: DUST, token: minting }); });
+  tb.addOutput({ to: vault.tokenAddress, amount: pool, token: minting });
+  if (bcmr) tb.addOpReturnOutput(['BCMR', `0x${bcmr.hash}`, bcmr.uri]);
+  const spent = DUST * BigInt(Object.keys(minters).length * rally.lanes + 1) + pool;
+  return { builder: tb.addOutput({ to: organizerLock, amount: base.utxo.satoshis - spent - 3000n }), vault };
+}
