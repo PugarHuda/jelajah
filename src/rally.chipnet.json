@@ -16,7 +16,8 @@
       "emoji": "☕",
       "color": "#7a4a2b",
       "price": 5000,
-      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "taglineId": "Kopi arang dekat stasiun"
     },
     {
       "id": 2,
@@ -25,7 +26,8 @@
       "emoji": "🍜",
       "color": "#c2410c",
       "price": 5000,
-      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "taglineId": "Mi godhog masak tungku"
     },
     {
       "id": 3,
@@ -34,7 +36,8 @@
       "emoji": "🍢",
       "color": "#b91c1c",
       "price": 5000,
-      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "taglineId": "Sate kambing tusuk jeruji sepeda"
     },
     {
       "id": 4,
@@ -43,7 +46,8 @@
       "emoji": "🥥",
       "color": "#15803d",
       "price": 5000,
-      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "taglineId": "Es kelapa dan gula aren"
     }
   ],
   "genesisTx": "aa5c20f53240528ab3fd4ea581cf6a8a42c28cdbdc2a43ffe3035239478dbffc",

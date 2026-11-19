@@ -8,6 +8,23 @@ import { Stamp, Trophy } from './Stamp';
 import { SLIDES_URL, REPO_URL, VOTE_ADDRESS } from './links';
 
 const sats = (n: number | bigint) => `${Number(n).toLocaleString('en-US')} sats`;
+
+// UI language: ?lang=id|en, then the saved choice, then the browser. ponytail: inline pairs, no i18n lib for two languages.
+const ID = (() => {
+  let saved: string | null = null;
+  try { saved = localStorage.getItem('lang'); } catch { /* private mode */ }
+  const l = new URLSearchParams(location.search).get('lang') ?? saved ?? navigator.language;
+  return l.toLowerCase().startsWith('id');
+})();
+document.documentElement.lang = ID ? 'id' : 'en';
+const tr = (en: string, id: string) => (ID ? id : en);
+function switchLang() {
+  try { localStorage.setItem('lang', ID ? 'en' : 'id'); } catch { /* private mode */ }
+  const u = new URL(location.href);
+  u.searchParams.set('lang', ID ? 'en' : 'id');
+  location.href = u.href;
+  if (u.hash) setTimeout(() => location.reload());
+}
 const stallOf = (c: Coin) => parseInt(c.utxo.token!.nft!.commitment.slice(0, 2), 16);
 
 export default function App() {
@@ -68,13 +85,13 @@ function Rally() {
     } finally { setBusy(null); }
   }
 
-  const buy = (m: Merchant) => run(`${m.emoji} Stamped at ${m.name}`, async () => {
+  const buy = (m: Merchant) => run(`${m.emoji} ${tr('Stamped at', 'Dapat stamp di')} ${m.name}`, async () => {
     const fresh = await walletCoins(wc.manager!); // never build on a stale or not-yet-loaded coin list
     const { builder, inputs } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: lock!, coins: fresh });
-    return signAndSend(wc.manager!, builder, inputs, `Pay ${m.name} ${sats(m.price)} and get its Jelajah stamp`);
+    return signAndSend(wc.manager!, builder, inputs, tr(`Pay ${m.name} ${sats(m.price)} and get its Jelajah stamp`, `Bayar ${m.name} ${sats(m.price)} dan dapat stamp Jelajah-nya`));
   });
 
-  const claim = () => run('🏆 Set claimed: reward + trophy', async () => {
+  const claim = () => run(tr('🏆 Set claimed: reward + trophy', '🏆 Set diklaim: hadiah + trofi'), async () => {
     const fresh = await walletCoins(wc.manager!);
     const hexPkh = hex(lock!.slice(3, 23));
     const { builder, inputs } = await buildClaim({
@@ -82,7 +99,7 @@ function Rally() {
       stamps: fresh.filter((c) => isRallyNft(rally, c.utxo) && stallOf(c) > 0 && c.utxo.token!.nft!.commitment.slice(2) === hexPkh),
       coins: fresh.filter((c) => !c.utxo.token),
     });
-    return signAndSend(wc.manager!, builder, inputs, `Burn ${rally.needed} stamps for ${sats(rally.reward)} + a trophy`);
+    return signAndSend(wc.manager!, builder, inputs, tr(`Burn ${rally.needed} stamps for ${sats(rally.reward)} + a trophy`, `Bakar ${rally.needed} stamp untuk ${sats(rally.reward)} + trofi`));
   });
 
   return (
@@ -92,40 +109,50 @@ function Rally() {
         <a className="brand" href="#"><span className="brand-mark">◉</span> Jelajah</a>
         <span className={`pill ${rally.network}`}>{rally.network === 'mainnet' ? 'BCH mainnet' : 'chipnet (test)'}</span>
         <div className="grow" />
+        <button className="ghost lang" onClick={switchLang} title={tr('Bahasa Indonesia', 'English')}>{ID ? 'EN' : 'ID'}</button>
         {connected ? (
-          <button className="ghost" onClick={wc.disconnect} title="Disconnect">
+          <button className="ghost" onClick={wc.disconnect} title={tr('Disconnect', 'Putuskan')}>
             {wc.walletName ?? 'Wallet'} · {sats(bch)}
           </button>
         ) : (
           <button className="primary" onClick={wc.connect} disabled={wc.state === 'connecting' || wc.state === 'connected'}>
-            {wc.state === 'connecting' ? 'Waiting for wallet…' : wc.state === 'connected' ? 'Loading wallet…' : 'Connect wallet'}
+            {wc.state === 'connecting' ? tr('Waiting for wallet…', 'Menunggu wallet…') : wc.state === 'connected' ? tr('Loading wallet…', 'Memuat wallet…') : tr('Connect wallet', 'Hubungkan wallet')}
           </button>
         )}
       </header>
       {wc.uri && wc.qrUri && (
         <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri}
-          title="Connect with WizardConnect" subtitle="Scan with Selene or Paytaca" />
+          title={tr('Connect with WizardConnect', 'Hubungkan lewat WizardConnect')} subtitle={tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca')} />
       )}
 
       <main>
         <section className="hero">
-          <p className="eyebrow">{rally.name} · a stamp rally on Bitcoin Cash</p>
-          <h1>Eat at {rally.needed} stalls.<br />Collect {rally.needed} stamps.<br /><em>Get paid back.</em></h1>
-          <p className="lede">
-            Paying a stall prints its stamp NFT <b>in the same transaction</b>. Burn a full set and the rally's
-            contract pays you {sats(rally.reward)} and mints your trophy. No sign-up, no server, no one holding the prize money.
-          </p>
+          <p className="eyebrow">{rally.name} · {tr('a stamp rally on Bitcoin Cash', 'stamp rally di Bitcoin Cash')}</p>
+          {ID
+            ? <h1>Jajan di {rally.needed} warung.<br />Kumpulkan {rally.needed} stamp.<br /><em>Uangmu kembali.</em></h1>
+            : <h1>Eat at {rally.needed} stalls.<br />Collect {rally.needed} stamps.<br /><em>Get paid back.</em></h1>}
+          {ID ? (
+            <p className="lede">
+              Bayar di warung dan stamp NFT-nya tercetak <b>di transaksi yang sama</b>. Bakar satu set lengkap, kontrak rally
+              membayarmu {sats(rally.reward)} dan mencetak trofimu. Tanpa daftar, tanpa server, tanpa ada yang memegang uang hadiah.
+            </p>
+          ) : (
+            <p className="lede">
+              Paying a stall prints its stamp NFT <b>in the same transaction</b>. Burn a full set and the rally's
+              contract pays you {sats(rally.reward)} and mints your trophy. No sign-up, no server, no one holding the prize money.
+            </p>
+          )}
         </section>
 
-        <section className="board" aria-label="Stalls">
+        <section className="board" aria-label={tr('Stalls', 'Warung')}>
           <div className="board-head">
             <div>
-              <h2>Stalls</h2>
-              <p className="muted">Any {rally.needed} different stalls complete the set.</p>
+              <h2>{tr('Stalls', 'Warung')}</h2>
+              <p className="muted">{tr(`Any ${rally.needed} different stalls complete the set.`, `${rally.needed} warung berbeda mana pun melengkapi satu set.`)}</p>
             </div>
             <div className="progress" aria-live="polite">
               <b>{Math.min(collected.size, rally.needed)}</b>/{rally.needed}
-              <span className="muted"> stamps</span>
+              <span className="muted"> stamp{ID ? '' : 's'}</span>
             </div>
           </div>
           <div className="stalls">
@@ -135,10 +162,10 @@ function Rally() {
                 <article key={m.id} id={`stall-${m.id}`} className={`stall ${have ? 'have' : ''}`} style={{ '--c': m.color } as React.CSSProperties}>
                   <Stamp m={m} inked={have} />
                   <h3>{m.name}</h3>
-                  <p className="muted small">{m.tagline}</p>
+                  <p className="muted small">{ID ? m.taglineId ?? m.tagline : m.tagline}</p>
                   <button className={have ? 'ghost' : 'primary'} disabled={!connected || !!busy}
-                    onClick={() => buy(m)} title={connected ? undefined : 'Connect your wallet first'}>
-                    {busy === `${m.emoji} Stamped at ${m.name}` ? 'Approve in wallet…' : have ? `Again · ${sats(m.price)}` : `Buy · ${sats(m.price)}`}
+                    onClick={() => buy(m)} title={connected ? undefined : tr('Connect your wallet first', 'Hubungkan wallet dulu')}>
+                    {busy?.endsWith(` ${m.name}`) ? tr('Approve in wallet…', 'Setujui di wallet…') : have ? `${tr('Again', 'Lagi')} · ${sats(m.price)}` : `${tr('Buy', 'Beli')} · ${sats(m.price)}`}
                   </button>
                 </article>
               );
@@ -147,55 +174,64 @@ function Rally() {
 
           <div className={`claim ${ready ? 'ready' : ''}`}>
             <div>
-              <h3>{ready ? 'Your set is complete' : 'Complete the set'}</h3>
+              <h3>{ready ? tr('Your set is complete', 'Set kamu sudah lengkap') : tr('Complete the set', 'Lengkapi set')}</h3>
               <p className="muted small">
-                Burns one stamp from each of {rally.needed} stalls → {sats(rally.reward)} + a {rally.name} Trophy NFT.
-                {rewardsLeft !== null && ` ${Math.max(rewardsLeft, 0)} rewards left in the pool.`}
+                {tr(`Burns one stamp from each of ${rally.needed} stalls → ${sats(rally.reward)} + a ${rally.name} Trophy NFT.`,
+                  `Membakar satu stamp dari tiap ${rally.needed} warung → ${sats(rally.reward)} + NFT Trofi ${rally.name}.`)}
+                {rewardsLeft !== null && tr(` ${Math.max(rewardsLeft, 0)} rewards left in the pool.`, ` Sisa ${Math.max(rewardsLeft, 0)} hadiah di pool.`)}
               </p>
             </div>
             <button className="primary big" disabled={!ready || !!busy} onClick={claim}>
-              {busy?.startsWith('🏆') ? 'Approve in wallet…' : `Claim ${sats(rally.reward)} + trophy`}
+              {busy?.startsWith('🏆') ? tr('Approve in wallet…', 'Setujui di wallet…') : tr(`Claim ${sats(rally.reward)} + trophy`, `Klaim ${sats(rally.reward)} + trofi`)}
             </button>
           </div>
-          {!connected && <p className="hint">Connect a wallet (Selene, Paytaca, Cashonize) to start. Each stamp costs the stall's price plus a tiny network fee.</p>}
+          {!connected && <p className="hint">{tr("Connect a wallet (Selene, Paytaca, Cashonize) to start. Each stamp costs the stall's price plus a tiny network fee.", 'Hubungkan wallet (Selene, Paytaca, Cashonize) untuk mulai. Tiap stamp seharga warungnya ditambah biaya jaringan yang sangat kecil.')}</p>}
           {error && <p className="error" role="alert">{error}</p>}
         </section>
 
         {trophies.length > 0 && (
           <section className="shelf">
-            <h2>Trophy shelf</h2>
+            <h2>{tr('Trophy shelf', 'Rak trofi')}</h2>
             <div className="trophies">{trophies.map((t) => <Trophy key={t.utxo.txid} name={rally.name} />)}</div>
           </section>
         )}
 
         {log.length > 0 && (
           <section className="log">
-            <h2>Your transactions</h2>
+            <h2>{tr('Your transactions', 'Transaksimu')}</h2>
             <ul>{log.map((l) => <li key={l.txid}>{l.label} · <a href={explorerTx(l.txid)} target="_blank" rel="noreferrer">{l.txid.slice(0, 12)}…</a></li>)}</ul>
           </section>
         )}
 
         <section className="how">
-          <h2>How it works</h2>
-          <ol>
-            <li><b>Organizer</b> locks the reward pool in a covenant. It can't take it back before the rally ends.</li>
-            <li><b>Every purchase</b> runs through the stall's covenant: it only lets the stamp out if the stall got paid at least its price. Stamps carry the buyer's key hash.</li>
-            <li><b>The vault</b> loops over the stamps you burn: same category, {rally.needed} different stalls, all bought by you. Then it pays you and mints your trophy.</li>
-          </ol>
+          <h2>{tr('How it works', 'Cara kerjanya')}</h2>
+          {ID ? (
+            <ol>
+              <li><b>Penyelenggara</b> mengunci pool hadiah di covenant. Pool itu tidak bisa ditarik sebelum rally berakhir.</li>
+              <li><b>Setiap pembelian</b> lewat covenant warung: stamp hanya keluar kalau warung dibayar minimal seharga barangnya. Stamp membawa hash kunci pembeli.</li>
+              <li><b>Vault</b> memeriksa satu per satu stamp yang kamu bakar: kategori sama, {rally.needed} warung berbeda, semuanya kamu yang beli. Lalu kamu dibayar dan trofimu dicetak.</li>
+            </ol>
+          ) : (
+            <ol>
+              <li><b>Organizer</b> locks the reward pool in a covenant. It can't take it back before the rally ends.</li>
+              <li><b>Every purchase</b> runs through the stall's covenant: it only lets the stamp out if the stall got paid at least its price. Stamps carry the buyer's key hash.</li>
+              <li><b>The vault</b> loops over the stamps you burn: same category, {rally.needed} different stalls, all bought by you. Then it pays you and mints your trophy.</li>
+            </ol>
+          )}
           <p className="muted small">
-            Anti-farming: the reward ({sats(rally.reward)}) is always lower than the cheapest full set, so a stall can't profit by buying from itself.
-            Stamps can be traded as collectibles, but the reward always goes to whoever actually bought them.
+            {tr(`Anti-farming: the reward (${sats(rally.reward)}) is always lower than the cheapest full set, so a stall can't profit by buying from itself. Stamps can be traded as collectibles, but the reward always goes to whoever actually bought them.`,
+              `Anti-farming: hadiah (${sats(rally.reward)}) selalu lebih kecil dari set termurah, jadi warung tidak bisa untung dengan membeli dari dirinya sendiri. Stamp boleh diperjualbelikan sebagai koleksi, tapi hadiah selalu jatuh ke pembeli aslinya.`)}
           </p>
           <dl className="tech">
-            <dt>Token category</dt><dd><code>{rally.category}</code></dd>
-            <dt>Reward vault</dt><dd><code>{vault.tokenAddress}</code></dd>
+            <dt>{tr('Token category', 'Kategori token')}</dt><dd><code>{rally.category}</code></dd>
+            <dt>{tr('Reward vault', 'Vault hadiah')}</dt><dd><code>{vault.tokenAddress}</code></dd>
             <dt>Genesis</dt><dd><a href={explorerTx(rally.genesisTx)} target="_blank" rel="noreferrer">{rally.genesisTx.slice(0, 16)}…</a></dd>
-            <dt>Stall dashboard</dt><dd><a href="#/stats" onClick={() => setTimeout(() => location.reload())}>Sales per stall, from the chain</a></dd>
-            <dt>Stall posters</dt><dd>{rally.merchants.map((m) => <a key={m.id} href={`#/stall/${m.id}`}>{m.emoji} {m.name}</a>)}</dd>
+            <dt>{tr('Stall dashboard', 'Dasbor warung')}</dt><dd><a href="#/stats" onClick={() => setTimeout(() => location.reload())}>{tr('Sales per stall, from the chain', 'Penjualan tiap warung, langsung dari chain')}</a></dd>
+            <dt>{tr('Stall posters', 'Poster warung')}</dt><dd>{rally.merchants.map((m) => <a key={m.id} href={`#/stall/${m.id}`}>{m.emoji} {m.name}</a>)}</dd>
           </dl>
         </section>
       </main>
-      <footer>Jelajah · stamp rallies on Bitcoin Cash · built for BCH BLAZE 2026 {lock && <span className="muted">· your stamp address {addressOf(lock, true)}</span>}</footer>
+      <footer>Jelajah · {tr('stamp rallies on Bitcoin Cash · built for BCH BLAZE 2026', 'stamp rally di Bitcoin Cash · dibuat untuk BCH BLAZE 2026')} {lock && <span className="muted">· {tr('your stamp address', 'alamat stamp-mu')} {addressOf(lock, true)}</span>}</footer>
     </>
   );
 }
@@ -223,10 +259,10 @@ function StallPoster({ m }: { m?: Merchant }) {
       <p className="eyebrow">{rally.name} · stamp rally</p>
       <Stamp m={m} inked size={180} />
       <h1>{m.name}</h1>
-      <p className="lede">Pay here with Bitcoin Cash and get the {m.name} stamp. Collect {rally.needed} → get paid back.</p>
-      <img className="qr" src={qr.createDataURL(8, 16)} alt={`QR code to ${m.name}'s stall in the rally`} />
+      <p className="lede">{tr(`Pay here with Bitcoin Cash and get the ${m.name} stamp. Collect ${rally.needed} → get paid back.`, `Bayar di sini pakai Bitcoin Cash dan dapat stamp ${m.name}. Kumpulkan ${rally.needed} → uangmu kembali.`)}</p>
+      <img className="qr" src={qr.createDataURL(8, 16)} alt={tr(`QR code to ${m.name}'s stall in the rally`, `Kode QR ke warung ${m.name} di rally`)} />
       <p className="muted small">{url}</p>
-      <a href="#" onClick={() => setTimeout(() => location.reload())}>← Back to the rally</a>
+      <a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a>
     </main>
   );
 }
@@ -242,13 +278,14 @@ function Stats() {
   return (
     <main className="stats">
       <p className="eyebrow">{rally.name} · {rally.network === 'mainnet' ? 'BCH mainnet' : 'chipnet (test)'}</p>
-      <h1>Stall dashboard</h1>
-      <p className="lede">Every stamp is a paid visit. These numbers are read straight from each stall's covenant history: anyone can recompute them, and no one can inflate them.</p>
+      <h1>{tr('Stall dashboard', 'Dasbor warung')}</h1>
+      <p className="lede">{tr("Every stamp is a paid visit. These numbers are read straight from each stall's covenant history: anyone can recompute them, and no one can inflate them.",
+        'Setiap stamp adalah kunjungan yang dibayar. Angka ini dibaca langsung dari riwayat covenant tiap warung: siapa pun bisa menghitung ulang, dan tidak ada yang bisa menggelembungkannya.')}</p>
       {err && <p className="error" role="alert">{err}</p>}
-      {!s && !err && <p className="muted">Reading the chain…</p>}
+      {!s && !err && <p className="muted">{tr('Reading the chain…', 'Membaca chain…')}</p>}
       {s && total && (
         <table>
-          <thead><tr><th>Stall</th><th>Stamps sold</th><th>Unique buyers</th><th>Paid to stall</th></tr></thead>
+          <thead><tr><th>{tr('Stall', 'Warung')}</th><th>{tr('Stamps sold', 'Stamp terjual')}</th><th>{tr('Unique buyers', 'Pembeli unik')}</th><th>{tr('Paid to stall', 'Dibayar ke warung')}</th></tr></thead>
           <tbody>
             {rally.merchants.map((m) => {
               const x = s.stalls.find((y) => y.id === m.id)!;
@@ -258,8 +295,8 @@ function Stats() {
           <tfoot><tr><td>Total</td><td>{total.stamps}</td><td /><td>{sats(total.revenue)}</td></tr></tfoot>
         </table>
       )}
-      {s && <p>Sets completed: <b>{s.claims}</b> · rewards paid: <b>{sats(BigInt(s.claims) * BigInt(rally.reward))}</b></p>}
-      <a href="#" onClick={() => setTimeout(() => location.reload())}>← Back to the rally</a>
+      {s && <p>{tr('Sets completed', 'Set selesai')}: <b>{s.claims}</b> · {tr('rewards paid', 'hadiah dibayar')}: <b>{sats(BigInt(s.claims) * BigInt(rally.reward))}</b></p>}
+      <a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a>
     </main>
   );
 }

@@ -12,7 +12,8 @@
       "tagline": "Charcoal coffee by the station",
       "emoji": "☕",
       "color": "#7a4a2b",
-      "price": 2000
+      "price": 2000,
+      "taglineId": "Kopi arang dekat stasiun"
     },
     {
       "id": 2,
@@ -20,7 +21,8 @@
       "tagline": "Wood-fire noodles",
       "emoji": "🍜",
       "color": "#c2410c",
-      "price": 2000
+      "price": 2000,
+      "taglineId": "Mi godhog masak tungku"
     },
     {
       "id": 3,
@@ -28,7 +30,8 @@
       "tagline": "Goat satay on bicycle spokes",
       "emoji": "🍢",
       "color": "#b91c1c",
-      "price": 2000
+      "price": 2000,
+      "taglineId": "Sate kambing tusuk jeruji sepeda"
     },
     {
       "id": 4,
@@ -36,7 +39,8 @@
       "tagline": "Iced coconut and palm sugar",
       "emoji": "🥥",
       "color": "#15803d",
-      "price": 2000
+      "price": 2000,
+      "taglineId": "Es kelapa dan gula aren"
     }
   ]
 }
