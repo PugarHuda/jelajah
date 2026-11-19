@@ -56,7 +56,7 @@ node scripts/smoke.mjs --network chipnet                         # real-network 
 `scripts/rally.config.json` sets the stalls, prices, reward and duration. `--merchant-address` pays real stall wallets.
 
 ## Mainnet rally (19 Nov 2026)
-The live demo runs **Jelajah Jogja on BCH mainnet** (add `?net=chipnet` for the test rally). Pool: 6 rewards × 5,000 sats, open for 60 days.
+The live demo runs **Jelajah Jogja on BCH mainnet** (add `?net=chipnet` for the test rally). Pool: 30,000 sats = 5 claimable rewards of 5,000 sats (the vault must keep 1,000 sats dust under its minting NFT, so the 6th reward is returned by `reclaim`; the deploy script now adds that dust on top). Open for 60 days.
 - Genesis: [`47f7df27…`](https://blockchair.com/bitcoin-cash/transaction/47f7df27c3142503911eee2fcd76199be91d64fbae0b4fa621041268a65b7f34) · category `026421ea8dc5944c03a0b2151f3c44a89ae307adc0cb828cc25ead05a4c5494f`
 - Reward vault: `bitcoincash:r057jerhmlqvykrwg9h8s6y4z8cuzc6856hf7k2n3kagwaz7p5w86nxj262cl`
 - BCMR metadata, hash-committed in the genesis OP_RETURN: [`bcmr.json`](https://pugarhuda.github.io/jelajah/bcmr.json)

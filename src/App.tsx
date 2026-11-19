@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
 import qrcode from 'qrcode-generator';
 import { rally, provider, minters, vault, type Merchant } from './chain';
@@ -51,7 +51,7 @@ function Rally() {
   const mine = (c: Coin) => lock && c.utxo.token!.nft!.commitment.slice(2) === hex(lock.slice(3, 23));
   const stamps = nfts.filter((c) => stallOf(c) > 0 && mine(c));
   const trophies = nfts.filter((c) => stallOf(c) === 0);
-  const collected = useMemo(() => new Set(stamps.map(stallOf)), [stamps]);
+  const collected = new Set(stamps.map(stallOf));
   const bch = coins.filter((c) => !c.utxo.token).reduce((s, c) => s + c.utxo.satoshis, 0n);
   const ready = collected.size >= rally.needed;
   const rewardsLeft = pool === null ? null : Number((pool - 1000n) / BigInt(rally.reward)); // vault keeps 1000 sats dust

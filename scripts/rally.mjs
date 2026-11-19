@@ -77,7 +77,8 @@ if (opt['merchant-address']) {
 let coins = await provider.getUtxos(addr(organizerLock));
 coins = coins.filter((u) => !u.token);
 const total = coins.reduce((s, u) => s + u.satoshis, 0n);
-const pool = BigInt(cfg.reward) * BigInt(cfg.rewardsInPool);
+// + DUST: the vault UTXO carries the minting NFT, so it must keep dust after the last claim
+const pool = BigInt(cfg.reward) * BigInt(cfg.rewardsInPool) + DUST;
 const need = pool + DUST * BigInt(cfg.merchants.length + 2) + 10_000n;
 if (total < need) throw new Error(`fund ${addr(organizerLock, true)} with at least ${need} sats (has ${total})`);
 let base = coins.find((u) => u.vout === 0 && u.satoshis >= need);
