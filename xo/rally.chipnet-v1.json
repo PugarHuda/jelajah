@@ -1,0 +1,56 @@
+{
+  "network": "chipnet",
+  "name": "Jelajah Jogja",
+  "description": "Stamp rally across Yogyakarta street-food stalls. Buy at any 3 stalls, burn the stamps, get paid back and keep a trophy.",
+  "category": "ccdb19f03632ba9718c268579c757aad138a3a3641eba82d78b6870c6fe95f8f",
+  "vmCategory": "8f5fe96f0c87b6782da8eb41363a8a13ad7a759c5768c21897ba3236f019dbcc",
+  "needed": 3,
+  "reward": 10000,
+  "endTime": 1800072852,
+  "organizerPub": "033f41a2eaf9fa8a2d9a21ada58031094cdce2981627120f09ac80332a32b693cd",
+  "merchants": [
+    {
+      "id": 1,
+      "name": "Kopi Joss",
+      "tagline": "Charcoal coffee by the station",
+      "emoji": "☕",
+      "color": "#7a4a2b",
+      "price": 5000,
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "taglineId": "Kopi arang dekat stasiun"
+    },
+    {
+      "id": 2,
+      "name": "Bakmi Jawa",
+      "tagline": "Wood-fire noodles",
+      "emoji": "🍜",
+      "color": "#c2410c",
+      "price": 5000,
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "taglineId": "Mi godhog masak tungku"
+    },
+    {
+      "id": 3,
+      "name": "Sate Klathak",
+      "tagline": "Goat satay on bicycle spokes",
+      "emoji": "🍢",
+      "color": "#b91c1c",
+      "price": 5000,
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "taglineId": "Sate kambing tusuk jeruji sepeda"
+    },
+    {
+      "id": 4,
+      "name": "Es Dawet",
+      "tagline": "Iced coconut and palm sugar",
+      "emoji": "🥥",
+      "color": "#15803d",
+      "price": 5000,
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "taglineId": "Es kelapa dan gula aren"
+    }
+  ],
+  "genesisTx": "aa5c20f53240528ab3fd4ea581cf6a8a42c28cdbdc2a43ffe3035239478dbffc",
+  "authHead": "50558ea4484e1f572bfb138ac6d6ffd85b4ddc048fdd71dc193c1a6a00e3db9a",
+  "bcmrMinor": 1
+}

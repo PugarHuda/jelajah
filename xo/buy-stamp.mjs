@@ -10,7 +10,7 @@ import { rallyContracts } from '../src/lib/tx.js';
 
 const here = (p) => new URL(p, import.meta.url);
 const stallId = Number(process.argv[2] ?? 2);
-const rally = JSON.parse(readFileSync(here('../src/rally.chipnet.json')));
+const rally = JSON.parse(readFileSync(here('./rally.chipnet-v1.json'))); // the chipnet rally XO was built against (original StampMinter)
 const stall = rally.merchants.find((m) => m.id === stallId);
 
 // throwaway chipnet account for the demo, gitignored

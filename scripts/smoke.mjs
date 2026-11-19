@@ -51,6 +51,18 @@ console.log('claim + trophy    ', explorer + txid);
 const left = (await buyer.coins()).filter((c) => isRallyNft(rally, c.utxo)).map((c) => c.utxo.token.nft.commitment.slice(0, 2));
 console.log('buyer NFTs now    ', left, '(expect ["00"] = trophy)');
 
+// StampMinter2 rallies: the fresh trophy is a membership card -> one more stamp at the member price, trophy comes back
+if (rally.minter === 2) {
+  const coins = await buyer.coins();
+  const trophy = coins.find((c) => isRallyNft(rally, c.utxo) && c.utxo.token.nft.commitment.startsWith('00'));
+  const m = rally.merchants[0];
+  const { builder: b } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: buyer.lock, coins: coins.filter((c) => !c.utxo.token), trophy });
+  console.log(`member stamp ${m.emoji} (${m.memberPrice} sats)`, explorer + (await b.send()).txid);
+  const back = (await buyer.coins()).some((c) => isRallyNft(rally, c.utxo) && c.utxo.token.nft.commitment.startsWith('00'));
+  if (!back) throw new Error('trophy did not come back');
+  console.log('trophy still held  ', back);
+}
+
 // the buyer key is throwaway: sweep the change and the trophy back to the organizer
 const rest = await buyer.coins();
 const sweep = new TransactionBuilder({ provider });

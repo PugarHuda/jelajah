@@ -1,0 +1,57 @@
+pragma cashscript ^0.14.0;
+
+// StampMinter v2 = StampMinter + a member price: a buyer who shows their own Trophy pays less.
+// A trophy is only ever minted by the RewardVault (merchant ids here are 1..127), and it must come back
+// to its owner in the same transaction, so the discount costs the member nothing but a signature.
+//
+//   in[0]  this minter                                  -> out[0] this minter, unchanged
+//   in[1]  OPTIONAL the buyer's Trophy (0x00 ‖ buyer pkh) -> out[3] the same Trophy, back to the buyer
+//   in[..] buyer's coins                                -> out[1] payment to merchant (>= memberPrice with a trophy, else >= minPrice)
+//                                                          out[2] stamp NFT to buyer (P2PKH)
+//                                                          out[3] (no trophy) / out[4] (trophy): optional BCH-only change
+// Several minter UTXOs ("lanes") may sit at the same address, so buyers at a busy stall don't race for one coin.
+contract StampMinter2(bytes merchantLock, int minPrice, int memberPrice, bytes1 merchantId) {
+    function stamp() {
+        require(this.activeInputIndex == 0);
+
+        // minter continues unchanged
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
+        require(tx.outputs[0].nftCommitment == tx.inputs[0].nftCommitment);
+        require(tx.outputs[0].value == tx.inputs[0].value);
+
+        // stamp: immutable NFT (32-byte category, no capability), bound to the buyer's pkh
+        bytes rallyCategory = tx.inputs[0].tokenCategory.split(32)[0];
+        require(tx.outputs[2].tokenCategory == rallyCategory);
+        bytes buyerLock = tx.outputs[2].lockingBytecode;
+        require(buyerLock.length == 25);
+        bytes20 buyerPkh = unsafe_bytes20(buyerLock.split(3)[1].split(20)[0]);
+        require(buyerLock == new LockingBytecodeP2PKH(buyerPkh));
+        require(tx.outputs[2].nftCommitment == merchantId + buyerPkh);
+        require(tx.outputs[2].tokenAmount == 0);
+
+        // member price: in[1] is the buyer's own trophy, and it goes straight back to them at out[3]
+        int price = minPrice;
+        int fixedOutputs = 3;
+        if (tx.inputs.length > 1) {
+            if (tx.inputs[1].tokenCategory == rallyCategory && tx.inputs[1].nftCommitment == 0x00 + buyerPkh) {
+                require(tx.outputs[3].lockingBytecode == buyerLock);
+                require(tx.outputs[3].tokenCategory == rallyCategory);
+                require(tx.outputs[3].nftCommitment == 0x00 + buyerPkh);
+                price = memberPrice;
+                fixedOutputs = 4;
+            }
+        }
+
+        // merchant gets paid, BCH only
+        require(tx.outputs[1].lockingBytecode == merchantLock);
+        require(tx.outputs[1].value >= price);
+        require(tx.outputs[1].tokenCategory == 0x);
+
+        // nothing else may leave with tokens (no extra mints)
+        require(tx.outputs.length <= fixedOutputs + 1);
+        if (tx.outputs.length == fixedOutputs + 1) {
+            require(tx.outputs[fixedOutputs].tokenCategory == 0x);
+        }
+    }
+}

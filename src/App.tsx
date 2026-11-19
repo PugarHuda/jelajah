@@ -69,6 +69,7 @@ function Rally() {
   const mine = (c: Coin) => lock && c.utxo.token!.nft!.commitment.slice(2) === hex(lock.slice(3, 23));
   const stamps = nfts.filter((c) => stallOf(c) > 0 && mine(c));
   const trophies = nfts.filter((c) => stallOf(c) === 0);
+  const member = rally.minter === 2 && trophies.some(mine); // own trophy -> member price at every stall
   const collected = new Set(stamps.map(stallOf));
   const bch = coins.filter((c) => !c.utxo.token).reduce((s, c) => s + c.utxo.satoshis, 0n);
   const ready = collected.size >= rally.needed;
@@ -87,8 +88,12 @@ function Rally() {
 
   const buy = (m: Merchant) => run(`${m.emoji} ${tr('Stamped at', 'Dapat stamp di')} ${m.name}`, async () => {
     const fresh = await walletCoins(wc.manager!); // never build on a stale or not-yet-loaded coin list
-    const { builder, inputs } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: lock!, coins: fresh });
-    return signAndSend(wc.manager!, builder, inputs, tr(`Pay ${m.name} ${sats(m.price)} and get its Jelajah stamp`, `Bayar ${m.name} ${sats(m.price)} dan dapat stamp Jelajah-nya`));
+    const myTrophy = rally.minter === 2 ? fresh.find((c) => isRallyNft(rally, c.utxo) && stallOf(c) === 0 && mine(c)) : undefined;
+    const price = sats(myTrophy ? m.memberPrice! : m.price);
+    const { builder, inputs } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: lock!, coins: fresh, trophy: myTrophy });
+    return signAndSend(wc.manager!, builder, inputs, myTrophy
+      ? tr(`Show your trophy, pay ${m.name} the member price ${price} and get its stamp`, `Tunjukkan trofimu, bayar ${m.name} harga member ${price} dan dapat stamp-nya`)
+      : tr(`Pay ${m.name} ${price} and get its Jelajah stamp`, `Bayar ${m.name} ${price} dan dapat stamp Jelajah-nya`));
   });
 
   const claim = () => run(tr('🏆 Set claimed: reward + trophy', '🏆 Set diklaim: hadiah + trofi'), async () => {
@@ -165,7 +170,8 @@ function Rally() {
                   <p className="muted small">{ID ? m.taglineId ?? m.tagline : m.tagline}</p>
                   <button className={have ? 'ghost' : 'primary'} disabled={!connected || !!busy}
                     onClick={() => buy(m)} title={connected ? undefined : tr('Connect your wallet first', 'Hubungkan wallet dulu')}>
-                    {busy?.endsWith(` ${m.name}`) ? tr('Approve in wallet…', 'Setujui di wallet…') : have ? `${tr('Again', 'Lagi')} · ${sats(m.price)}` : `${tr('Buy', 'Beli')} · ${sats(m.price)}`}
+                    {busy?.endsWith(` ${m.name}`) ? tr('Approve in wallet…', 'Setujui di wallet…')
+                      : `${have ? tr('Again', 'Lagi') : tr('Buy', 'Beli')} · ${sats(member ? m.memberPrice! : m.price)}${member ? ' ★' : ''}`}
                   </button>
                 </article>
               );
@@ -186,6 +192,13 @@ function Rally() {
             </button>
           </div>
           {!connected && <p className="hint">{tr("Connect a wallet (Selene, Paytaca, Cashonize) to start. Each stamp costs the stall's price plus a tiny network fee.", 'Hubungkan wallet (Selene, Paytaca, Cashonize) untuk mulai. Tiap stamp seharga warungnya ditambah biaya jaringan yang sangat kecil.')}</p>}
+          {rally.minter === 2 && (
+            <p className="hint">{member
+              ? tr('★ You hold a trophy: every stall gives you its member price. Your trophy is shown to the stall\'s covenant and comes straight back.',
+                '★ Kamu punya trofi: semua warung memberimu harga member. Trofimu ditunjukkan ke covenant warung lalu langsung kembali.')
+              : tr('★ Finish a set and your trophy becomes a membership card: a lower price at every stall, enforced on chain.',
+                '★ Selesaikan satu set dan trofimu jadi kartu member: harga lebih murah di semua warung, dijamin di chain.')}</p>
+          )}
           {error && <p className="error" role="alert">{error}</p>}
         </section>
 

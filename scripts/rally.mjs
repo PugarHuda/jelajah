@@ -43,7 +43,7 @@ if (cmd === 'address') {
   process.exit(0);
 }
 
-const StampMinter = read('src/contracts/StampMinter.json');
+const StampMinter2 = read('src/contracts/StampMinter2.json'); // new rallies: member price for trophy holders
 const RewardVault = read('src/contracts/RewardVault.json');
 
 if (cmd === 'reclaim') {
@@ -87,9 +87,12 @@ if (cmd === 'bcmr') {
 if (cmd !== 'deploy') throw new Error('usage: rally.mjs address|deploy|reclaim|bcmr --network chipnet|mainnet');
 
 const cfg = read('scripts/rally.config.json');
-const cheapest = cfg.merchants.map((m) => m.price).sort((a, b) => a - b).slice(0, cfg.needed).reduce((a, b) => a + b, 0);
+// a trophy holder pays memberPrice, so that is the cheapest way to a full set
+const cheapest = cfg.merchants.map((m) => m.memberPrice ?? m.price).sort((a, b) => a - b).slice(0, cfg.needed).reduce((a, b) => a + b, 0);
 if (!(cfg.reward < cheapest)) throw new Error(`anti-farming: reward ${cfg.reward} must be < cheapest set ${cheapest}`);
 if (cfg.merchants.some((m) => m.id < 1 || m.id > 127)) throw new Error('merchant ids must be 1..127');
+if (cfg.merchants.some((m) => (m.memberPrice ?? m.price) > m.price)) throw new Error('memberPrice must be <= price');
+const lanes = cfg.lanes ?? 1; // minter coins per stall, so simultaneous buyers rarely race for one coin
 
 let merchantLock = organizerLock;
 if (opt['merchant-address']) {
@@ -104,15 +107,16 @@ coins = coins.filter((u) => !u.token);
 const total = coins.reduce((s, u) => s + u.satoshis, 0n);
 // + DUST: the vault UTXO carries the minting NFT, so it must keep dust after the last claim
 const pool = BigInt(cfg.reward) * BigInt(cfg.rewardsInPool) + DUST;
-const need = pool + DUST * BigInt(cfg.merchants.length + 2) + 10_000n;
+const need = pool + DUST * BigInt(cfg.merchants.length * lanes + 2) + 5_000n; // + fees (genesis ~3k)
 if (total < need) throw new Error(`fund ${addr(organizerLock, true)} with at least ${need} sats (has ${total})`);
 let base = coins.find((u) => u.vout === 0 && u.satoshis >= need);
 if (!base) {
+  const fee = 200n + 160n * BigInt(coins.length); // ~148 bytes per P2PKH input at 1 sat/byte, rounded up
   const tb = new TransactionBuilder({ provider });
   coins.forEach((u) => tb.addInput(u, signer.unlockP2PKH()));
-  const { txid } = await tb.addOutput({ to: organizerLock, amount: total - 2000n }).send();
+  const { txid } = await tb.addOutput({ to: organizerLock, amount: total - fee }).send();
   console.log('prepared vout-0 coin', txid);
-  base = { txid, vout: 0, satoshis: total - 2000n, lockingBytecode: binToHex(organizerLock) };
+  base = { txid, vout: 0, satoshis: total - fee, lockingBytecode: binToHex(organizerLock) };
 }
 
 // 2. category = txid of the spent vout-0 outpoint; the vault is parameterised with it (internal byte order)
@@ -121,10 +125,10 @@ const vmCategory = binToHex(hexToBin(category).reverse());
 const endTime = Math.floor(Date.now() / 1000) + cfg.durationDays * 86400;
 const rally = {
   network, name: cfg.name, description: cfg.description, category, vmCategory,
-  needed: cfg.needed, reward: cfg.reward, endTime, organizerPub: binToHex(pub),
-  merchants: cfg.merchants.map((m) => ({ ...m, lock: binToHex(merchantLock) })),
+  needed: cfg.needed, reward: cfg.reward, endTime, organizerPub: binToHex(pub), minter: 2, lanes,
+  merchants: cfg.merchants.map((m) => ({ ...m, memberPrice: m.memberPrice ?? m.price, lock: binToHex(merchantLock) })),
 };
-const minters = rally.merchants.map((m) => new Contract(StampMinter, minterArgs(m), { provider }));
+const minters = rally.merchants.map((m) => new Contract(StampMinter2, minterArgs(m), { provider }));
 const vault = new Contract(RewardVault, vaultArgs(rally), { provider });
 
 // 3. optional BCMR registry so wallets show names: stamp type = first commitment byte
@@ -134,15 +138,15 @@ if (opt.registry) {
   writeFileSync(new URL('public/bcmr.json', root), bcmr.body);
 }
 
-// 4. genesis: out[0] identity (plain BCH, stays with organizer), one minting NFT per minter, one for the vault
+// 4. genesis: out[0] identity (plain BCH, stays with organizer), `lanes` minting NFTs per minter, one for the vault
 const minting = { category, amount: 0n, nft: { capability: 'minting', commitment: '' } };
 const tb = new TransactionBuilder({ provider })
   .addInput(base, signer.unlockP2PKH())
   .addOutput({ to: organizerLock, amount: DUST });
-minters.forEach((c) => tb.addOutput({ to: c.tokenAddress, amount: DUST, token: minting }));
+minters.forEach((c) => { for (let l = 0; l < lanes; l++) tb.addOutput({ to: c.tokenAddress, amount: DUST, token: minting }); });
 tb.addOutput({ to: vault.tokenAddress, amount: pool, token: minting });
 if (bcmr) tb.addOpReturnOutput(['BCMR', `0x${bcmr.hash}`, bcmr.uri]);
-const spent = DUST * BigInt(minters.length + 1) + pool;
+const spent = DUST * BigInt(minters.length * lanes + 1) + pool;
 tb.addOutput({ to: organizerLock, amount: base.satoshis - spent - 3000n });
 const { txid } = await tb.send();
 
@@ -190,5 +194,5 @@ function registry(rally, registryUrl, minor = 0) {
   return { body, hash: createHash('sha256').update(body).digest('hex'), uri: registryUrl.replace(/^https:\/\//, '') };
 }
 
-function minterArgs(m) { return [m.lock, BigInt(m.price), m.id.toString(16).padStart(2, '0')]; }
+function minterArgs(m) { return [m.lock, BigInt(m.price), BigInt(m.memberPrice), m.id.toString(16).padStart(2, '0')]; }
 function vaultArgs(r) { return [r.vmCategory, BigInt(r.needed), BigInt(r.reward), r.organizerPub, BigInt(r.endTime)]; }

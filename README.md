@@ -30,6 +30,8 @@ There is no server and no database. State lives in UTXOs and NFT commitments, an
 ### Contracts (`contracts/`, CashScript 0.14)
 - `StampMinter.cash`, 94 bytes: `stamp()`.
 - `RewardVault.cash`, 170 bytes: `claim()` (uses the 2026 VM's loops) and `reclaim()`.
+- `StampMinter2.cash`, 152 bytes, used by new rallies: `StampMinter` plus a **member price**. Your trophy becomes a membership card. Show it as input 1 and every stall charges you its `memberPrice`, as long as the trophy (commitment `00 ‖ your pkh`) goes straight back to you at output 3. Only the vault can mint `00`, a traded trophy doesn't match your pkh, and keeping the discount while sending the trophy elsewhere is rejected.
+- **Lanes:** each stall gets several minter coins at the same covenant address (`lanes` in the config), and the app picks one at random, so two people buying at the same stall in the same second don't fight over one coin. The contract needed no change, because each lane hands its minting NFT back to itself.
 
 ### Threat model
 | Attack | Why it fails |
@@ -39,6 +41,7 @@ There is no server and no database. State lives in UTXOs and NFT commitments, an
 | The organizer runs off with the pool | The vault only pays out through `claim()` until `endTime`. |
 | Extra stamps minted / a minter drained | Minter value and token must come back unchanged, and no other output may carry tokens. |
 | A trophy reused as a stamp | Trophy id `00` can never satisfy `id > prev` starting from 0. |
+| Member discount without a trophy, with someone else's trophy, or while keeping the trophy away from its owner | `StampMinter2` only lowers the price when input 1 is a rally trophy whose commitment is `00 ‖ buyer pkh`, and it requires that exact trophy back at the buyer's address. The anti-farming check uses the member price. |
 | **Every stall in a set colludes** with a buyer and refunds them off-chain | **Not prevented on chain.** The buyer pays only fees, so the pool can be drained one reward at a time. The price rule only stops a single cheater. A merchant co-signature doesn't help (the merchants are the colluders), and one claim per pkh is beaten by using many addresses. The real fix is governance: **the stalls fund the pool themselves** in proportion, so colluding only drains their own money. (In the demo every stall payment goes to the organizer, who also funds the pool, so the risk is zero.) An optional organizer co-signature on each stamp is the centralized alternative. |
 
 ## Try it
@@ -64,7 +67,12 @@ The live demo runs **Jelajah Jogja on BCH mainnet** (add `?net=chipnet` for the 
 - BCMR metadata with stamp and trophy icons: [`bcmr.json`](https://pugarhuda.github.io/jelajah/bcmr.json), revision 1.1 published along the authchain in [`85ccbf71…`](https://blockchair.com/bitcoin-cash/transaction/85ccbf7111bd700c9f8ebf899934dd7b26091dc90f05149316137ab019057395)
 - **End to end on mainnet** (`smoke.mjs`, 19 Nov 2026): stamps [`60513b45…`](https://blockchair.com/bitcoin-cash/transaction/60513b45ff9fd8be183710554b3707ee3d6f2a71cb963ec025a8a921918c7bba) · [`196503e3…`](https://blockchair.com/bitcoin-cash/transaction/196503e31c0b09f6fdb605c361280b4a2ca4fc263dedca5c9beec7c7371f72e0) · [`a7fb6db1…`](https://blockchair.com/bitcoin-cash/transaction/a7fb6db15732b5c015c59fac9dd5ac8116919b8b17d49591120700c682174521) · claim + trophy [`0e071a46…`](https://blockchair.com/bitcoin-cash/transaction/0e071a4648f8ac6ab48bf97f48e72ff473dfd5af3fa3bc6a131e5974ab528b33)
 
-## Chipnet run (17 Nov 2026)
+## Chipnet run, StampMinter2 + 2 lanes per stall (19 Nov 2026)
+- Genesis: [`c8f9be79…`](https://chipnet.imaginary.cash/tx/c8f9be79320fe95370fc4a88ad7d2b5f5bf2b0b1fbbcc195fdd5923a2fe05ccc) (8 minter coins + vault)
+- Stamps [`1df23b2f…`](https://chipnet.imaginary.cash/tx/1df23b2f4990586f1545489d588e6286fdbf1c208719575a1ff3606ad20e51ee) · [`0542ac61…`](https://chipnet.imaginary.cash/tx/0542ac61b4cb611c58197001657722c556e5990974a16a9a48f9ba4bb34c2165) · [`7e1a8b70…`](https://chipnet.imaginary.cash/tx/7e1a8b70c09698c2a19b81a2dd23c16f37d527b1057dad2241b6f5d56be8db66) · claim + trophy [`9056ff5d…`](https://chipnet.imaginary.cash/tx/9056ff5dc5d2ab2569fd2188d311e5166b9b817f1d0c44a1b11b71167a09d9e1)
+- **Member-price stamp** using that trophy (1,800 instead of 2,000 sats, trophy returned): [`14875f6d…`](https://chipnet.imaginary.cash/tx/14875f6d30c42372342efc84372e133c9061986be0074cc5197723f7276dac28)
+
+## Chipnet run (17 Nov 2026, original StampMinter, still used by `xo/`)
 - Genesis: [`aa5c20f5…`](https://chipnet.imaginary.cash/tx/aa5c20f53240528ab3fd4ea581cf6a8a42c28cdbdc2a43ffe3035239478dbffc)
 - Stamps: [`abaafd90…`](https://chipnet.imaginary.cash/tx/abaafd903a316c9290013e4698ce974cc687195552fc5f3b6c6c0ff3f93de9b9) · [`b3d2ae3b…`](https://chipnet.imaginary.cash/tx/b3d2ae3bd6fcf910ee9f6798620dc10a3a321ce816a5b01205d166dd9fc1c292) · [`a4d05c49…`](https://chipnet.imaginary.cash/tx/a4d05c49b719b044196134335a4af6f4cca38d6329f5b79bebbf31cc6a113aa9)
 - Claim + trophy: [`33d11924…`](https://chipnet.imaginary.cash/tx/33d119246e891151d6735d0159392e7c30b6eda67e84f33af8fd98f52b9c93b9)

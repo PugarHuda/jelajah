@@ -3,7 +3,7 @@
   "description": "Stamp rally across Yogyakarta street-food stalls. Buy at any 3 stalls, burn the stamps, get paid back and keep a trophy.",
   "needed": 3,
   "reward": 5000,
-  "rewardsInPool": 6,
+  "rewardsInPool": 4,
   "durationDays": 60,
   "merchants": [
     {
@@ -13,7 +13,8 @@
       "emoji": "☕",
       "color": "#7a4a2b",
       "price": 2000,
-      "taglineId": "Kopi arang dekat stasiun"
+      "taglineId": "Kopi arang dekat stasiun",
+      "memberPrice": 1800
     },
     {
       "id": 2,
@@ -22,7 +23,8 @@
       "emoji": "🍜",
       "color": "#c2410c",
       "price": 2000,
-      "taglineId": "Mi godhog masak tungku"
+      "taglineId": "Mi godhog masak tungku",
+      "memberPrice": 1800
     },
     {
       "id": 3,
@@ -31,7 +33,8 @@
       "emoji": "🍢",
       "color": "#b91c1c",
       "price": 2000,
-      "taglineId": "Sate kambing tusuk jeruji sepeda"
+      "taglineId": "Sate kambing tusuk jeruji sepeda",
+      "memberPrice": 1800
     },
     {
       "id": 4,
@@ -40,7 +43,9 @@
       "emoji": "🥥",
       "color": "#15803d",
       "price": 2000,
-      "taglineId": "Es kelapa dan gula aren"
+      "taglineId": "Es kelapa dan gula aren",
+      "memberPrice": 1800
     }
-  ]
+  ],
+  "lanes": 2
 }

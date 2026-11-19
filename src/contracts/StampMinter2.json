@@ -1,0 +1,49 @@
+{
+  "contractName": "StampMinter2",
+  "constructorInputs": [
+    { "name": "merchantLock", "type": "bytes" },
+    { "name": "minPrice", "type": "int" },
+    { "name": "memberPrice", "type": "int" },
+    { "name": "merchantId", "type": "bytes1" }
+  ],
+  "abi": [
+    { "name": "stamp", "inputs": [] }
+  ],
+  "bytecode": "OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_0 OP_OUTPUTBYTECODE OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_0 OP_UTXOTOKENCOMMITMENT OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_0 OP_UTXOVALUE OP_NUMEQUALVERIFY OP_0 OP_UTXOTOKENCATEGORY 20 OP_SPLIT OP_DROP OP_2 OP_OUTPUTTOKENCATEGORY OP_OVER OP_EQUALVERIFY OP_2 OP_OUTPUTBYTECODE OP_SIZE 19 OP_NUMEQUALVERIFY OP_DUP OP_3 OP_SPLIT OP_NIP 14 OP_SPLIT OP_DROP OP_OVER 76a914 OP_2 OP_PICK OP_CAT 88ac OP_CAT OP_EQUALVERIFY OP_2 OP_OUTPUTTOKENCOMMITMENT OP_7 OP_ROLL OP_2 OP_PICK OP_CAT OP_EQUALVERIFY OP_2 OP_OUTPUTTOKENAMOUNT OP_0 OP_NUMEQUALVERIFY OP_4 OP_ROLL OP_3 OP_TXINPUTCOUNT OP_1 OP_GREATERTHAN OP_IF OP_1 OP_UTXOTOKENCATEGORY OP_5 OP_PICK OP_EQUAL OP_1 OP_UTXOTOKENCOMMITMENT 00 OP_5 OP_PICK OP_CAT OP_EQUAL OP_BOOLAND OP_IF OP_3 OP_OUTPUTBYTECODE OP_4 OP_PICK OP_EQUALVERIFY OP_3 OP_OUTPUTTOKENCATEGORY OP_5 OP_PICK OP_EQUALVERIFY OP_3 OP_OUTPUTTOKENCOMMITMENT 00 OP_4 OP_PICK OP_CAT OP_EQUALVERIFY OP_6 OP_PICK OP_NIP OP_NIP OP_4 OP_ENDIF OP_ENDIF OP_1 OP_OUTPUTBYTECODE OP_6 OP_ROLL OP_EQUALVERIFY OP_1 OP_OUTPUTVALUE OP_ROT OP_GREATERTHANOREQUAL OP_VERIFY OP_1 OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_TXOUTPUTCOUNT OP_OVER OP_1ADD OP_LESSTHANOREQUAL OP_VERIFY OP_TXOUTPUTCOUNT OP_OVER OP_1ADD OP_NUMEQUAL OP_IF OP_DUP OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_ENDIF OP_2DROP OP_2DROP OP_DROP OP_1",
+  "source": "pragma cashscript ^0.14.0;\n\n// StampMinter v2 = StampMinter + a member price: a buyer who shows their own Trophy pays less.\n// A trophy is only ever minted by the RewardVault (merchant ids here are 1..127), and it must come back\n// to its owner in the same transaction, so the discount costs the member nothing but a signature.\n//\n//   in[0]  this minter                                  -> out[0] this minter, unchanged\n//   in[1]  OPTIONAL the buyer's Trophy (0x00 ‖ buyer pkh) -> out[3] the same Trophy, back to the buyer\n//   in[..] buyer's coins                                -> out[1] payment to merchant (>= memberPrice with a trophy, else >= minPrice)\n//                                                          out[2] stamp NFT to buyer (P2PKH)\n//                                                          out[3] (no trophy) / out[4] (trophy): optional BCH-only change\n// Several minter UTXOs (\"lanes\") may sit at the same address, so buyers at a busy stall don't race for one coin.\ncontract StampMinter2(bytes merchantLock, int minPrice, int memberPrice, bytes1 merchantId) {\n    function stamp() {\n        require(this.activeInputIndex == 0);\n\n        // minter continues unchanged\n        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);\n        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);\n        require(tx.outputs[0].nftCommitment == tx.inputs[0].nftCommitment);\n        require(tx.outputs[0].value == tx.inputs[0].value);\n\n        // stamp: immutable NFT (32-byte category, no capability), bound to the buyer's pkh\n        bytes rallyCategory = tx.inputs[0].tokenCategory.split(32)[0];\n        require(tx.outputs[2].tokenCategory == rallyCategory);\n        bytes buyerLock = tx.outputs[2].lockingBytecode;\n        require(buyerLock.length == 25);\n        bytes20 buyerPkh = unsafe_bytes20(buyerLock.split(3)[1].split(20)[0]);\n        require(buyerLock == new LockingBytecodeP2PKH(buyerPkh));\n        require(tx.outputs[2].nftCommitment == merchantId + buyerPkh);\n        require(tx.outputs[2].tokenAmount == 0);\n\n        // member price: in[1] is the buyer's own trophy, and it goes straight back to them at out[3]\n        int price = minPrice;\n        int fixedOutputs = 3;\n        if (tx.inputs.length > 1) {\n            if (tx.inputs[1].tokenCategory == rallyCategory && tx.inputs[1].nftCommitment == 0x00 + buyerPkh) {\n                require(tx.outputs[3].lockingBytecode == buyerLock);\n                require(tx.outputs[3].tokenCategory == rallyCategory);\n                require(tx.outputs[3].nftCommitment == 0x00 + buyerPkh);\n                price = memberPrice;\n                fixedOutputs = 4;\n            }\n        }\n\n        // merchant gets paid, BCH only\n        require(tx.outputs[1].lockingBytecode == merchantLock);\n        require(tx.outputs[1].value >= price);\n        require(tx.outputs[1].tokenCategory == 0x);\n\n        // nothing else may leave with tokens (no extra mints)\n        require(tx.outputs.length <= fixedOutputs + 1);\n        if (tx.outputs.length == fixedOutputs + 1) {\n            require(tx.outputs[fixedOutputs].tokenCategory == 0x);\n        }\n    }\n}\n",
+  "fingerprint": "ec250275beaba66a6e25f0feab5fb697db0f2398c5531e00912366ab8247c227",
+  "debug": {
+    "bytecode": "c0009d00cd00c78800d100ce8800d200cf8800cc00c69d00ce01207f7552d1788852cd8201199d76537f7701147f75780376a91452797e0288ac7e8852d2577a52797e8852d3009d547a53c351a06351ce55798751cf010055797e879a6353cd54798853d155798853d2010054797e885679777754686851cd567a8851cc7ba26951d10088c4788ba169c4788b9c6376d10088686d6d7551",
+    "sourceMap": "15:16:15:37;:41::42;:8::44:1;18:27:18:28:0;:16::45:1;:59::60:0;:49::77:1;:8::79;19:27:19:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;20:27:20:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;21:27:21:28:0;:16::35:1;:49::50:0;:39::57:1;:8::59;24:40:24:41:0;:30::56:1;:63::65:0;:30::66:1;:::69;25:27:25:28:0;:16::43:1;:47::60:0;:8::62:1;26:37:26:38:0;:26::55:1;27:16:27:32;:36::38:0;:8::40:1;28:42:28:51:0;:58::59;:42::60:1;:::63;:70::72:0;:42::73:1;:::76;29:16:29:25:0;:29::63;:54::62;;:29::63:1;;;:8::65;30:27:30:28:0;:16::43:1;:47::57:0;;:60::68;;:47:::1;:8::70;31:27:31:28:0;:16::41:1;:45::46:0;:8::48:1;34:20:34:28:0;;35:27:35;36:12:36;:31::32;:12:::1;:34:44:9:0;37:26:37:27;:16::42:1;:46::59:0;;:16:::1;:73::74:0;:63::89:1;:93::97:0;:100::108;;:93:::1;:63;:16;:110:43:13:0;38:35:38:36;:24::53:1;:57::66:0;;:16::68:1;39:35:39:36:0;:24::51:1;:55::68:0;;:16::70:1;40:35:40:36:0;:24::51:1;:55::59:0;:62::70;;:55:::1;:16::72;41:24:41:35:0;;:16:42:33:1;;42;37:110:43:13;36:34:44:9;47:27:47:28:0;:16::45:1;:49::61:0;;:8::63:1;48:27:48:28:0;:16::35:1;:39::44:0;:16:::1;:8::46;49:27:49:28:0;:16::43:1;:47::49:0;:8::51:1;52:16:52:33:0;:37::49;:::53:1;:16;:8::55;53:12:53:29:0;:33::45;:::49:1;:12;:51:55:9:0;54:31:54:43;:20::58:1;:62::64:0;:12::66:1;53:51:55:9;14:21:56:5;;;",
+    "logs": [],
+    "requires": [
+      { "ip": 6, "line": 15 },
+      { "ip": 11, "line": 18 },
+      { "ip": 16, "line": 19 },
+      { "ip": 21, "line": 20 },
+      { "ip": 26, "line": 21 },
+      { "ip": 35, "line": 25 },
+      { "ip": 40, "line": 27 },
+      { "ip": 55, "line": 29 },
+      { "ip": 63, "line": 30 },
+      { "ip": 67, "line": 31 },
+      { "ip": 93, "line": 38 },
+      { "ip": 98, "line": 39 },
+      { "ip": 105, "line": 40 },
+      { "ip": 117, "line": 47 },
+      { "ip": 122, "line": 48 },
+      { "ip": 126, "line": 49 },
+      { "ip": 131, "line": 52 },
+      { "ip": 140, "line": 54 }
+    ]
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.14.0",
+    "options": {
+      "enforceFunctionParameterTypes": true,
+      "enforceLocktimeGuard": true
+    }
+  },
+  "updatedAt": "2026-11-19T01:56:38.861Z"
+}

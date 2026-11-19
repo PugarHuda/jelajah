@@ -3,6 +3,7 @@
 import { Contract, TransactionBuilder } from 'cashscript';
 import { hexToBin, binToHex, decodeTransaction, cashAddressToLockingBytecode } from '@bitauth/libauth';
 import StampMinter from '../contracts/StampMinter.json' with { type: 'json' };
+import StampMinter2 from '../contracts/StampMinter2.json' with { type: 'json' };
 import RewardVault from '../contracts/RewardVault.json' with { type: 'json' };
 
 export const DUST = 1000n;
@@ -12,8 +13,11 @@ const CLAIM_FEE = 2500n;
 const hex2 = (n) => n.toString(16).padStart(2, '0');
 
 export function rallyContracts(rally, provider) {
+  // rally.minter: 2 = StampMinter2 (member price); older rallies use the original StampMinter
   const minters = Object.fromEntries(rally.merchants.map((m) => [
-    m.id, new Contract(StampMinter, [m.lock, BigInt(m.price), hex2(m.id)], { provider }),
+    m.id, rally.minter === 2
+      ? new Contract(StampMinter2, [m.lock, BigInt(m.price), BigInt(m.memberPrice), hex2(m.id)], { provider })
+      : new Contract(StampMinter, [m.lock, BigInt(m.price), hex2(m.id)], { provider }),
   ]));
   const vault = new Contract(RewardVault, [rally.vmCategory, BigInt(rally.needed), BigInt(rally.reward), rally.organizerPub, BigInt(rally.endTime)], { provider });
   return { minters, vault };
@@ -32,23 +36,29 @@ export function pickCoins(coins, target) {
   return { picked, sum };
 }
 
-/** Buy at one stall and receive its stamp in the same transaction. buyerLock: Uint8Array P2PKH */
-export async function buildStamp({ rally, provider, minters, merchantId, buyerLock, coins }) {
+/** Buy at one stall and receive its stamp in the same transaction. buyerLock: Uint8Array P2PKH.
+ *  trophy (optional, StampMinter2 rallies): the buyer's own Trophy coin { utxo, unlocker } -> member price, trophy comes back. */
+export async function buildStamp({ rally, provider, minters, merchantId, buyerLock, coins, trophy }) {
   const merchant = rally.merchants.find((m) => m.id === merchantId);
   const minter = minters[merchantId];
-  const [minterUtxo] = await minter.getUtxos();
+  // a stall may have several minter coins ("lanes"); pick one at random so simultaneous buyers rarely collide.
+  // Only coins carrying the rally's minting NFT are minters; anything else sent to the address is ignored.
+  const lanes = (await minter.getUtxos()).filter((u) => u.token?.category === rally.category && u.token.nft?.capability === 'minting');
+  const minterUtxo = lanes[Math.floor(Math.random() * lanes.length)];
   if (!minterUtxo) throw new Error('This stall is not open (minter not found)');
-  const price = BigInt(merchant.price);
+  const member = !!trophy && rally.minter === 2;
+  const price = BigInt(member ? merchant.memberPrice : merchant.price);
   const { picked, sum } = pickCoins(coins, price + DUST + STAMP_FEE + DUST);
   const tb = new TransactionBuilder({ provider }).addInput(minterUtxo, minter.unlock.stamp());
+  if (member) tb.addInput(trophy.utxo, trophy.unlocker);
   picked.forEach((c) => tb.addInput(c.utxo, c.unlocker));
+  tb.addOutput({ to: minter.tokenAddress, amount: minterUtxo.satoshis, token: minterUtxo.token })
+    .addOutput({ to: hexToBin(merchant.lock), amount: price })
+    .addOutput({ to: buyerLock, amount: DUST, token: stampToken(rally, merchantId, buyerLock) });
+  if (member) tb.addOutput({ to: buyerLock, amount: trophy.utxo.satoshis, token: trophy.utxo.token });
   return {
-    inputs: picked,
-    builder: tb
-      .addOutput({ to: minter.tokenAddress, amount: minterUtxo.satoshis, token: minterUtxo.token })
-      .addOutput({ to: hexToBin(merchant.lock), amount: price })
-      .addOutput({ to: buyerLock, amount: DUST, token: stampToken(rally, merchantId, buyerLock) })
-      .addOutput({ to: buyerLock, amount: sum - price - DUST - STAMP_FEE }),
+    inputs: member ? [trophy, ...picked] : picked,
+    builder: tb.addOutput({ to: buyerLock, amount: sum - price - DUST - STAMP_FEE }),
   };
 }
 

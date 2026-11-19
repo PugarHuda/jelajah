@@ -104,3 +104,36 @@ await fails('organizer cannot reclaim before the rally ends', () => reclaim(Numb
 await reclaim(Number(END));
 assert.equal((await vault.getUtxos()).length, 0);
 console.log('PASS organizer reclaims the rest after the rally ends');
+
+// ---- StampMinter2: member price for trophy holders, two lanes (minter coins) for one stall
+const StampMinter2 = artifact('StampMinter2');
+const MEMBER = 8_000n;
+const m2 = new Contract(StampMinter2, [merchants[0].lock, PRICE, MEMBER, '01'], { provider });
+for (let l = 0; l < 2; l++) provider.addUtxo(m2.address, randomUtxo({ satoshis: DUST, token: minting }));
+
+async function buy2(buyer, { pay = PRICE, trophy, trophyTo = buyer, lane = 0 } = {}) {
+  const minterUtxo = (await m2.getUtxos()).filter((u) => u.token)[lane];
+  const coin = fund(buyer);
+  const tb = new TransactionBuilder({ provider }).addInput(minterUtxo, m2.unlock.stamp());
+  if (trophy) tb.addInput(trophy, buyer.sig.unlockP2PKH());
+  tb.addInput(coin, buyer.sig.unlockP2PKH())
+    .addOutput({ to: m2.tokenAddress, amount: DUST, token: minterUtxo.token })
+    .addOutput({ to: hexToBin(merchants[0].lock), amount: pay })
+    .addOutput(nftOut(buyer, '01' + binToHex(buyer.pkh)));
+  if (trophy) tb.addOutput({ to: hexToBin(trophyTo.lock), amount: trophy.satoshis, token: trophy.token });
+  return tb.addOutput({ to: hexToBin(buyer.lock), amount: coin.satoshis - pay - DUST - 2_000n }).send();
+}
+const trophyOf = async (who) => (await nftsOf(who)).find((u) => u.token.nft.commitment.startsWith('00'));
+
+await fails('member price without a trophy', () => buy2(bob, { pay: MEMBER }));
+await fails('member keeps the discount but sends the trophy away', async () => buy2(alice, { pay: MEMBER, trophy: await trophyOf(alice), trophyTo: bob }));
+provider.addUtxo(bob.lock, randomUtxo({ satoshis: DUST, token: { category, amount: 0n, nft: { capability: 'none', commitment: '00' + binToHex(alice.pkh) } } }));
+await fails("someone else's (traded) trophy gives no discount", async () => buy2(bob, { pay: MEMBER, trophy: await trophyOf(bob) }));
+await buy2(alice, { pay: MEMBER, trophy: await trophyOf(alice) });
+assert.ok(await trophyOf(alice), 'trophy came back');
+assert.equal((await stampsOf(alice)).length, 1);
+console.log('PASS trophy holder bought at the member price and kept the trophy');
+
+await buy2(bob, { lane: 0 }); await buy2(bob, { lane: 1 });
+assert.equal((await m2.getUtxos()).filter((u) => u.token).length, 2);
+console.log('PASS two lanes of one stall both mint, and both lanes stay open');
