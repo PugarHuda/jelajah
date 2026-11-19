@@ -52,7 +52,9 @@ npm run dev       # web app
 node scripts/rally.mjs address --network chipnet                 # organizer funding address
 node scripts/rally.mjs deploy  --network chipnet [--registry https://<host>/bcmr.json]
 node scripts/smoke.mjs --network chipnet                         # real-network end to end: 3 stamps + claim
+node scripts/rally.mjs bcmr    --network chipnet --registry https://<host>/bcmr.json   # new BCMR revision (icons) via the authchain, no redeploy
 ```
+**Stall dashboard:** open `#/stats` in the app. Stamps sold, unique buyers, sats paid to each stall and sets claimed, all recomputed in the browser from each covenant's history. A transaction only counts if it really spent the covenant (the rally's minting NFT goes back to it at out[0]), so nobody can inflate the numbers by sending junk to a minter address.
 `scripts/rally.config.json` sets the stalls, prices, reward and duration. `--merchant-address` pays real stall wallets.
 
 ## Mainnet rally (19 Nov 2026)
