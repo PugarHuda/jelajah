@@ -122,3 +122,11 @@ footer { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size:
 @media print { .banner, .poster a { display: none; } }
 .art { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 1.5rem; padding: 3rem 1rem; max-width: 1300px; }
 .stall button { font-size: .9rem; white-space: nowrap; padding-inline: .6rem; }
+
+.stats { padding-top: 2.5rem; }
+.stats table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.stats th, .stats td { padding: .7rem 1rem; text-align: left; border-bottom: 1px solid var(--line); }
+.stats th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+.stats td:not(:first-child), .stats th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.stats tfoot td { font-weight: 700; border-bottom: 0; }
+@media (max-width: 520px) { .stats th, .stats td { padding: .55rem .5rem; font-size: .88rem; } }

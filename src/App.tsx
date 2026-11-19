@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
 import qrcode from 'qrcode-generator';
 import { rally, provider, minters, vault, type Merchant } from './chain';
-import { buildStamp, buildClaim, isRallyNft } from './lib/tx.js';
+import { buildStamp, buildClaim, isRallyNft, rallyStats } from './lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, type Coin } from './wallet';
 import { Stamp, Trophy } from './Stamp';
 import { SLIDES_URL, REPO_URL, VOTE_ADDRESS } from './links';
@@ -13,6 +13,7 @@ const stallOf = (c: Coin) => parseInt(c.utxo.token!.nft!.commitment.slice(0, 2),
 export default function App() {
   const stallFromHash = window.location.hash.match(/^#\/stall\/(\d+)/)?.[1];
   if (stallFromHash) return <StallPoster m={rally.merchants.find((x) => x.id === Number(stallFromHash))} />;
+  if (window.location.hash === '#/stats') return <Stats />;
   if (window.location.hash === '#/art') return ( // press image: every stamp + the trophy
     <main className="art">{rally.merchants.map((m) => <Stamp key={m.id} m={m} inked size={220} />)}<Trophy name={rally.name} size={220} /></main>
   );
@@ -189,6 +190,7 @@ function Rally() {
             <dt>Token category</dt><dd><code>{rally.category}</code></dd>
             <dt>Reward vault</dt><dd><code>{vault.tokenAddress}</code></dd>
             <dt>Genesis</dt><dd><a href={explorerTx(rally.genesisTx)} target="_blank" rel="noreferrer">{rally.genesisTx.slice(0, 16)}…</a></dd>
+            <dt>Stall dashboard</dt><dd><a href="#/stats" onClick={() => setTimeout(() => location.reload())}>Sales per stall, from the chain</a></dd>
             <dt>Stall posters</dt><dd>{rally.merchants.map((m) => <a key={m.id} href={`#/stall/${m.id}`}>{m.emoji} {m.name}</a>)}</dd>
           </dl>
         </section>
@@ -224,6 +226,39 @@ function StallPoster({ m }: { m?: Merchant }) {
       <p className="lede">Pay here with Bitcoin Cash and get the {m.name} stamp. Collect {rally.needed} → get paid back.</p>
       <img className="qr" src={qr.createDataURL(8, 16)} alt={`QR code to ${m.name}'s stall in the rally`} />
       <p className="muted small">{url}</p>
+      <a href="#" onClick={() => setTimeout(() => location.reload())}>← Back to the rally</a>
+    </main>
+  );
+}
+
+type StatsData = { stalls: { id: number; stamps: number; buyers: number; revenue: bigint }[]; claims: number };
+
+// Every number here is recomputed from minter and vault history: no server, no database.
+function Stats() {
+  const [s, setS] = useState<StatsData | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => { rallyStats({ rally, provider, minters, vault }).then(setS, (e) => setErr(String(e))); }, []);
+  const total = s?.stalls.reduce((a, x) => ({ stamps: a.stamps + x.stamps, revenue: a.revenue + x.revenue }), { stamps: 0, revenue: 0n });
+  return (
+    <main className="stats">
+      <p className="eyebrow">{rally.name} · {rally.network === 'mainnet' ? 'BCH mainnet' : 'chipnet (test)'}</p>
+      <h1>Stall dashboard</h1>
+      <p className="lede">Every stamp is a paid visit. These numbers are read straight from each stall's covenant history: anyone can recompute them, and no one can inflate them.</p>
+      {err && <p className="error" role="alert">{err}</p>}
+      {!s && !err && <p className="muted">Reading the chain…</p>}
+      {s && total && (
+        <table>
+          <thead><tr><th>Stall</th><th>Stamps sold</th><th>Unique buyers</th><th>Paid to stall</th></tr></thead>
+          <tbody>
+            {rally.merchants.map((m) => {
+              const x = s.stalls.find((y) => y.id === m.id)!;
+              return <tr key={m.id}><td>{m.emoji} {m.name}</td><td>{x.stamps}</td><td>{x.buyers}</td><td>{sats(x.revenue)}</td></tr>;
+            })}
+          </tbody>
+          <tfoot><tr><td>Total</td><td>{total.stamps}</td><td /><td>{sats(total.revenue)}</td></tr></tfoot>
+        </table>
+      )}
+      {s && <p>Sets completed: <b>{s.claims}</b> · rewards paid: <b>{sats(BigInt(s.claims) * BigInt(rally.reward))}</b></p>}
       <a href="#" onClick={() => setTimeout(() => location.reload())}>← Back to the rally</a>
     </main>
   );

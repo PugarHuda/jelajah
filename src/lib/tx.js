@@ -1,7 +1,7 @@
 // Transaction builders shared by the web app and the node scripts.
 // Callers pass unlockers, so the same code works with a local key (scripts) or a WizardConnect placeholder (app).
 import { Contract, TransactionBuilder } from 'cashscript';
-import { hexToBin } from '@bitauth/libauth';
+import { hexToBin, binToHex, decodeTransaction } from '@bitauth/libauth';
 import StampMinter from '../contracts/StampMinter.json' with { type: 'json' };
 import RewardVault from '../contracts/RewardVault.json' with { type: 'json' };
 
@@ -88,7 +88,31 @@ export function pickSet(rally, stamps) {
   return set;
 }
 
-export const isRallyNft = (rally, utxo) => utxo.token?.category === rally.category && utxo.token.nft;
+/** Per-stall sales and claims, read from the chain: every spend of a minter is one paid stamp.
+ *  ponytail: one Electrum round trip per tx, fine for hundreds of stamps; index by height if a rally gets big. */
+export async function rallyStats({ rally, provider, minters, vault }) {
+  const txsOf = async (contract) => {
+    const hist = await provider.performRequest('blockchain.address.get_history', contract.address);
+    const ids = hist.map((h) => h.tx_hash).filter((id) => id !== rally.genesisTx);
+    return Promise.all(ids.map(async (id) => {
+      const tx = decodeTransaction(hexToBin(await provider.getRawTransaction(id)));
+      if (typeof tx === 'string') throw new Error(tx);
+      return { id, tx };
+    }));
+  };
+  const stalls = await Promise.all(rally.merchants.map(async (m) => {
+    // only spends of the minter (input 0) are stamps; anything else sent to its address is noise
+    const sales = (await txsOf(minters[m.id])).filter(({ tx }) => tx.outputs[2]?.token?.nft?.commitment.length === 21);
+    const buyers = new Set(sales.map(({ tx }) => binToHex(tx.outputs[2].token.nft.commitment.slice(1))));
+    const revenue = sales.reduce((s, { tx }) => s + tx.outputs[1].valueSatoshis, 0n);
+    return { id: m.id, stamps: sales.length, buyers: buyers.size, revenue };
+  }));
+  // claims mint a trophy (commitment 0x00 + pkh) at out[2]; reclaim does not
+  const claims = (await txsOf(vault)).filter(({ tx }) => tx.outputs[2]?.token?.nft?.commitment[0] === 0).length;
+  return { stalls, claims };
+}
+
+export const isRallyNft =(rally, utxo) => utxo.token?.category === rally.category && utxo.token.nft;
 const pkhOf = (lock) => Array.from(lock.slice(3, 23), (b) => b.toString(16).padStart(2, '0')).join('');
 const nft = (rally, commitment) => ({ category: rally.category, amount: 0n, nft: { capability: 'none', commitment } });
 const stampToken = (rally, id, buyerLock) => nft(rally, hex2(id) + pkhOf(buyerLock));
