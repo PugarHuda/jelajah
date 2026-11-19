@@ -1,7 +1,7 @@
 // Transaction builders shared by the web app and the node scripts.
 // Callers pass unlockers, so the same code works with a local key (scripts) or a WizardConnect placeholder (app).
 import { Contract, TransactionBuilder } from 'cashscript';
-import { hexToBin, binToHex, decodeTransaction } from '@bitauth/libauth';
+import { hexToBin, binToHex, decodeTransaction, cashAddressToLockingBytecode } from '@bitauth/libauth';
 import StampMinter from '../contracts/StampMinter.json' with { type: 'json' };
 import RewardVault from '../contracts/RewardVault.json' with { type: 'json' };
 
@@ -100,15 +100,22 @@ export async function rallyStats({ rally, provider, minters, vault }) {
       return { id, tx };
     }));
   };
+  const ofRally = (o) => o?.token && binToHex(o.token.category) === rally.category;
+  const lockOf = (c) => binToHex(cashAddressToLockingBytecode(c.address).bytecode);
+  // A real spend of a covenant hands the rally's minting NFT back to that covenant at out[0]. Only the
+  // covenant holds that NFT, so junk sent to its address (or a fake NFT of another category) never counts.
+  const spends = (c) => ({ tx }) => ofRally(tx.outputs[0]) && tx.outputs[0].token.nft?.capability === 'minting'
+    && binToHex(tx.outputs[0].lockingBytecode) === lockOf(c);
   const stalls = await Promise.all(rally.merchants.map(async (m) => {
-    // only spends of the minter (input 0) are stamps; anything else sent to its address is noise
-    const sales = (await txsOf(minters[m.id])).filter(({ tx }) => tx.outputs[2]?.token?.nft?.commitment.length === 21);
+    const sales = (await txsOf(minters[m.id])).filter(spends(minters[m.id]))
+      .filter(({ tx }) => ofRally(tx.outputs[2]) && tx.outputs[2].token.nft?.commitment[0] === m.id);
     const buyers = new Set(sales.map(({ tx }) => binToHex(tx.outputs[2].token.nft.commitment.slice(1))));
     const revenue = sales.reduce((s, { tx }) => s + tx.outputs[1].valueSatoshis, 0n);
     return { id: m.id, stamps: sales.length, buyers: buyers.size, revenue };
   }));
   // claims mint a trophy (commitment 0x00 + pkh) at out[2]; reclaim does not
-  const claims = (await txsOf(vault)).filter(({ tx }) => tx.outputs[2]?.token?.nft?.commitment[0] === 0).length;
+  const claims = (await txsOf(vault)).filter(spends(vault))
+    .filter(({ tx }) => ofRally(tx.outputs[2]) && tx.outputs[2].token.nft?.commitment[0] === 0).length;
   return { stalls, claims };
 }
 

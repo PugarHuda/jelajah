@@ -46,5 +46,7 @@
       "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
     }
   ],
-  "genesisTx": "aa5c20f53240528ab3fd4ea581cf6a8a42c28cdbdc2a43ffe3035239478dbffc"
+  "genesisTx": "aa5c20f53240528ab3fd4ea581cf6a8a42c28cdbdc2a43ffe3035239478dbffc",
+  "authHead": "50558ea4484e1f572bfb138ac6d6ffd85b4ddc048fdd71dc193c1a6a00e3db9a",
+  "bcmrMinor": 1
 }

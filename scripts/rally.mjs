@@ -59,7 +59,32 @@ if (cmd === 'reclaim') {
   process.exit(0);
 }
 
-if (cmd !== 'deploy') throw new Error('usage: rally.mjs address|deploy|reclaim --network chipnet|mainnet');
+// Publish a new BCMR revision (e.g. icons) by spending the identity output (genesis out[0]) along the authchain.
+if (cmd === 'bcmr') {
+  if (!opt.registry) throw new Error('--registry https://host/bcmr.json is required');
+  const rally = read(`src/rally.${network}.json`);
+  const coins = (await provider.getUtxos(addr(organizerLock))).filter((u) => !u.token);
+  // authhead: follow out[0] from genesis until it is unspent
+  const head = rally.authHead ?? rally.genesisTx;
+  const identity = coins.find((u) => u.txid === head && u.vout === 0);
+  if (!identity) throw new Error(`identity output ${head}:0 is spent or missing; set authHead in src/rally.${network}.json`);
+  const fee = coins.filter((u) => u !== identity).sort((a, b) => Number(b.satoshis - a.satoshis))[0];
+  const minor = (rally.bcmrMinor ?? 0) + 1;
+  const { body, hash, uri } = registry(rally, opt.registry, minor);
+  writeFileSync(new URL('public/bcmr.json', root), body);
+  const { txid } = await new TransactionBuilder({ provider })
+    .addInput(identity, signer.unlockP2PKH())
+    .addInput(fee, signer.unlockP2PKH())
+    .addOutput({ to: organizerLock, amount: DUST }) // out[0] = next identity output
+    .addOpReturnOutput(['BCMR', `0x${hash}`, uri])
+    .addOutput({ to: organizerLock, amount: identity.satoshis + fee.satoshis - DUST - 1500n })
+    .send();
+  write(`src/rally.${network}.json`, { ...rally, authHead: txid, bcmrMinor: minor });
+  console.log('BCMR revision published', txid);
+  process.exit(0);
+}
+
+if (cmd !== 'deploy') throw new Error('usage: rally.mjs address|deploy|reclaim|bcmr --network chipnet|mainnet');
 
 const cfg = read('scripts/rally.config.json');
 const cheapest = cfg.merchants.map((m) => m.price).sort((a, b) => a - b).slice(0, cfg.needed).reduce((a, b) => a + b, 0);
@@ -105,36 +130,8 @@ const vault = new Contract(RewardVault, vaultArgs(rally), { provider });
 // 3. optional BCMR registry so wallets show names: stamp type = first commitment byte
 let bcmr;
 if (opt.registry) {
-  const registry = {
-    $schema: 'https://cashtokens.org/bcmr-v2.schema.json',
-    version: { major: 1, minor: 0, patch: 0 },
-    latestRevision: new Date().toISOString(),
-    registryIdentity: { name: 'Jelajah', description: 'Stamp rallies on Bitcoin Cash' },
-    identities: {
-      [category]: {
-        [new Date().toISOString()]: {
-          name: `${cfg.name} stamps`,
-          description: cfg.description,
-          token: {
-            category, symbol: 'JELAJAH',
-            nfts: {
-              parse: {
-                bytecode: '00d2517f75', // OP_0 OP_UTXOTOKENCOMMITMENT OP_1 OP_SPLIT OP_DROP -> first byte
-                types: Object.fromEntries([
-                  ['00', { name: `${cfg.name} Trophy`, description: `Completed ${cfg.name}` }],
-                  ...cfg.merchants.map((m) => [m.id.toString(16).padStart(2, '0'), { name: `${m.emoji} ${m.name} stamp`, description: m.tagline }]),
-                ]),
-              },
-            },
-          },
-          uris: { web: new URL('.', opt.registry).href },
-        },
-      },
-    },
-  };
-  const body = JSON.stringify(registry, null, 2) + '\n';
-  writeFileSync(new URL('public/bcmr.json', root), body);
-  bcmr = { hash: createHash('sha256').update(body).digest('hex'), uri: opt.registry.replace(/^https:\/\//, '') };
+  bcmr = registry(rally, opt.registry);
+  writeFileSync(new URL('public/bcmr.json', root), bcmr.body);
 }
 
 // 4. genesis: out[0] identity (plain BCH, stays with organizer), one minting NFT per minter, one for the vault
@@ -154,6 +151,44 @@ console.log(`rally "${cfg.name}" live on ${network}`);
 console.log('category', category);
 console.log('genesis ', txid);
 console.log('vault   ', vault.tokenAddress);
+
+// stamp type = first commitment byte; icons are rendered from the app's #/art page into public/art/<type>.png
+function registry(rally, registryUrl, minor = 0) {
+  const now = new Date().toISOString();
+  const web = new URL('.', registryUrl).href;
+  const icon = (type) => new URL(`art/${type}.png`, web).href;
+  const body = JSON.stringify({
+    $schema: 'https://cashtokens.org/bcmr-v2.schema.json',
+    version: { major: 1, minor, patch: 0 },
+    latestRevision: now,
+    registryIdentity: { name: 'Jelajah', description: 'Stamp rallies on Bitcoin Cash', uris: { icon: icon('00'), web } },
+    identities: {
+      [rally.category]: {
+        [now]: {
+          name: `${rally.name} stamps`,
+          description: rally.description,
+          token: {
+            category: rally.category, symbol: 'JELAJAH',
+            nfts: {
+              parse: {
+                bytecode: '00d2517f75', // OP_0 OP_UTXOTOKENCOMMITMENT OP_1 OP_SPLIT OP_DROP -> first byte
+                types: Object.fromEntries([
+                  ['00', { name: `${rally.name} Trophy`, description: `Completed ${rally.name}`, uris: { icon: icon('00') } }],
+                  ...rally.merchants.map((m) => {
+                    const type = m.id.toString(16).padStart(2, '0');
+                    return [type, { name: `${m.emoji} ${m.name} stamp`, description: m.tagline, uris: { icon: icon(type) } }];
+                  }),
+                ]),
+              },
+            },
+          },
+          uris: { icon: icon('00'), web },
+        },
+      },
+    },
+  }, null, 2) + '\n';
+  return { body, hash: createHash('sha256').update(body).digest('hex'), uri: registryUrl.replace(/^https:\/\//, '') };
+}
 
 function minterArgs(m) { return [m.lock, BigInt(m.price), m.id.toString(16).padStart(2, '0')]; }
 function vaultArgs(r) { return [r.vmCategory, BigInt(r.needed), BigInt(r.reward), r.organizerPub, BigInt(r.endTime)]; }
