@@ -1,0 +1,55 @@
+{
+  "$schema": "https://cashtokens.org/bcmr-v2.schema.json",
+  "version": {
+    "major": 1,
+    "minor": 0,
+    "patch": 0
+  },
+  "latestRevision": "2026-11-19T01:12:29.027Z",
+  "registryIdentity": {
+    "name": "Jelajah",
+    "description": "Stamp rallies on Bitcoin Cash"
+  },
+  "identities": {
+    "026421ea8dc5944c03a0b2151f3c44a89ae307adc0cb828cc25ead05a4c5494f": {
+      "2026-11-19T01:12:29.027Z": {
+        "name": "Jelajah Jogja stamps",
+        "description": "Stamp rally across Yogyakarta street-food stalls. Buy at any 3 stalls, burn the stamps, get paid back and keep a trophy.",
+        "token": {
+          "category": "026421ea8dc5944c03a0b2151f3c44a89ae307adc0cb828cc25ead05a4c5494f",
+          "symbol": "JELAJAH",
+          "nfts": {
+            "parse": {
+              "bytecode": "00d2517f75",
+              "types": {
+                "00": {
+                  "name": "Jelajah Jogja Trophy",
+                  "description": "Completed Jelajah Jogja"
+                },
+                "01": {
+                  "name": "☕ Kopi Joss stamp",
+                  "description": "Charcoal coffee by the station"
+                },
+                "02": {
+                  "name": "🍜 Bakmi Jawa stamp",
+                  "description": "Wood-fire noodles"
+                },
+                "03": {
+                  "name": "🍢 Sate Klathak stamp",
+                  "description": "Goat satay on bicycle spokes"
+                },
+                "04": {
+                  "name": "🥥 Es Dawet stamp",
+                  "description": "Iced coconut and palm sugar"
+                }
+              }
+            }
+          }
+        },
+        "uris": {
+          "web": "https://pugarhuda.github.io/jelajah/"
+        }
+      }
+    }
+  }
+}
