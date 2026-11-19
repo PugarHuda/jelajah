@@ -2,17 +2,21 @@
   "$schema": "https://cashtokens.org/bcmr-v2.schema.json",
   "version": {
     "major": 1,
-    "minor": 0,
+    "minor": 1,
     "patch": 0
   },
-  "latestRevision": "2026-11-19T01:12:29.027Z",
+  "latestRevision": "2026-11-19T01:42:19.197Z",
   "registryIdentity": {
     "name": "Jelajah",
-    "description": "Stamp rallies on Bitcoin Cash"
+    "description": "Stamp rallies on Bitcoin Cash",
+    "uris": {
+      "icon": "https://pugarhuda.github.io/jelajah/art/00.png",
+      "web": "https://pugarhuda.github.io/jelajah/"
+    }
   },
   "identities": {
     "026421ea8dc5944c03a0b2151f3c44a89ae307adc0cb828cc25ead05a4c5494f": {
-      "2026-11-19T01:12:29.027Z": {
+      "2026-11-19T01:42:19.197Z": {
         "name": "Jelajah Jogja stamps",
         "description": "Stamp rally across Yogyakarta street-food stalls. Buy at any 3 stalls, burn the stamps, get paid back and keep a trophy.",
         "token": {
@@ -24,29 +28,45 @@
               "types": {
                 "00": {
                   "name": "Jelajah Jogja Trophy",
-                  "description": "Completed Jelajah Jogja"
+                  "description": "Completed Jelajah Jogja",
+                  "uris": {
+                    "icon": "https://pugarhuda.github.io/jelajah/art/00.png"
+                  }
                 },
                 "01": {
                   "name": "☕ Kopi Joss stamp",
-                  "description": "Charcoal coffee by the station"
+                  "description": "Charcoal coffee by the station",
+                  "uris": {
+                    "icon": "https://pugarhuda.github.io/jelajah/art/01.png"
+                  }
                 },
                 "02": {
                   "name": "🍜 Bakmi Jawa stamp",
-                  "description": "Wood-fire noodles"
+                  "description": "Wood-fire noodles",
+                  "uris": {
+                    "icon": "https://pugarhuda.github.io/jelajah/art/02.png"
+                  }
                 },
                 "03": {
                   "name": "🍢 Sate Klathak stamp",
-                  "description": "Goat satay on bicycle spokes"
+                  "description": "Goat satay on bicycle spokes",
+                  "uris": {
+                    "icon": "https://pugarhuda.github.io/jelajah/art/03.png"
+                  }
                 },
                 "04": {
                   "name": "🥥 Es Dawet stamp",
-                  "description": "Iced coconut and palm sugar"
+                  "description": "Iced coconut and palm sugar",
+                  "uris": {
+                    "icon": "https://pugarhuda.github.io/jelajah/art/04.png"
+                  }
                 }
               }
             }
           }
         },
         "uris": {
+          "icon": "https://pugarhuda.github.io/jelajah/art/00.png",
           "web": "https://pugarhuda.github.io/jelajah/"
         }
       }
