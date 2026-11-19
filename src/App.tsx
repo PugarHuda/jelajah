@@ -102,7 +102,8 @@ function Rally() {
   const claim = () => run(tr('🏆 Set claimed: reward + trophy', '🏆 Set diklaim: hadiah + trofi'), async () => {
     const fresh = await walletCoins(wc.manager!);
     const hexPkh = hex(lock!.slice(3, 23));
-    const vaultUtxo = (await mergeLevies({ rally, provider, vault })) ?? undefined; // unsigned, so no wallet prompt
+    // unsigned, so no wallet prompt; if it fails (e.g. a racing merge) the claim still uses the current vault coin
+    const vaultUtxo = (await mergeLevies({ rally, provider, vault }).catch(() => null)) ?? undefined;
     const { builder, inputs } = await buildClaim({
       rally, provider, vault, buyerLock: lock!, vaultUtxo,
       stamps: fresh.filter((c) => isRallyNft(rally, c.utxo) && stallOf(c) > 0 && c.utxo.token!.nft!.commitment.slice(2) === hexPkh),

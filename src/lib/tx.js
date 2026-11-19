@@ -49,7 +49,7 @@ export async function buildStamp({ rally, provider, minters, merchantId, buyerLo
   const minter = minters[merchantId];
   // a stall may have several minter coins ("lanes"); pick one at random so simultaneous buyers rarely collide.
   // Only coins carrying the rally's minting NFT are minters; anything else sent to the address is ignored.
-  const lanes = (await minter.getUtxos()).filter((u) => u.token?.category === rally.category && u.token.nft?.capability === 'minting');
+  const lanes = (await minter.getUtxos()).filter((u) => isMintingCoin(rally, u));
   const minterUtxo = lanes[Math.floor(Math.random() * lanes.length)];
   if (!minterUtxo) throw new Error('This stall is not open (minter not found)');
   const member = !!trophy && rally.minter >= 2;
@@ -74,7 +74,7 @@ export async function buildStamp({ rally, provider, minters, merchantId, buyerLo
  *  stamps, coins: [{ utxo, unlocker }] — coins top up the fee when the stamps' dust is not enough.
  *  @param {{ rally: any, provider: any, vault: any, buyerLock: Uint8Array, stamps: any[], coins?: any[], vaultUtxo?: any }} args */
 export async function buildClaim({ rally, provider, vault, buyerLock, stamps, coins = [], vaultUtxo = undefined }) {
-  vaultUtxo ??= (await vault.getUtxos()).find((u) => u.token); // levy coins share the vault's address
+  vaultUtxo ??= (await vault.getUtxos()).find((u) => isMintingCoin(rally, u)); // levy coins (and junk) share the vault's address
   if (!vaultUtxo) throw new Error('This rally is over (vault not found)');
   const reward = BigInt(rally.reward);
   if (vaultUtxo.satoshis - reward < DUST) throw new Error('The reward pool is empty');
@@ -94,15 +94,18 @@ export async function buildClaim({ rally, provider, vault, buyerLock, stamps, co
   };
 }
 
-const MERGE_FEE = 500n; // per input; RewardVault2.merge allows up to 600
+const MERGE_FEE = 500n; // per input; RewardVault2.merge allows up to 600, and never out of the vault coin itself
+const MAX_MERGE = 30;
 
 /** Levy rallies: fold the levy coins at the vault address into the vault coin. Needs no signature, anyone can send it.
  *  Returns the new vault coin, or null when there is nothing worth merging. */
 export async function mergeLevies({ rally, provider, vault }) {
   if (rally.minter !== 3) return null;
   const all = await vault.getUtxos();
-  const vaultCoin = all.find((u) => u.token);
-  const levies = all.filter((u) => !u.token && u.satoshis > MERGE_FEE);
+  const vaultCoin = all.find((u) => isMintingCoin(rally, u));
+  // largest first, capped so one merge stays well under the standard tx size; the rest wait for the next merge
+  const levies = all.filter((u) => !u.token && u.satoshis > MERGE_FEE * 2n)
+    .sort((a, b) => Number(b.satoshis - a.satoshis)).slice(0, MAX_MERGE);
   if (!vaultCoin || !levies.length) return null;
   const ins = [vaultCoin, ...levies];
   const amount = ins.reduce((s, u) => s + u.satoshis, 0n) - MERGE_FEE * BigInt(ins.length);
@@ -157,7 +160,10 @@ export async function rallyStats({ rally, provider, minters, vault }) {
   return { stalls, claims };
 }
 
-export const isRallyNft =(rally, utxo) => utxo.token?.category === rally.category && utxo.token.nft;
+/** The coin that holds this rally's minting NFT (a minter lane or the vault), not junk sent to the same address. */
+export const isMintingCoin = (rally, u) => u.token?.category === rally.category && u.token.nft?.capability === 'minting';
+
+export const isRallyNft = (rally, utxo) => utxo.token?.category === rally.category && utxo.token.nft;
 const pkhOf = (lock) => Array.from(lock.slice(3, 23), (b) => b.toString(16).padStart(2, '0')).join('');
 const nft = (rally, commitment) => ({ category: rally.category, amount: 0n, nft: { capability: 'none', commitment } });
 const stampToken = (rally, id, buyerLock) => nft(rally, hex2(id) + pkhOf(buyerLock));

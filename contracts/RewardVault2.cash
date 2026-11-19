@@ -65,6 +65,9 @@ contract RewardVault2(bytes32 rallyCategory, int needed, int reward, pubkey orga
             total = total + tx.inputs[i].value;
         }
         require(tx.outputs[0].value >= total - 600 * tx.inputs.length);
+        // the fee comes out of the levies, never out of the pool: a merge can't shrink the vault coin
+        // (without this, merging the vault coin with nothing would burn 600 sats per call, over and over)
+        require(tx.outputs[0].value >= tx.inputs[0].value);
     }
 
     // after the rally ends the organizer takes back what is left

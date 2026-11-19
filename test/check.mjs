@@ -193,6 +193,13 @@ await merge();
 const pooled = (await vaultCoins()).vaultCoin.satoshis;
 assert.ok(pooled >= DUST + 3n * LEVY - 2_000n);
 console.log('PASS anyone merged the levies into the vault coin, unsigned:', pooled, 'sats');
+{
+  const { vaultCoin } = await vaultCoins();
+  await fails('merge of the vault coin alone, paying the fee out of the pool', () => new TransactionBuilder({ provider })
+    .addInput(vaultCoin, vault2.unlock.merge())
+    .addOutput({ to: vault2.tokenAddress, amount: vaultCoin.satoshis - 500n, token: vaultCoin.token })
+    .send());
+}
 
 await buy3(0, bob); // a fresh levy coin for the next attack
 {

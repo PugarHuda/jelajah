@@ -7,7 +7,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { createHash } from 'node:crypto';
 import { ElectrumNetworkProvider, SignatureTemplate, TransactionBuilder } from 'cashscript';
-import { rallyContracts } from '../src/lib/tx.js'; // one place that knows which contract version a rally uses
+import { rallyContracts, isMintingCoin } from '../src/lib/tx.js'; // one place that knows which contract version a rally uses
 import {
   secp256k1, hash160, binToHex, hexToBin, encodeLockingBytecodeP2pkh, lockingBytecodeToCashAddress,
   encodePrivateKeyWif, decodePrivateKeyWif, cashAddressToLockingBytecode, generatePrivateKey,
@@ -48,7 +48,7 @@ if (cmd === 'reclaim') {
   const rally = read(opt.rally ?? `src/rally.${network}.json`); // --rally scripts/rally.mainnet-v1.json for a retired rally
   const { vault } = rallyContracts(rally, provider);
   const coins = await vault.getUtxos(); // the vault coin, plus any unmerged levy coins on levy rallies
-  const v = coins.find((u) => u.token);
+  const v = coins.find((u) => isMintingCoin(rally, u));
   const tb = new TransactionBuilder({ provider });
   coins.forEach((u) => tb.addInput(u, vault.unlock.reclaim(signer)));
   const { txid } = await tb
