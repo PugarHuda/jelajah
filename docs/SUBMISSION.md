@@ -32,7 +32,7 @@ There is no sign-up, no server and no database. The prize is locked in a covenan
 
 **Why it's a business:** organisers, malls and brands pay per rally, and every stamp is a paid visit they can prove. The anti-farming rule (reward < cheapest full set) means a stall can never profit from buying its own stamps.
 
-**Tech:** CashScript 0.14 (StampMinter 94 B, RewardVault 170 B), CashTokens, WizardConnect, React/Vite. The test suite runs every transaction against the BCH VM, including the attack cases. Tested end to end with Selene on chipnet, then on mainnet.
+**Tech:** CashScript 0.14 (StampMinter 94 B, RewardVault 170 B), CashTokens, WizardConnect, React/Vite. The test suite runs every transaction against the BCH VM, including the attack cases. Tested end to end with Selene on chipnet. The demo rally is live on mainnet: genesis [`47f7df27…`](https://blockchair.com/bitcoin-cash/transaction/47f7df27c3142503911eee2fcd76199be91d64fbae0b4fa621041268a65b7f34).
 
 ### FoldingCash Reward Claims bounty (`claims/`)
 Pull-based Merkle claims built on a **second "claimed" Merkle tree** that shares the earned tree's indices. A receipt NFT alone can't stop a double claim, because the claimer can just hide it. The keeper category has no minting authority, new roots wait behind a cancellable CSV timelock, and epochs only move forward. Shipped:

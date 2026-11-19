@@ -26,8 +26,8 @@ const buyer = wallet(generatePrivateKey());
 const fund = (await organizer.coins()).filter((c) => !c.utxo.token).sort((a, b) => Number(b.utxo.satoshis - a.utxo.satoshis))[0];
 const funded = await new TransactionBuilder({ provider })
   .addInput(fund.utxo, fund.unlocker)
-  .addOutput({ to: buyer.lock, amount: 60_000n })
-  .addOutput({ to: organizer.lock, amount: fund.utxo.satoshis - 60_000n - 1000n })
+  .addOutput({ to: buyer.lock, amount: 20_000n }) // 3 stamps (price + dust + fee) + claim fee
+  .addOutput({ to: organizer.lock, amount: fund.utxo.satoshis - 20_000n - 1000n })
   .send();
 console.log('funded buyer      ', explorer + funded.txid);
 
