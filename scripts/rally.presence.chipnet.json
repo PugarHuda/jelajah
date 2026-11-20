@@ -2,11 +2,11 @@
   "network": "chipnet",
   "name": "Jelajah Jogja (presence)",
   "description": "Levy rally where two stalls also require their device to sign for each buyer, proving the buyer was there.",
-  "category": "02e0c3303568888c4f0370194f4997c450bd952c3f77513ee7e02ef316b9b618",
-  "vmCategory": "18b6b916f32ee0e73e51773f2c95bd50c497494f1970034f8c88683530c3e002",
+  "category": "70a9c892f2351f4f7c27ace3a802851cb56b5c23f4fb4c21e37bf07f1c2c37b8",
+  "vmCategory": "b8372c1c7ff07be3214cfbf4235c6bb51c8502a8e3ac277c4f1f35f292c8a970",
   "needed": 3,
   "reward": 4000,
-  "endTime": 1800332196,
+  "endTime": 1800332890,
   "organizerPub": "033f41a2eaf9fa8a2d9a21ada58031094cdce2981627120f09ac80332a32b693cd",
   "lanes": 2,
   "minter": 3,
@@ -61,5 +61,5 @@
       "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
     }
   ],
-  "genesisTx": "c5dc4f5b32dd132ec491fc968b7e7a1f6c00c2df64a37120bf9425823c8dedee"
+  "genesisTx": "4809c236822130f8df83414453d242e6e19628fe785da46380073a99c69595fa"
 }

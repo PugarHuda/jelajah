@@ -4,14 +4,18 @@ import { readFileSync, existsSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { ElectrumNetworkProvider, SignatureTemplate, TransactionBuilder } from 'cashscript';
 import { secp256k1, hash160, encodeLockingBytecodeP2pkh, lockingBytecodeToCashAddress, decodePrivateKeyWif, generatePrivateKey, hexToBin, binToHex } from '@bitauth/libauth';
-import { rallyContracts, buildStamp, buildClaim, isRallyNft, mergeLevies, signPresence } from '../src/lib/tx.js';
+import { rallyContracts, buildStamp, buildClaim, isRallyNft, mergeLevies, signPresence, pickLane } from '../src/lib/tx.js';
 
 const { values: { network, rally: rallyFile } } = parseArgs({ options: { network: { type: 'string', default: 'chipnet' }, rally: { type: 'string' } } });
 const rally = JSON.parse(readFileSync(rallyFile ?? new URL(`../src/rally.${network}.json`, import.meta.url)));
 // presence stalls: sign as the stall's device would (CLI-made rallies keep device keys in scripts/.presence.<net>.json)
 const presenceFile = new URL(`./.presence.${network}.json`, import.meta.url);
 const devices = existsSync(presenceFile) ? JSON.parse(readFileSync(presenceFile)) : {};
-const presenceFor = (m, lock) => (m.presenceKey ? signPresence(hexToBin(devices[m.id]), rally, m.id, binToHex(lock.slice(3, 23))) : undefined);
+// pick the lane first: the device's signature covers that exact minter coin
+const presenceFor = async (m, lock) => {
+  const lane = await pickLane(rally, minters[m.id]);
+  return { lane, presence: m.presenceKey ? signPresence(hexToBin(devices[m.id]), rally, m.id, binToHex(lock.slice(3, 23)), lane) : undefined };
+};
 const provider = new ElectrumNetworkProvider(network);
 const prefix = network === 'mainnet' ? 'bitcoincash' : 'bchtest';
 const explorer = network === 'mainnet' ? 'https://blockchair.com/bitcoin-cash/transaction/' : 'https://chipnet.imaginary.cash/tx/';
@@ -40,7 +44,7 @@ console.log('funded buyer      ', explorer + funded.txid);
 
 const { minters, vault } = rallyContracts(rally, provider);
 for (const m of rally.merchants.slice(0, tier)) {
-  const { builder } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: buyer.lock, coins: await buyer.coins(), presence: presenceFor(m, buyer.lock) });
+  const { builder } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: buyer.lock, coins: await buyer.coins(), ...(await presenceFor(m, buyer.lock)) });
   const { txid } = await builder.send();
   console.log(`stamp ${m.emoji} ${m.name.padEnd(12)}`, explorer + txid);
 }
@@ -63,7 +67,7 @@ if ((rally.minter ?? 1) >= 2) {
   const coins = await buyer.coins();
   const trophy = coins.find((c) => isRallyNft(rally, c.utxo) && c.utxo.token.nft.commitment.startsWith('00'));
   const m = rally.merchants[0];
-  const { builder: b } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: buyer.lock, coins: coins.filter((c) => !c.utxo.token), trophy, presence: presenceFor(m, buyer.lock) });
+  const { builder: b } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: buyer.lock, coins: coins.filter((c) => !c.utxo.token), trophy, ...(await presenceFor(m, buyer.lock)) });
   console.log(`member stamp ${m.emoji} (${m.memberPrice} sats)`, explorer + (await b.send()).txid);
   const back = (await buyer.coins()).some((c) => isRallyNft(rally, c.utxo) && c.utxo.token.nft.commitment.startsWith('00'));
   if (!back) throw new Error('trophy did not come back');

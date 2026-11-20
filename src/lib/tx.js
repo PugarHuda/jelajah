@@ -46,13 +46,13 @@ export function pickCoins(coins, target) {
 
 /** Buy at one stall and receive its stamp in the same transaction. buyerLock: Uint8Array P2PKH.
  *  trophy (optional, StampMinter2 rallies): the buyer's own Trophy coin { utxo, unlocker } -> member price, trophy comes back. */
-export async function buildStamp({ rally, provider, minters, merchantId, buyerLock, coins, trophy, presence }) {
+export async function buildStamp({ rally, provider, minters, merchantId, buyerLock, coins, trophy, presence, lane }) {
   const merchant = rally.merchants.find((m) => m.id === merchantId);
   const minter = minters[merchantId];
   // a stall may have several minter coins ("lanes"); pick one at random so simultaneous buyers rarely collide.
   // Only coins carrying the rally's minting NFT are minters; anything else sent to the address is ignored.
-  const lanes = (await minter.getUtxos()).filter((u) => isMintingCoin(rally, u));
-  const minterUtxo = lanes[Math.floor(Math.random() * lanes.length)];
+  // a presence signature is bound to one lane coin, so then the caller passes that lane
+  const minterUtxo = lane ?? await pickLane(rally, minter);
   if (!minterUtxo) throw new Error('This stall is not open (minter not found)');
   const member = !!trophy && rally.minter >= 2;
   const price = BigInt(member ? merchant.memberPrice : merchant.price);
@@ -173,11 +173,26 @@ export async function rallyStats({ rally, provider, minters, vault }) {
   return { stalls, claims: claimTxs.length, collectors };
 }
 
-// ---- proof of presence: the stall's device signs rallyCategory ‖ merchantId ‖ buyer pkh (what StampMinter3 checks)
-export const presenceMessage = (rally, merchantId, buyerPkhHex) => hexToBin(rally.vmCategory + hex2(merchantId) + buyerPkhHex);
+/** One of the stall's minter coins, at random, so simultaneous buyers rarely collide. */
+export async function pickLane(rally, minter) {
+  const lanes = (await minter.getUtxos()).filter((u) => isMintingCoin(rally, u));
+  return lanes[Math.floor(Math.random() * lanes.length)];
+}
+
+// ---- proof of presence: the stall's device signs rallyCategory ‖ merchantId ‖ buyer pkh ‖ minter outpoint
+// (what StampMinter3 checks). The outpoint is the lane coin the stamp will spend, so every code is single use.
+const le32 = (n) => [0, 8, 16, 24].map((s) => ((n >>> s) & 0xff).toString(16).padStart(2, '0')).join('');
+export const presenceMessage = (rally, merchantId, buyerPkhHex, outpoint) => hexToBin(rally.vmCategory + hex2(merchantId) + buyerPkhHex
+  + binToHex(hexToBin(outpoint.txid).reverse()) + le32(outpoint.vout));
+/** The buyer's code for the stall's device: pkh:txid:vout of the lane coin they will spend. */
+export const presenceCode = (buyerPkhHex, lane) => `${buyerPkhHex}:${lane.txid}:${lane.vout}`;
+export function parsePresenceCode(code) {
+  const m = /^([0-9a-f]{40}):([0-9a-f]{64}):(\d{1,5})$/.exec(code.trim().toLowerCase());
+  return m ? { buyerPkh: m[1], outpoint: { txid: m[2], vout: Number(m[3]) } } : null;
+}
 /** Schnorr datasig as OP_CHECKDATASIG expects it (over sha256 of the message). */
-export function signPresence(privateKey, rally, merchantId, buyerPkhHex) {
-  const sig = secp256k1.signMessageHashSchnorr(privateKey, sha256.hash(presenceMessage(rally, merchantId, buyerPkhHex)));
+export function signPresence(privateKey, rally, merchantId, buyerPkhHex, outpoint) {
+  const sig = secp256k1.signMessageHashSchnorr(privateKey, sha256.hash(presenceMessage(rally, merchantId, buyerPkhHex, outpoint)));
   if (typeof sig === 'string') throw new Error(sig);
   return sig;
 }

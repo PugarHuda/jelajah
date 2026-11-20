@@ -261,9 +261,12 @@ async function claim2(stamps, pay) {
 const stallDevice = key(21), otherDevice = key(22), erin = key(5);
 const mP = new Contract(StampMinter3, [merchants3[0].lock, PRICE, MEMBER, '01', vault2Lock, LEVY, binToHex(stallDevice.pub)], { provider });
 provider.addUtxo(mP.address, randomUtxo({ satoshis: DUST, token: minting }));
-const presenceSig = (device, id, buyer) => secp256k1.signMessageHashSchnorr(device.priv, sha256.hash(hexToBin(vmCategory + id + binToHex(buyer.pkh))));
-async function buyP(buyer, presence) {
+const outpointHex = (u) => binToHex(hexToBin(u.txid).reverse()) + binToHex(Uint8Array.of(u.vout, 0, 0, 0));
+// sign(minterUtxo) -> sig: the signature covers the lane coin that this stamp spends
+const presenceSig = (device, id, buyer, coin) => secp256k1.signMessageHashSchnorr(device.priv, sha256.hash(hexToBin(vmCategory + id + binToHex(buyer.pkh) + outpointHex(coin))));
+async function buyP(buyer, sign) {
   const [minterUtxo] = (await mP.getUtxos()).filter((u) => u.token);
+  const presence = sign(minterUtxo);
   const coin = fund(buyer);
   return new TransactionBuilder({ provider })
     .addInput(minterUtxo, mP.unlock.stamp(presence))
@@ -275,9 +278,11 @@ async function buyP(buyer, presence) {
     .addOutput({ to: hexToBin(buyer.lock), amount: coin.satoshis - PRICE - DUST - LEVY - 2_000n })
     .send();
 }
-await fails('presence stall without the device signature', () => buyP(erin, new Uint8Array()));
-await fails("presence signature made for someone else (a shared screenshot)", () => buyP(erin, presenceSig(stallDevice, '01', dave)));
-await fails('presence signature from another device', () => buyP(erin, presenceSig(otherDevice, '01', erin)));
-await fails('presence signature for another stall', () => buyP(erin, presenceSig(stallDevice, '02', erin)));
-await buyP(erin, presenceSig(stallDevice, '01', erin));
-console.log("PASS erin bought at a presence stall with the stall device's signature over her own pkh");
+await fails('presence stall without the device signature', () => buyP(erin, () => new Uint8Array()));
+await fails("presence signature made for someone else (a shared screenshot)", () => buyP(erin, (c) => presenceSig(stallDevice, '01', dave, c)));
+await fails('presence signature from another device', () => buyP(erin, (c) => presenceSig(otherDevice, '01', erin, c)));
+await fails('presence signature for another stall', () => buyP(erin, (c) => presenceSig(stallDevice, '02', erin, c)));
+let used;
+await buyP(erin, (c) => (used = presenceSig(stallDevice, '01', erin, c)));
+console.log("PASS erin bought at a presence stall with the stall device's signature over her own pkh and that minter coin");
+await fails('replaying a used presence code (the minter coin it named is gone)', () => buyP(erin, () => used));
