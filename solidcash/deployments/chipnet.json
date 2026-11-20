@@ -1,0 +1,14 @@
+{
+  "network": "chipnet",
+  "address": "bchtest:r0xpyv5dvj0ftnm03zjp8cyadf0l7g2nft8kg6xcxlz7dqs25psnxz3xwa0h0",
+  "stall": "bchtest:qqjpq6g2fjuha8jvjv45algtcqdxvu0x9s50zpjqja",
+  "customer": "bchtest:qq2lzvs4wjlp7pef7dtgtrmyxx420auuc5wu9vjc6e",
+  "txs": {
+    "deploy": "d898cd1aa5fb079c996ab3fa82a5bdd2a3b6eb1d6a1e75923f788321014937f6",
+    "fund": "77693100a8f80d8126172e4f48518862d1d3c21fdccea7f888e5e8b57fbb28c4",
+    "visit1": "b3d47c5a019a434f323aa22a99216a236308ae2222b1e341965b0a2669bdfeb3",
+    "visit2": "9864fcaae8951ee893caee215e636a9c8668c0fb6baea0d7a36149146d0d4c9b",
+    "visit3": "25ea606ea6af1f7737dd46a1e886a63c70017c81547d658c76252e7555d43961",
+    "redeem": "196b364edf351aaa684e2f4aecbb15d03393e7fdd78ffeab91387c1a0a81931c"
+  }
+}
