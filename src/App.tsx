@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
 import qrcode from 'qrcode-generator';
-import { hexToBin, binToHex, cashAddressToLockingBytecode, secp256k1, sha256, generatePrivateKey, encodePrivateKeyWif, decodePrivateKeyWif } from '@bitauth/libauth';
+import { hexToBin, binToHex, cashAddressToLockingBytecode, secp256k1, sha256, generatePrivateKey, encodePrivateKeyWif, decodePrivateKeyWif, encodeLockingBytecodeP2pkh, hash160 } from '@bitauth/libauth';
 import { TransactionBuilder, SignatureTemplate, type Utxo } from 'cashscript';
-import { rally, provider, minters, vault, rallyLink, fromLink, type Merchant, type Rally } from './chain';
-import { buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane, buildReclaim } from './lib/tx.js';
+import { rally, provider, minters, vault, rallyLink, fromLink, passportFromLink, type Merchant, type Rally } from './chain';
+import { isVoucher, buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane, buildReclaim, buildAddStall, buildPassportClaim, isTrophyOf } from './lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, receiveZeroCoin, type Coin } from './wallet';
 import { Stamp, Trophy } from './Stamp';
 import { SLIDES_URL, REPO_URL, VOTE_ADDRESS } from './links';
@@ -37,7 +37,7 @@ function switchLang() {
   if (u.hash) setTimeout(() => location.reload());
 }
 // what the buyer pays for one stamp: the stall's (member) price plus the levy that goes to the pool
-const cost = (m: Merchant, member: boolean) => (member ? m.memberPrice! : m.price) + (rally.levy ?? 0);
+const cost = (m: Merchant, member: boolean, voucher = false) => (member ? m.memberPrice! : m.price) + (rally.levy ?? 0) - (voucher ? rally.sponsor!.value : 0);
 const stallOf = (c: Coin) => parseInt(c.utxo.token!.nft!.commitment.slice(0, 2), 16);
 
 export default function App() {
@@ -47,6 +47,7 @@ export default function App() {
   if (window.location.hash === '#/organize') return <Organize />;
   if (window.location.hash.startsWith('#/device')) return <Device />;
   if (window.location.hash === '#/reclaim') return <Reclaim />;
+  if (window.location.hash === '#/passport' && passportFromLink) return <PassportPage />;
   if (window.location.hash === '#/art') return ( // press image: every stamp + the trophy
     <main className="art">{rally.merchants.map((m) => <Stamp key={m.id} m={m} inked size={220} />)}<Trophy name={rally.name} size={220} /></main>
   );
@@ -87,10 +88,11 @@ function Rally() {
   }, [refresh]);
 
   const nfts = coins.filter((c) => isRallyNft(rally, c.utxo));
-  const mine = (c: Coin) => lock && c.utxo.token!.nft!.commitment.slice(2) === hex(lock.slice(3, 23));
+  const mine = (c: Coin) => lock && c.utxo.token!.nft!.commitment.slice(2, 42) === hex(lock.slice(3, 23)); // id ‖ pkh (‖ tier)
   const stamps = nfts.filter((c) => stallOf(c) > 0 && mine(c));
   const trophies = nfts.filter((c) => stallOf(c) === 0);
   const member = (rally.minter ?? 1) >= 2 && trophies.some(mine); // own trophy -> member price at every stall
+  const hasVoucher = coins.some((c) => isVoucher(rally, c.utxo)); // a sponsor's voucher pays part of the next stamp
   const collected = new Set(stamps.map(stallOf));
   const bch = coins.filter((c) => !c.utxo.token).reduce((s, c) => s + c.utxo.satoshis, 0n);
   const ready = collected.size >= rally.needed;
@@ -118,8 +120,9 @@ function Rally() {
     : run(`${m.emoji} ${tr('Stamped at', 'Dapat stamp di')} ${m.name}`, async () => {
     const fresh = await walletCoins(wc.manager!); // never build on a stale or not-yet-loaded coin list
     const myTrophy = (rally.minter ?? 1) >= 2 ? fresh.find((c) => isRallyNft(rally, c.utxo) && stallOf(c) === 0 && mine(c)) : undefined;
-    const price = sats(cost(m, !!myTrophy));
-    const { builder, inputs } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: lock!, coins: fresh, trophy: myTrophy, presence: presence ? hexToBin(presence) : undefined, lane });
+    const voucher = fresh.find((c) => isVoucher(rally, c.utxo));
+    const price = sats(cost(m, !!myTrophy, !!voucher));
+    const { builder, inputs } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: lock!, coins: fresh.filter((c) => !c.utxo.token), trophy: myTrophy, presence: presence ? hexToBin(presence) : undefined, lane, voucher });
     return signAndSend(wc.manager!, builder, inputs, myTrophy
       ? tr(`Show your trophy, pay ${m.name} the member price ${price} and get its stamp`, `Tunjukkan trofimu, bayar ${m.name} harga member ${price} dan dapat stamp-nya`)
       : tr(`Pay ${m.name} ${price} and get its Jelajah stamp`, `Bayar ${m.name} ${price} dan dapat stamp Jelajah-nya`));
@@ -218,7 +221,7 @@ function Rally() {
                   <button className={have ? 'ghost' : 'primary'} disabled={!connected || !!busy}
                     onClick={() => buy(m)} title={connected ? undefined : tr('Connect your wallet first', 'Hubungkan wallet dulu')}>
                     {busy?.endsWith(` ${m.name}`) ? tr('Approve in wallet…', 'Setujui di wallet…')
-                      : `${have ? tr('Again', 'Lagi') : tr('Buy', 'Beli')} · ${sats(cost(m, member))}${member ? ' ★' : ''}`}
+                      : `${have ? tr('Again', 'Lagi') : tr('Buy', 'Beli')} · ${sats(cost(m, member, hasVoucher))}${member ? ' ★' : ''}${hasVoucher ? ' 🎟' : ''}`}
                   </button>
                 </article>
               );
@@ -241,6 +244,10 @@ function Rally() {
             </button>
           </div>
           {!connected && <p className="hint">{tr("Connect a wallet (Selene, Paytaca, Cashonize) to start. Each stamp costs the stall's price plus a tiny network fee.", 'Hubungkan wallet (Selene, Paytaca, Cashonize) untuk mulai. Tiap stamp seharga warungnya ditambah biaya jaringan yang sangat kecil.')}</p>}
+          {rally.sponsor && (
+            <p className="hint">🎟 {tr(`Sponsored by ${rally.sponsor.name}: a voucher takes ${sats(rally.sponsor.value)} off a stamp, and the stall still gets its full price.`,
+              `Disponsori ${rally.sponsor.name}: satu voucher memotong ${sats(rally.sponsor.value)} dari harga stamp, dan warung tetap dibayar penuh.`)}{hasVoucher && tr(' You hold a voucher.', ' Kamu punya voucher.')}</p>
+          )}
           {(rally.minter ?? 1) >= 2 && (
             <p className="hint">{member
               ? tr('★ You hold a trophy: every stall gives you its member price. Your trophy is shown to the stall\'s covenant and comes straight back.',
@@ -260,7 +267,7 @@ function Rally() {
         {trophies.length > 0 && (
           <section className="shelf">
             <h2>{tr('Trophy shelf', 'Rak trofi')}</h2>
-            <div className="trophies">{trophies.map((t) => <Trophy key={t.utxo.txid} name={rally.name} />)}</div>
+            <div className="trophies">{trophies.map((t) => <Trophy key={t.utxo.txid} name={rally.name} bonus={t.utxo.token!.nft!.commitment.length > 42} />)}</div>
           </section>
         )}
 
@@ -521,7 +528,104 @@ function Reclaim() {
         <button className="primary big" disabled={!keyOk || !dest || !open || busy} onClick={reclaim}>{busy ? tr('Sending…', 'Mengirim…') : tr('Reclaim the pool', 'Ambil pool')}</button>
         {err && <p className="error" role="alert">{err}</p>}
       </>)}
+      {keyOk && rally.minter === 3 && <AddStall keyBytes={key!} />}
       <p><a href={location.pathname + location.search} onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
+    </main>
+  );
+}
+
+// Organizer tools: open a stall mid-rally (levy rallies). Signed locally with the reclaim (organizer) key; the fee comes from
+// coins sent to that key's own address. The vault derives the new stall's minter itself (RewardVault2.addStall).
+function AddStall({ keyBytes }: { keyBytes: Uint8Array }) {
+  const keyLock = encodeLockingBytecodeP2pkh(hash160(secp256k1.derivePublicKeyCompressed(keyBytes) as Uint8Array));
+  const keyAddress = addressOf(keyLock);
+  const [s, setS] = useState({ name: '', emoji: '⭐', price: '3000', memberPrice: '2700', address: '' });
+  const [funds, setFunds] = useState<bigint | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ link: string; txid: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => { provider.getUtxos(keyAddress).then((u) => setFunds(u.filter((x) => !x.token).reduce((t, x) => t + x.satoshis, 0n))).catch(() => {}); }, [keyAddress]);
+  async function add() {
+    setBusy(true); setErr(null);
+    try {
+      const signer = new SignatureTemplate(keyBytes);
+      const coin = (await provider.getUtxos(keyAddress)).filter((u) => !u.token).sort((a, b) => Number(b.satoshis - a.satoshis))[0];
+      if (!coin) throw new Error(tr('Send a few thousand sats to the organizer address first', 'Kirim beberapa ribu sats ke alamat penyelenggara dulu'));
+      let lock = binToHex(keyLock);
+      if (s.address.trim()) { const r = cashAddressToLockingBytecode(s.address.trim()); if (typeof r === 'string') throw new Error(r); lock = binToHex(r.bytecode); }
+      const { builder, rally: next } = await buildAddStall({ rally, provider, signer, changeTo: keyLock, feeCoin: { utxo: coin, unlocker: signer.unlockP2PKH() },
+        stall: { name: s.name.trim() || 'New stall', emoji: s.emoji || '⭐', price: Number(s.price), memberPrice: Number(s.memberPrice || s.price), lock } });
+      const { txid } = await builder.send();
+      setMsg({ txid, link: await rallyLink(next as Rally) });
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  }
+  const set = (k: keyof typeof s) => (e: React.ChangeEvent<HTMLInputElement>) => setS({ ...s, [k]: e.target.value });
+  return (
+    <section>
+      <h2>{tr('Open a stall mid-rally', 'Buka warung baru di tengah rally')}</h2>
+      <p className="muted small">{tr("The vault itself derives the new stall's minter from the stamp-minter code, so the minting NFT can only go to a real stall of this rally, with this rally's levy.",
+        'Vault sendiri menurunkan minter warung baru dari kode stamp-minter, jadi minting NFT hanya bisa ke warung sungguhan rally ini, dengan levy rally ini.')}</p>
+      {msg ? <p className="hint">✅ <a href={explorerTx(msg.txid)} target="_blank" rel="noreferrer">{msg.txid.slice(0, 16)}…</a> · {tr('New share link (with the new stall):', 'Share link baru (dengan warung baru):')} <a href={msg.link} style={{ wordBreak: 'break-all' }}>{msg.link.slice(0, 60)}…</a></p> : (<>
+        <div className="form stall-row">
+          <label>{tr('Name', 'Nama')}<input value={s.name} onChange={set('name')} maxLength={40} /></label>
+          <label>Emoji<input value={s.emoji} onChange={set('emoji')} maxLength={4} /></label>
+          <label>{tr('Price', 'Harga')}<input type="number" value={s.price} onChange={set('price')} /></label>
+          <label>{tr('Member price', 'Harga member')}<input type="number" value={s.memberPrice} onChange={set('memberPrice')} /></label>
+          <label className="wide">{tr("Stall's P2PKH address (empty = the organizer key)", 'Alamat P2PKH warung (kosong = kunci penyelenggara)')}<input value={s.address} onChange={set('address')} placeholder={rally.network === 'mainnet' ? 'bitcoincash:q…' : 'bchtest:q…'} /></label>
+        </div>
+        <p className="muted small">{tr('Fee coins (≥ 5,500 sats) at the organizer address:', 'Koin fee (≥ 5.500 sats) di alamat penyelenggara:')} <code className="wrap">{keyAddress}</code> · {funds === null ? '…' : sats(funds)}</p>
+        <button className="primary" disabled={busy} onClick={add}>{busy ? tr('Sending…', 'Mengirim…') : tr('Open the stall', 'Buka warung')}</button>
+        {err && <p className="error" role="alert">{err}</p>}
+      </>)}
+    </section>
+  );
+}
+
+// ---- #/passport (?pp=…): trade a trophy from each of two rallies for the passport reward + a Passport NFT
+function PassportPage() {
+  const pp = passportFromLink!;
+  const wc = useWizardConnect({ dappName: 'Jelajah', dappIcon: new URL('favicon.svg', location.origin + import.meta.env.BASE_URL).href });
+  const lock = wc.state === 'connected' ? buyerLock(wc.manager) : null;
+  const [coins, setCoins] = useState<Coin[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [, tick] = useState(0);
+  useEffect(() => { // xpubs can land after "connected"
+    if (wc.state !== 'connected' || lock) return;
+    const t = setInterval(() => tick((n) => n + 1), 500);
+    return () => clearInterval(t);
+  }, [wc.state, lock]);
+  useEffect(() => { if (lock) walletCoins(wc.manager!).then(setCoins).catch(() => {}); }, [lock, wc.manager]);
+  const pkh = lock ? hex(lock.slice(3, 23)) : '';
+  const a = coins?.find((c) => isTrophyOf(pp.rallyA.category, pkh, c.utxo));
+  const b = coins?.find((c) => isTrophyOf(pp.rallyB.category, pkh, c.utxo));
+  async function claim() {
+    setBusy(true); setErr(null);
+    try {
+      const fresh = await walletCoins(wc.manager!);
+      const { builder, inputs } = await buildPassportClaim({ passport: pp, provider, ownerLock: lock!, coins: fresh.filter((c) => !c.utxo.token),
+        trophyA: fresh.find((c) => isTrophyOf(pp.rallyA.category, pkh, c.utxo)), trophyB: fresh.find((c) => isTrophyOf(pp.rallyB.category, pkh, c.utxo)) });
+      setDone(await signAndSend(wc.manager!, builder, inputs, tr(`Trade your two trophies for the ${pp.name} passport + ${sats(pp.reward)}`, `Tukar dua trofimu dengan paspor ${pp.name} + ${sats(pp.reward)}`)));
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  }
+  return (
+    <main className="organize">
+      <p className="eyebrow">{pp.network === 'mainnet' ? 'BCH mainnet' : 'chipnet (test)'} · {tr('passport', 'paspor')}</p>
+      <h1>🛂 {pp.name}</h1>
+      <p className="lede">{tr(`Finished both "${pp.rallyA.name}" and "${pp.rallyB.name}"? Trade one trophy from each for ${sats(pp.reward)} and a Passport NFT. The trophies are burned, so each pair counts once.`,
+        `Sudah menyelesaikan "${pp.rallyA.name}" dan "${pp.rallyB.name}"? Tukar satu trofi dari masing-masing dengan ${sats(pp.reward)} dan NFT Paspor. Trofinya dibakar, jadi setiap pasangan hanya berlaku sekali.`)}</p>
+      {done ? <p className="hint">✅ <a href={explorerTx(done)} target="_blank" rel="noreferrer">{done.slice(0, 16)}…</a></p>
+        : !lock ? <button className="primary big" onClick={wc.connect} disabled={wc.state === 'connecting' || wc.state === 'connected'}>{wc.state === 'connected' ? tr('Loading wallet…', 'Memuat wallet…') : tr('Connect wallet', 'Hubungkan wallet')}</button>
+        : (<>
+          <ul>
+            <li>{a ? '🏆' : '·'} {pp.rallyA.name}</li>
+            <li>{b ? '🏆' : '·'} {pp.rallyB.name}</li>
+          </ul>
+          <button className="primary big" disabled={!a || !b || busy} onClick={claim}>{busy ? tr('Approve in wallet…', 'Setujui di wallet…') : tr('Get my passport', 'Ambil pasporku')}</button>
+        </>)}
+      {err && <p className="error" role="alert">{err}</p>}
+      {wc.uri && wc.qrUri && <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri} title="WizardConnect" subtitle={tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca')} />}
     </main>
   );
 }

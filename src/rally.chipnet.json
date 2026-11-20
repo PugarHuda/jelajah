@@ -2,17 +2,17 @@
   "network": "chipnet",
   "name": "Jelajah Jogja",
   "description": "Stamp rally across Yogyakarta street-food stalls. Every stamp pays a levy into the pool, so each set funds its own reward.",
-  "category": "c0680f114b6a8fe9bda76c515dc22645eb40a7f264c9530fa607718a57cbf3f4",
-  "vmCategory": "f4f3cb578a7107a60f53c964f2a740eb4526c25d516ca7bde98f6a4b110f68c0",
+  "category": "1974505eea06ff02f0a0f2ede6d9580957dd975e3986d768551d32489e244438",
+  "vmCategory": "3844249e48321d5568d786395e97dd570958d9e6edf2a0f002ff06ea5e507419",
   "needed": 3,
-  "reward": 4000,
-  "endTime": 1800332798,
+  "reward": 3000,
+  "endTime": 1800336007,
   "organizerPub": "033f41a2eaf9fa8a2d9a21ada58031094cdce2981627120f09ac80332a32b693cd",
   "lanes": 2,
   "minter": 3,
-  "levy": 2200,
+  "levy": 2500,
   "bonusNeeded": 4,
-  "bonusReward": 5500,
+  "bonusReward": 4500,
   "merchants": [
     {
       "id": 1,
@@ -20,11 +20,11 @@
       "tagline": "Charcoal coffee by the station",
       "emoji": "☕",
       "color": "#7a4a2b",
-      "price": 4000,
+      "price": 3000,
       "taglineId": "Kopi arang dekat stasiun",
-      "memberPrice": 3600,
-      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
-      "place": "Jl. Wongsodirjan, Yogyakarta"
+      "memberPrice": 2700,
+      "place": "Jl. Wongsodirjan, Yogyakarta",
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
     },
     {
       "id": 2,
@@ -32,11 +32,11 @@
       "tagline": "Wood-fire noodles",
       "emoji": "🍜",
       "color": "#c2410c",
-      "price": 4000,
+      "price": 3000,
       "taglineId": "Mi godhog masak tungku",
-      "memberPrice": 3600,
-      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
-      "place": "Kotagede, Yogyakarta"
+      "memberPrice": 2700,
+      "place": "Kotagede, Yogyakarta",
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
     },
     {
       "id": 3,
@@ -44,11 +44,11 @@
       "tagline": "Goat satay on bicycle spokes",
       "emoji": "🍢",
       "color": "#b91c1c",
-      "price": 4000,
+      "price": 3000,
       "taglineId": "Sate kambing tusuk jeruji sepeda",
-      "memberPrice": 3600,
-      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
-      "place": "Jl. Imogiri Timur, Bantul"
+      "memberPrice": 2700,
+      "place": "Jl. Imogiri Timur, Bantul",
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
     },
     {
       "id": 4,
@@ -56,12 +56,31 @@
       "tagline": "Iced coconut and palm sugar",
       "emoji": "🥥",
       "color": "#15803d",
-      "price": 4000,
+      "price": 3000,
       "taglineId": "Es kelapa dan gula aren",
-      "memberPrice": 3600,
+      "memberPrice": 2700,
+      "place": "Pasar Beringharjo, Yogyakarta",
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+    },
+    {
+      "tagline": "",
+      "color": "#7a4a2b",
+      "name": "Gudeg Yu Djum",
+      "emoji": "🍛",
+      "price": 3000,
+      "memberPrice": 2700,
       "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
-      "place": "Pasar Beringharjo, Yogyakarta"
+      "id": 17
     }
   ],
-  "genesisTx": "a7ba3a4976fda7a91c3d94fd58915e67174cae908d580ca489364b31949859c4"
+  "genesisTx": "e34531670dbf5edaaf6c4aab41098d582417ca8e45b607e4d34f617d1e0d5812",
+  "sponsor": {
+    "name": "Dinas Pariwisata Jogja (demo)",
+    "category": "7b2b93df5db090dd1d916461e4765c83028cc1da9a83e110d3ae043b8f4625e4",
+    "vmCategory": "e425468f3b04aed310e1839adac18c02835c76e46164911ddd90b05ddf932b7b",
+    "value": 1000,
+    "sponsorPub": "033f41a2eaf9fa8a2d9a21ada58031094cdce2981627120f09ac80332a32b693cd",
+    "endTime": 1800336007,
+    "genesisTx": "2459de959a69dd74712a2cd604278f78daf8ca833c4a0ee5be08b48e4bebf7b1"
+  }
 }

@@ -1,0 +1,35 @@
+pragma cashscript ^0.14.0;
+
+// Sponsored stamps: a sponsor (a tourism office, a brand) hands out voucher tokens and parks subsidy coins of
+// `voucherValue` sats here. A buyer spends one subsidy coin plus one voucher in a stamp purchase and pays the stall
+// that much less. The stall's minter still guarantees the stall gets its full price, so the subsidy can only end up
+// with a stall, never as a buyer's change, and only in a real stamp purchase of this rally.
+//
+//   in[0]          a minter of the rally (it carries the rally's minting NFT)
+//   in[k]          this subsidy coin (exactly voucherValue sats, consumed whole)
+//   in[k+1]        one voucher: exactly 1 fungible token of voucherCategory, burned
+//   out[2]         must be a stamp of the rally (commitment starts with a stall id, not 0x00 = trophy)
+contract SponsorPool(bytes32 rallyCategory, bytes32 voucherCategory, int voucherValue, pubkey sponsor, int endTime) {
+    function redeem() {
+        // part of a stamp purchase of this rally: in[0] holds the rally's minting NFT and out[2] is a stamp
+        require(tx.inputs[0].tokenCategory == rallyCategory + 0x02);
+        require(tx.outputs[2].tokenCategory == rallyCategory);
+        require(tx.outputs[2].nftCommitment.split(1)[0] != 0x00);
+
+        // this coin pays exactly one voucher's worth, and sits right after the minter (or after the buyer's trophy at
+        // in[1]); with its voucher right behind it, there is no room for a second subsidy coin in the same purchase
+        require(this.activeInputIndex <= 2);
+        require(tx.inputs[this.activeInputIndex].value == voucherValue);
+
+        // the next input is one voucher, and it is burned (minters let no extra token outputs through)
+        int v = this.activeInputIndex + 1;
+        require(tx.inputs[v].tokenCategory == voucherCategory);
+        require(tx.inputs[v].tokenAmount == 1);
+    }
+
+    // unused subsidy goes back to the sponsor after the offer ends
+    function reclaim(sig sponsorSig) {
+        require(tx.time >= endTime);
+        require(checkSig(sponsorSig, sponsor));
+    }
+}

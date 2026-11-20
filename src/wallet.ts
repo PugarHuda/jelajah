@@ -10,7 +10,7 @@ const SCAN = 10; // addresses per branch; stamps always go to receive/0
 const prefix = rally.network === 'mainnet' ? 'bitcoincash' : 'bchtest';
 const BRANCHES = [['receive', 0], ['change', 1]] as const;
 
-export interface Coin { utxo: SpendableUtxo; unlocker: Unlocker; path: [string, number] }
+export interface Coin { utxo: SpendableUtxo; unlocker: Unlocker; path: [string, number]; index?: number }
 
 /** Stamps always go to receive/0. Null until the wallet has shared its xpubs (wallet_ready can lag "connected"). */
 export function buyerLock(manager: DappConnectionManager | null): Uint8Array | null {
@@ -52,7 +52,8 @@ export async function signAndSend(manager: DappConnectionManager, builder: Trans
     broadcast: false,
     userPrompt,
   };
-  const inputPaths = inputs.map((c, i) => [i + firstInput, c.path[0], c.path[1]] as [number, string, number]);
+  // c.index when a builder placed contract inputs between the wallet's (e.g. a sponsor's subsidy coin)
+  const inputPaths = inputs.map((c, i) => [c.index ?? i + firstInput, c.path[0], c.path[1]] as [number, string, number]);
   const res = await manager.signTransaction({ transaction: transaction as never, inputPaths });
   if (res.error) throw new Error(res.error);
   return provider.sendRawTransaction(res.signedTransaction);

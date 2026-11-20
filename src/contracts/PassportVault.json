@@ -1,0 +1,59 @@
+{
+  "contractName": "PassportVault",
+  "constructorInputs": [
+    { "name": "rallyA", "type": "bytes32" },
+    { "name": "rallyB", "type": "bytes32" },
+    { "name": "reward", "type": "int" },
+    { "name": "organizer", "type": "pubkey" },
+    { "name": "endTime", "type": "int" }
+  ],
+  "abi": [
+    { "name": "claim", "inputs": [] },
+    {
+      "name": "reclaim",
+      "inputs": [
+        { "name": "organizerSig", "type": "sig" }
+      ]
+    }
+  ],
+  "bytecode": "OP_5 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_1 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_2 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_1 OP_UTXOTOKENCOMMITMENT OP_2 OP_UTXOTOKENCOMMITMENT OP_OVER OP_SIZE OP_NIP 15 OP_GREATERTHANOREQUAL OP_VERIFY OP_SIZE 15 OP_GREATERTHANOREQUAL OP_VERIFY OP_SWAP 15 OP_SPLIT OP_DROP OP_DUP OP_1 OP_SPLIT OP_DROP 00 OP_EQUALVERIFY OP_SWAP 15 OP_SPLIT OP_DROP OP_OVER OP_EQUALVERIFY OP_1 OP_SPLIT OP_NIP OP_0 OP_OUTPUTBYTECODE OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_0 OP_UTXOTOKENCOMMITMENT OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_0 OP_UTXOVALUE OP_3 OP_PICK OP_SUB OP_NUMEQUALVERIFY 76a914 OP_OVER OP_CAT 88ac OP_CAT OP_1 OP_OUTPUTBYTECODE OP_OVER OP_EQUALVERIFY OP_1 OP_OUTPUTVALUE OP_3 OP_ROLL OP_GREATERTHANOREQUAL OP_VERIFY OP_1 OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_0 OP_UTXOTOKENCATEGORY 20 OP_SPLIT OP_DROP OP_2 OP_OUTPUTBYTECODE OP_ROT OP_EQUALVERIFY OP_2 OP_OUTPUTTOKENCATEGORY OP_EQUALVERIFY OP_2 OP_OUTPUTTOKENCOMMITMENT OP_EQUALVERIFY OP_3 OP_BEGIN OP_DUP OP_TXOUTPUTCOUNT OP_LESSTHAN OP_DUP OP_TOALTSTACK OP_IF OP_DUP OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_1ADD OP_ENDIF OP_FROMALTSTACK OP_NOT OP_UNTIL OP_2DROP OP_2DROP OP_1 OP_ELSE OP_5 OP_ROLL OP_1 OP_NUMEQUALVERIFY OP_4 OP_ROLL OP_CHECKLOCKTIMEVERIFY OP_DROP OP_4 OP_ROLL OP_4 OP_ROLL OP_CHECKSIG OP_NIP OP_NIP OP_NIP OP_ENDIF",
+  "source": "pragma cashscript ^0.14.0;\n\n// Passport across rallies: trade a trophy from rally A and a trophy from rally B (same owner) for a reward and a\n// Passport NFT of this vault's own category. The trophies are burned, so a pair can only be redeemed once.\n//\n//   in[0]  this vault (BCH pool + minting NFT of the passport category)  -> out[0] this vault, value minus the reward\n//   in[1]  a trophy of rally A: commitment 0x00 ‖ pkh (‖ tier byte)       -> burned\n//   in[2]  a trophy of rally B with the same pkh                         -> burned\n//   in[3+] fee coins                                                     -> out[1] reward to the pkh (P2PKH)\n//                                                                           out[2] Passport NFT (commitment = pkh) to the pkh\n//                                                                           out[3+] BCH-only change\ncontract PassportVault(bytes32 rallyA, bytes32 rallyB, int reward, pubkey organizer, int endTime) {\n    function claim() {\n        require(this.activeInputIndex == 0);\n\n        // both trophies: an immutable NFT of the right rally, commitment starting 0x00 ‖ the same 20-byte pkh\n        require(tx.inputs[1].tokenCategory == rallyA);\n        require(tx.inputs[2].tokenCategory == rallyB);\n        bytes a = tx.inputs[1].nftCommitment;\n        bytes b = tx.inputs[2].nftCommitment;\n        require(a.length >= 21);\n        require(b.length >= 21);\n        bytes trophyA = a.split(21)[0];\n        require(trophyA.split(1)[0] == 0x00);\n        require(b.split(21)[0] == trophyA);\n        bytes20 owner = unsafe_bytes20(trophyA.split(1)[1]);\n\n        // vault continues with its minting NFT, paying exactly one reward\n        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);\n        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);\n        require(tx.outputs[0].nftCommitment == tx.inputs[0].nftCommitment);\n        require(tx.outputs[0].value == tx.inputs[0].value - reward);\n\n        bytes ownerLock = new LockingBytecodeP2PKH(owner);\n        require(tx.outputs[1].lockingBytecode == ownerLock);\n        require(tx.outputs[1].value >= reward);\n        require(tx.outputs[1].tokenCategory == 0x);\n\n        bytes passportCategory = tx.inputs[0].tokenCategory.split(32)[0];\n        require(tx.outputs[2].lockingBytecode == ownerLock);\n        require(tx.outputs[2].tokenCategory == passportCategory);\n        require(tx.outputs[2].nftCommitment == owner);\n\n        // the trophies are burned: nothing else may carry tokens\n        for (int o = 3; o < tx.outputs.length; o++) {\n            require(tx.outputs[o].tokenCategory == 0x);\n        }\n    }\n\n    // after the passport offer ends the organizer takes back what is left\n    function reclaim(sig organizerSig) {\n        require(tx.time >= endTime);\n        require(checkSig(organizerSig, organizer));\n    }\n}\n",
+  "fingerprint": "6e083a76b4d2edf219e865015cfef11e028bf11f003e075f6107f2084d6f0c1e",
+  "debug": {
+    "bytecode": "5579009c63c0009d51ce8852ce8851cf52cf7882770115a269820115a2697c01157f7576517f750100887c01157f757888517f7700cd00c78800d100ce8800d200cf8800cc00c65379949d0376a914787e0288ac7e51cd788851cc537aa26951d1008800ce01207f7552cd7b8852d18852d288536576c49f766b6376d100888b686c91666d6d5167557a519d547ab175547a547aac77777768",
+    "sourceMap": "13:4:48:5;;;;;14:16:14:37;:41::42;:8::44:1;17:26:17:27:0;:16::42:1;:8::54;18:26:18:27:0;:16::42:1;:8::54;19:28:19:29:0;:18::44:1;20:28:20:29:0;:18::44:1;21:16:21:17:0;:::24:1;;:28::30:0;:16:::1;:8::32;22:16:22:24;:28::30:0;:16:::1;:8::32;23:24:23:25:0;:32::34;:24::35:1;:::38;24:16:24:23:0;:30::31;:16::32:1;:::35;:39::43:0;:8::45:1;25:16:25:17:0;:24::26;:16::27:1;:::30;:34::41:0;:8::43:1;26:53:26:54:0;:39::55:1;:::58;29:27:29:28:0;:16::45:1;:59::60:0;:49::77:1;:8::79;30:27:30:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;31:27:31:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;32:27:32:28:0;:16::35:1;:49::50:0;:39::57:1;:60::66:0;;:39:::1;:8::68;34:26:34:57:0;:51::56;:26::57:1;;;35:27:35:28:0;:16::45:1;:49::58:0;:8::60:1;36:27:36:28:0;:16::35:1;:39::45:0;;:16:::1;:8::47;37:27:37:28:0;:16::43:1;:47::49:0;:8::51:1;39:43:39:44:0;:33::59:1;:66::68:0;:33::69:1;:::72;40:27:40:28:0;:16::45:1;:49::58:0;:8::60:1;41:27:41:28:0;:16::43:1;:8::65;42:27:42:28:0;:16::43:1;:8::54;45:21:45:22:0;:8:47:9;:24:45:25;:28::45;:24:::1;;;:52:47:9:0;46:31:46:32;:20::47:1;:51::53:0;:12::55:1;45:47:45:50;:52:47:9;;:8;;13:21:48:5;;;:4;51::54::0;;;;52:27:52:34;;:8::36:1;;53:25:53:37:0;;:39::48;;:8::51:1;51:39:54:5;;;12:0:55:1",
+    "logs": [],
+    "requires": [
+      { "ip": 12, "line": 14 },
+      { "ip": 15, "line": 17 },
+      { "ip": 18, "line": 18 },
+      { "ip": 28, "line": 21 },
+      { "ip": 32, "line": 22 },
+      { "ip": 42, "line": 24 },
+      { "ip": 48, "line": 25 },
+      { "ip": 56, "line": 29 },
+      { "ip": 61, "line": 30 },
+      { "ip": 66, "line": 31 },
+      { "ip": 74, "line": 32 },
+      { "ip": 83, "line": 35 },
+      { "ip": 89, "line": 36 },
+      { "ip": 93, "line": 37 },
+      { "ip": 102, "line": 40 },
+      { "ip": 105, "line": 41 },
+      { "ip": 108, "line": 42 },
+      { "ip": 120, "line": 46 },
+      { "ip": 136, "line": 52 },
+      { "ip": 143, "line": 53 }
+    ],
+    "sourceTags": "116:116:fu;117:120:lc;121:121:sc;138:140:sc"
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.14.0",
+    "options": {
+      "enforceFunctionParameterTypes": true,
+      "enforceLocktimeGuard": true
+    }
+  },
+  "updatedAt": "2026-11-20T05:30:04.381Z"
+}

@@ -48,12 +48,19 @@ contract StampMinter3(bytes merchantLock, int minPrice, int memberPrice, bytes1 
         int price = minPrice;
         int fixedOutputs = 4;
         if (tx.inputs.length > 1) {
-            if (tx.inputs[1].tokenCategory == rallyCategory && tx.inputs[1].nftCommitment == 0x00 + buyerPkh) {
-                require(tx.outputs[4].lockingBytecode == buyerLock);
-                require(tx.outputs[4].tokenCategory == rallyCategory);
-                require(tx.outputs[4].nftCommitment == 0x00 + buyerPkh);
-                price = memberPrice;
-                fixedOutputs = 5;
+            // any of the buyer's trophies (plain 0x00 ‖ pkh, or the bonus one with a trailing tier byte);
+            // nested ifs because CashScript doesn't short-circuit, and split(21) needs at least 21 bytes
+            bytes c = tx.inputs[1].nftCommitment;
+            if (tx.inputs[1].tokenCategory == rallyCategory) {
+                if (c.length >= 21) {
+                    if (c.split(21)[0] == 0x00 + buyerPkh) {
+                        require(tx.outputs[4].lockingBytecode == buyerLock);
+                        require(tx.outputs[4].tokenCategory == rallyCategory);
+                        require(tx.outputs[4].nftCommitment == c);
+                        price = memberPrice;
+                        fixedOutputs = 5;
+                    }
+                }
             }
         }
 

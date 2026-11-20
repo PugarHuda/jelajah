@@ -1,0 +1,55 @@
+pragma cashscript ^0.14.0;
+
+// Passport across rallies: trade a trophy from rally A and a trophy from rally B (same owner) for a reward and a
+// Passport NFT of this vault's own category. The trophies are burned, so a pair can only be redeemed once.
+//
+//   in[0]  this vault (BCH pool + minting NFT of the passport category)  -> out[0] this vault, value minus the reward
+//   in[1]  a trophy of rally A: commitment 0x00 ‖ pkh (‖ tier byte)       -> burned
+//   in[2]  a trophy of rally B with the same pkh                         -> burned
+//   in[3+] fee coins                                                     -> out[1] reward to the pkh (P2PKH)
+//                                                                           out[2] Passport NFT (commitment = pkh) to the pkh
+//                                                                           out[3+] BCH-only change
+contract PassportVault(bytes32 rallyA, bytes32 rallyB, int reward, pubkey organizer, int endTime) {
+    function claim() {
+        require(this.activeInputIndex == 0);
+
+        // both trophies: an immutable NFT of the right rally, commitment starting 0x00 ‖ the same 20-byte pkh
+        require(tx.inputs[1].tokenCategory == rallyA);
+        require(tx.inputs[2].tokenCategory == rallyB);
+        bytes a = tx.inputs[1].nftCommitment;
+        bytes b = tx.inputs[2].nftCommitment;
+        require(a.length >= 21);
+        require(b.length >= 21);
+        bytes trophyA = a.split(21)[0];
+        require(trophyA.split(1)[0] == 0x00);
+        require(b.split(21)[0] == trophyA);
+        bytes20 owner = unsafe_bytes20(trophyA.split(1)[1]);
+
+        // vault continues with its minting NFT, paying exactly one reward
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
+        require(tx.outputs[0].nftCommitment == tx.inputs[0].nftCommitment);
+        require(tx.outputs[0].value == tx.inputs[0].value - reward);
+
+        bytes ownerLock = new LockingBytecodeP2PKH(owner);
+        require(tx.outputs[1].lockingBytecode == ownerLock);
+        require(tx.outputs[1].value >= reward);
+        require(tx.outputs[1].tokenCategory == 0x);
+
+        bytes passportCategory = tx.inputs[0].tokenCategory.split(32)[0];
+        require(tx.outputs[2].lockingBytecode == ownerLock);
+        require(tx.outputs[2].tokenCategory == passportCategory);
+        require(tx.outputs[2].nftCommitment == owner);
+
+        // the trophies are burned: nothing else may carry tokens
+        for (int o = 3; o < tx.outputs.length; o++) {
+            require(tx.outputs[o].tokenCategory == 0x);
+        }
+    }
+
+    // after the passport offer ends the organizer takes back what is left
+    function reclaim(sig organizerSig) {
+        require(tx.time >= endTime);
+        require(checkSig(organizerSig, organizer));
+    }
+}

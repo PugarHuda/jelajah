@@ -6,6 +6,8 @@ import StampMinter from '../contracts/StampMinter.json' with { type: 'json' };
 import StampMinter2 from '../contracts/StampMinter2.json' with { type: 'json' };
 import StampMinter3 from '../contracts/StampMinter3.json' with { type: 'json' };
 import RewardVault2 from '../contracts/RewardVault2.json' with { type: 'json' };
+import SponsorPool from '../contracts/SponsorPool.json' with { type: 'json' };
+import PassportVault from '../contracts/PassportVault.json' with { type: 'json' };
 import RewardVault from '../contracts/RewardVault.json' with { type: 'json' };
 
 export const DUST = 1000n;
@@ -18,7 +20,7 @@ export function rallyContracts(rally, provider) {
   // rally.minter: 3 = StampMinter3 + RewardVault2 (levy), 2 = StampMinter2 (member price), else the original StampMinter
   const vault = rally.minter === 3
     ? new Contract(RewardVault2, [rally.vmCategory, BigInt(rally.needed), BigInt(rally.reward),
-      BigInt(rally.bonusNeeded ?? 0), BigInt(rally.bonusReward ?? 0), rally.organizerPub, BigInt(rally.endTime)], { provider })
+      BigInt(rally.bonusNeeded ?? 0), BigInt(rally.bonusReward ?? 0), BigInt(rally.levy), rally.organizerPub, BigInt(rally.endTime)], { provider })
     : new Contract(RewardVault, [rally.vmCategory, BigInt(rally.needed), BigInt(rally.reward), rally.organizerPub, BigInt(rally.endTime)], { provider });
   const vaultLock = binToHex(cashAddressToLockingBytecode(vault.address).bytecode);
   const minters = Object.fromEntries(rally.merchants.map((m) => [
@@ -46,7 +48,15 @@ export function pickCoins(coins, target) {
 
 /** Buy at one stall and receive its stamp in the same transaction. buyerLock: Uint8Array P2PKH.
  *  trophy (optional, StampMinter2 rallies): the buyer's own Trophy coin { utxo, unlocker } -> member price, trophy comes back. */
-export async function buildStamp({ rally, provider, minters, merchantId, buyerLock, coins, trophy, presence, lane }) {
+/** The rally's sponsor pool (subsidy coins), when a sponsor backs it: rally.sponsor = { vmCategory of the voucher, value, sponsorPub, endTime } */
+export const sponsorPool = (rally, provider) => rally.sponsor && new Contract(SponsorPool,
+  [rally.vmCategory, rally.sponsor.vmCategory, BigInt(rally.sponsor.value), rally.sponsor.sponsorPub, BigInt(rally.sponsor.endTime)], { provider });
+/** A voucher the buyer can spend: exactly 1 fungible token of the sponsor's category (SponsorPool burns exactly one). */
+export const isVoucher = (rally, u) => !!rally.sponsor && u.token?.category === rally.sponsor.category && u.token.amount === 1n && !u.token.nft;
+
+/** Buy at one stall. Returns the wallet's inputs with their input index (contract inputs sit between them).
+ *  @param {{ rally: any, provider: any, minters: any, merchantId: number, buyerLock: Uint8Array, coins: any[], trophy?: any, presence?: Uint8Array, lane?: any, voucher?: any }} args */
+export async function buildStamp({ rally, provider, minters, merchantId, buyerLock, coins, trophy, presence, lane, voucher }) {
   const merchant = rally.merchants.find((m) => m.id === merchantId);
   const minter = minters[merchantId];
   // a stall may have several minter coins ("lanes"); pick one at random so simultaneous buyers rarely collide.
@@ -57,20 +67,31 @@ export async function buildStamp({ rally, provider, minters, merchantId, buyerLo
   const member = !!trophy && rally.minter >= 2;
   const price = BigInt(member ? merchant.memberPrice : merchant.price);
   const levy = rally.minter === 3 ? BigInt(rally.levy) : 0n;
-  const { picked, sum } = pickCoins(coins, price + levy + DUST + STAMP_FEE + DUST);
+  // sponsored: a subsidy coin + one voucher pay `sponsor.value` of the price (levy rallies only; SponsorPool checks it)
+  const pool = voucher && rally.minter === 3 ? sponsorPool(rally, provider) : null;
+  const subsidy = pool ? (await pool.getUtxos()).find((u) => !u.token && u.satoshis === BigInt(rally.sponsor.value)) : null;
+  if (voucher && !subsidy) throw new Error('The sponsor has no subsidy left');
+  const off = subsidy ? subsidy.satoshis : 0n;
+  const { picked, sum } = pickCoins(coins, price + levy - off + DUST + STAMP_FEE + DUST);
   // levy rallies take the stall's presence signature (ignored by stalls without a presenceKey)
   const unlock = rally.minter === 3 ? minter.unlock.stamp(presence ?? new Uint8Array(64)) : minter.unlock.stamp();
-  const tb = new TransactionBuilder({ provider }).addInput(minterUtxo, unlock);
-  if (member) tb.addInput(trophy.utxo, trophy.unlocker);
-  picked.forEach((c) => tb.addInput(c.utxo, c.unlocker));
+  const tb = new TransactionBuilder({ provider, allowImplicitFungibleTokenBurn: !!subsidy }).addInput(minterUtxo, unlock);
+  const wallet = []; // [coin, input index]
+  if (member) { wallet.push([trophy, 1]); tb.addInput(trophy.utxo, trophy.unlocker); }
+  if (subsidy) { // order matters: subsidy at in[1] or in[2], its voucher right after it
+    tb.addInput(subsidy, pool.unlock.redeem());
+    wallet.push([voucher, member ? 3 : 2]); tb.addInput(voucher.utxo, voucher.unlocker);
+  }
+  picked.forEach((c) => { wallet.push([c, wallet.length + 1 + (subsidy ? 1 : 0)]); tb.addInput(c.utxo, c.unlocker); });
   tb.addOutput({ to: minter.tokenAddress, amount: minterUtxo.satoshis, token: minterUtxo.token })
     .addOutput({ to: hexToBin(merchant.lock), amount: price })
     .addOutput({ to: buyerLock, amount: DUST, token: stampToken(rally, merchantId, buyerLock) });
   if (levy) tb.addOutput({ to: rallyVaultAddress(rally, provider), amount: levy });
   if (member) tb.addOutput({ to: buyerLock, amount: trophy.utxo.satoshis, token: trophy.utxo.token });
+  const voucherDust = subsidy ? voucher.utxo.satoshis : 0n;
   return {
-    inputs: member ? [trophy, ...picked] : picked,
-    builder: tb.addOutput({ to: buyerLock, amount: sum - price - levy - DUST - STAMP_FEE }),
+    inputs: wallet.map(([c, index]) => ({ ...c, index })),
+    builder: tb.addOutput({ to: buyerLock, amount: sum + off + voucherDust - price - levy - DUST - STAMP_FEE }),
   };
 }
 
@@ -96,11 +117,12 @@ export async function buildClaim({ rally, provider, vault, buyerLock, stamps, co
     builder: tb
       .addOutput({ to: vault.tokenAddress, amount: vaultUtxo.satoshis - reward, token: vaultUtxo.token })
       .addOutput({ to: buyerLock, amount: reward + back })
-      .addOutput({ to: buyerLock, amount: DUST, token: nft(rally, '00' + pkhOf(buyerLock)) }),
+      // a bonus claim mints the bonus trophy 00 ‖ pkh ‖ 02 (RewardVault2 checks the tier)
+      .addOutput({ to: buyerLock, amount: DUST, token: nft(rally, '00' + pkhOf(buyerLock) + (tier === rally.needed ? '' : '02')) }),
   };
 }
 
-const MERGE_FEE = 500n; // per input; RewardVault2.merge allows up to 600, and never out of the vault coin itself
+const MERGE_FEE = 950n; // per input (each reveals the ~740-byte vault script); RewardVault2.merge allows up to 1000, never out of the vault coin
 const MAX_MERGE = 30;
 
 /** Levy rallies: fold the levy coins at the vault address into the vault coin. Needs no signature, anyone can send it.
@@ -167,7 +189,7 @@ export async function rallyStats({ rally, provider, minters, vault }) {
   // claims mint a trophy (commitment 0x00 + pkh) at out[2]; reclaim does not
   const claimTxs = (await txsOf(vault)).filter(spends(vault))
     .filter(({ tx }) => ofRally(tx.outputs[2]) && tx.outputs[2].token.nft?.commitment[0] === 0);
-  claimTxs.forEach(({ tx }) => who(binToHex(tx.outputs[2].token.nft.commitment.slice(1))).trophies++);
+  claimTxs.forEach(({ tx }) => who(binToHex(tx.outputs[2].token.nft.commitment.slice(1, 21))).trophies++); // bonus trophies carry a tier byte
   const collectors = [...people.values()].map((p) => ({ ...p, stalls: p.stalls.size }))
     .sort((a, b) => b.trophies - a.trophies || b.stalls - a.stalls || b.stamps - a.stamps).slice(0, 10);
   return { stalls, claims: claimTxs.length, collectors };
@@ -183,7 +205,7 @@ export async function buildReclaim({ rally, provider, vault, signer, to }) {
   const total = coins.reduce((s, u) => s + u.satoshis, 0n);
   const tb = new TransactionBuilder({ provider });
   coins.forEach((u) => tb.addInput(u, vault.unlock.reclaim(signer)));
-  return { builder: tb.addOutput({ to, amount: total - 600n * BigInt(coins.length), token: vaultCoin.token }).setLocktime(rally.endTime), total };
+  return { builder: tb.addOutput({ to, amount: total - 1000n * BigInt(coins.length), token: vaultCoin.token }).setLocktime(rally.endTime), total };
 }
 
 /** One of the stall's minter coins, at random, so simultaneous buyers rarely collide. */
@@ -234,8 +256,8 @@ export function checkRallyConfig(cfg) {
   if (cfg.merchants.some((m) => m.presenceKey !== undefined && !/^0[23][0-9a-f]{64}$/.test(m.presenceKey))) throw new Error('a presence key is a 33-byte compressed public key (66 hex)');
   if (cfg.merchants.some((m) => m.presenceKey) && cfg.levy === undefined) throw new Error('proof of presence needs a levy rally');
   // levy rallies: each set must fund its own reward, or colluding stalls can drain the pool.
-  // A merge costs up to 600 sats per coin, so count that against the levies of one set (plus the vault coin's merge).
-  if (cfg.levy !== undefined && cfg.needed * (cfg.levy - 600) - 600 < cfg.reward)
+  // A merge costs up to 1000 sats per coin, so count that against the levies of one set (plus the vault coin's merge).
+  if (cfg.levy !== undefined && cfg.needed * (cfg.levy - 1000) - 1000 < cfg.reward)
     throw new Error(`anti-collusion: ${cfg.needed} levies of ${cfg.levy} (minus merge fees) must cover the reward ${cfg.reward}`);
   // bonus tier: more stalls, bigger reward; same anti-farming and anti-collusion rules at that size
   if (cfg.bonusNeeded !== undefined) {
@@ -244,7 +266,7 @@ export function checkRallyConfig(cfg) {
     if (!(cfg.bonusReward > cfg.reward)) throw new Error('the bonus reward must be bigger than the reward');
     const cheapestBonus = cfg.merchants.map((m) => m.memberPrice ?? m.price).sort((a, b) => a - b).slice(0, cfg.bonusNeeded).reduce((a, b) => a + b, 0);
     if (!(cfg.bonusReward < cheapestBonus)) throw new Error(`anti-farming: bonus ${cfg.bonusReward} must be < cheapest bonus set ${cheapestBonus}`);
-    if (cfg.bonusNeeded * (cfg.levy - 600) - 600 < cfg.bonusReward)
+    if (cfg.bonusNeeded * (cfg.levy - 1000) - 1000 < cfg.bonusReward)
       throw new Error(`anti-collusion: ${cfg.bonusNeeded} levies of ${cfg.levy} (minus merge fees) must cover the bonus ${cfg.bonusReward}`);
   }
 }
@@ -281,4 +303,59 @@ export function buildGenesis({ provider, rally, rewardsInPool, base, organizerLo
   if (bcmr) tb.addOpReturnOutput(['BCMR', `0x${bcmr.hash}`, bcmr.uri]);
   const spent = DUST * BigInt(Object.keys(minters).length * rally.lanes + 1) + pool;
   return { builder: tb.addOutput({ to: organizerLock, amount: base.utxo.satoshis - spent - 3000n }), vault };
+}
+
+// ---- passport across two rallies (PassportVault): trade a trophy from each for a reward + a Passport NFT
+// passport = { network, name, category, vmCategory, rallyA: { name, category, vmCategory }, rallyB: {…}, reward, endTime, organizerPub, genesisTx }
+export const passportVault = (pp, provider) => new Contract(PassportVault,
+  [pp.rallyA.vmCategory, pp.rallyB.vmCategory, BigInt(pp.reward), pp.organizerPub, BigInt(pp.endTime)], { provider });
+/** A trophy of this rally category owned by pkh (plain or bonus). */
+export const isTrophyOf = (category, pkhHex, u) => u.token?.category === category && !!u.token.nft
+  && u.token.nft.capability === 'none' && u.token.nft.commitment.slice(0, 42) === '00' + pkhHex;
+/** @param {{ passport: any, provider: any, ownerLock: Uint8Array, trophyA: any, trophyB: any, coins?: any[] }} args */
+export async function buildPassportClaim({ passport, provider, ownerLock, trophyA, trophyB, coins = [] }) {
+  const vault = passportVault(passport, provider);
+  const v = (await vault.getUtxos()).find((u) => u.token?.category === passport.category && u.token.nft?.capability === 'minting');
+  if (!v) throw new Error('This passport offer is over');
+  const reward = BigInt(passport.reward);
+  if (v.satoshis - reward < DUST) throw new Error('The passport pool is empty');
+  const dust = trophyA.utxo.satoshis + trophyB.utxo.satoshis;
+  const shortfall = DUST + CLAIM_FEE - dust;
+  const { picked, sum } = shortfall > 0n ? pickCoins(coins, shortfall) : { picked: [], sum: 0n };
+  const tb = new TransactionBuilder({ provider }).addInput(v, vault.unlock.claim())
+    .addInput(trophyA.utxo, trophyA.unlocker).addInput(trophyB.utxo, trophyB.unlocker);
+  picked.forEach((c) => tb.addInput(c.utxo, c.unlocker));
+  return {
+    inputs: [trophyA, trophyB, ...picked].map((c, i) => ({ ...c, index: i + 1 })),
+    builder: tb
+      .addOutput({ to: vault.tokenAddress, amount: v.satoshis - reward, token: v.token })
+      .addOutput({ to: ownerLock, amount: reward + dust + sum - DUST - CLAIM_FEE })
+      .addOutput({ to: ownerLock, amount: DUST, token: nft({ category: passport.category }, binToHex(ownerLock.slice(3, 23))) }),
+  };
+}
+
+// ---- addStall (RewardVault2): the organizer opens a stall mid-rally; the vault derives its minter address on chain.
+// stall = { name, emoji, price, memberPrice, lock (P2PKH hex), presenceKey?, place?, tagline? }; id = 17.. (see the contract)
+/** @param {{ rally: any, provider: any, signer: any, stall: any, feeCoin: any, changeTo: Uint8Array }} args */
+export async function buildAddStall({ rally, provider, signer, stall, feeCoin, changeTo }) {
+  if (rally.minter !== 3) throw new Error('Adding stalls needs a levy rally');
+  if (!/^76a914[0-9a-f]{40}88ac$/.test(stall.lock)) throw new Error('An added stall is paid at a P2PKH address');
+  const id = Math.max(16, ...rally.merchants.map((m) => m.id)) + 1;
+  if (id > 127) throw new Error('No stall ids left');
+  const merchant = { tagline: '', color: '#7a4a2b', ...stall, id, memberPrice: stall.memberPrice ?? stall.price };
+  const next = { ...rally, merchants: [...rally.merchants, merchant] };
+  checkRallyConfig({ ...next, rewardsInPool: 1 });
+  const { vault, minters } = rallyContracts(next, provider);
+  const vaultCoin = (await vault.getUtxos()).find((u) => isMintingCoin(rally, u));
+  if (!vaultCoin) throw new Error('The vault is gone: the rally has been reclaimed');
+  const lanes = 2n * DUST, fee = 2500n; // the vault input reveals its ~740-byte script
+  if (feeCoin.utxo.satoshis < lanes + fee + DUST) throw new Error(`Fund the organizer key with at least ${lanes + fee + DUST} sats`);
+  const builder = new TransactionBuilder({ provider })
+    .addInput(vaultCoin, vault.unlock.addStall(signer, merchant.lock, BigInt(merchant.price), BigInt(merchant.memberPrice), BigInt(id), merchant.presenceKey ?? ''))
+    .addInput(feeCoin.utxo, feeCoin.unlocker)
+    .addOutput({ to: vault.tokenAddress, amount: vaultCoin.satoshis, token: vaultCoin.token })
+    .addOutput({ to: minters[id].tokenAddress, amount: DUST, token: vaultCoin.token })
+    .addOutput({ to: minters[id].tokenAddress, amount: DUST, token: vaultCoin.token })
+    .addOutput({ to: changeTo, amount: feeCoin.utxo.satoshis - lanes - fee });
+  return { builder, rally: next };
 }

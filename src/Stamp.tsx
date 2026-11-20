@@ -32,16 +32,18 @@ export function Stamp({ m, inked, size = 132 }: { m: Merchant; inked: boolean; s
   );
 }
 
-export function Trophy({ size = 120, name }: { size?: number; name: string }) {
+/** bonus: the trophy from a bonus-tier claim (commitment 00 ‖ pkh ‖ 02), drawn in violet with a star */
+export function Trophy({ size = 120, name, bonus = false }: { size?: number; name: string; bonus?: boolean }) {
   return (
     <svg viewBox="0 0 120 120" width={size} height={size} role="img" aria-label={`${name} trophy`}>
-      <circle cx="60" cy="60" r="56" fill="var(--gold-soft)" stroke="var(--gold)" strokeWidth="3" />
-      <path d="M40 30h40v14a20 20 0 0 1-40 0z" fill="var(--gold)" />
-      <path d="M40 34h-9a9 9 0 0 0 11 13M80 34h9a9 9 0 0 1-11 13" fill="none" stroke="var(--gold)" strokeWidth="3.5" />
-      <rect x="55" y="63" width="10" height="14" fill="var(--gold)" />
-      <rect x="44" y="77" width="32" height="8" rx="2" fill="var(--gold)" />
+      <circle cx="60" cy="60" r="56" fill={bonus ? '#ede9fe' : 'var(--gold-soft)'} stroke={bonus ? '#7c3aed' : 'var(--gold)'} strokeWidth="3" />
+      <path d="M40 30h40v14a20 20 0 0 1-40 0z" fill={bonus ? '#7c3aed' : 'var(--gold)'} />
+      <path d="M40 34h-9a9 9 0 0 0 11 13M80 34h9a9 9 0 0 1-11 13" fill="none" stroke={bonus ? '#7c3aed' : 'var(--gold)'} strokeWidth="3.5" />
+      <rect x="55" y="63" width="10" height="14" fill={bonus ? '#7c3aed' : 'var(--gold)'} />
+      <rect x="44" y="77" width="32" height="8" rx="2" fill={bonus ? '#7c3aed' : 'var(--gold)'} />
       <text x="60" y="100" textAnchor="middle" fontSize="8" fontWeight="800" fill="var(--ink)"
         textLength="72" lengthAdjust="spacingAndGlyphs" fontFamily="var(--font-display)">{name.toUpperCase()}</text>
+      {bonus && <text x="60" y="24" textAnchor="middle" fontSize="14" fill="#7c3aed">★ BONUS ★</text>}
     </svg>
   );
 }

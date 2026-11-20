@@ -8,7 +8,7 @@ import { parseArgs } from 'node:util';
 import { createHash } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
 import { ElectrumNetworkProvider, SignatureTemplate, TransactionBuilder } from 'cashscript';
-import { rallyContracts, checkRallyConfig, genesisNeed, planRally, buildGenesis, buildReclaim } from '../src/lib/tx.js'; // one place that knows which contract version a rally uses
+import { rallyContracts, checkRallyConfig, genesisNeed, planRally, buildGenesis, buildReclaim, sponsorPool, passportVault, buildAddStall } from '../src/lib/tx.js'; // one place that knows which contract version a rally uses
 import {
   secp256k1, hash160, binToHex, hexToBin, encodeLockingBytecodeP2pkh, lockingBytecodeToCashAddress,
   encodePrivateKeyWif, decodePrivateKeyWif, cashAddressToLockingBytecode, generatePrivateKey,
@@ -20,7 +20,7 @@ const write = (p, v) => writeFileSync(new URL(p, root), JSON.stringify(v, null, 
 
 const { positionals: [cmd], values: opt } = parseArgs({
   allowPositionals: true,
-  options: { network: { type: 'string', default: 'chipnet' }, registry: { type: 'string' }, rally: { type: 'string' }, config: { type: 'string' }, out: { type: 'string' }, 'merchant-address': { type: 'string' } },
+  options: { network: { type: 'string', default: 'chipnet' }, registry: { type: 'string' }, rally: { type: 'string' }, config: { type: 'string' }, out: { type: 'string' }, 'merchant-address': { type: 'string' }, vouchers: { type: 'string' }, value: { type: 'string' }, name: { type: 'string' }, a: { type: 'string' }, b: { type: 'string' }, price: { type: 'string' }, member: { type: 'string' }, emoji: { type: 'string' } },
 });
 const network = opt.network;
 if (!['chipnet', 'mainnet'].includes(network)) throw new Error('--network must be chipnet or mainnet');
@@ -55,6 +55,80 @@ if (cmd === 'reclaim') {
 }
 
 // Publish a new BCMR revision (e.g. icons) by spending the identity output (genesis out[0]) along the authchain.
+// A vout-0 coin of at least `need` sats (a token category id is the txid of the vout-0 outpoint it spends).
+async function vout0Coin(need) {
+  const coins = (await provider.getUtxos(addr(organizerLock))).filter((u) => !u.token);
+  const total = coins.reduce((s, u) => s + u.satoshis, 0n);
+  if (total < need) throw new Error(`fund ${addr(organizerLock, true)} with at least ${need} sats (has ${total})`);
+  const ready = coins.find((u) => u.vout === 0 && u.satoshis >= need);
+  if (ready) return ready;
+  const fee = 200n + 160n * BigInt(coins.length); // ~148 bytes per P2PKH input at 1 sat/byte, rounded up
+  const tb = new TransactionBuilder({ provider });
+  coins.forEach((u) => tb.addInput(u, signer.unlockP2PKH()));
+  const { txid } = await tb.addOutput({ to: organizerLock, amount: total - fee }).send();
+  console.log('prepared vout-0 coin', txid);
+  return { txid, vout: 0, satoshis: total - fee, lockingBytecode: binToHex(organizerLock) };
+}
+
+// A sponsor backs a levy rally: a voucher token category (N vouchers of exactly 1 token each, to the sponsor = organizer
+// key here, to hand out) and N subsidy coins of --value sats in the rally's SponsorPool.
+if (cmd === 'sponsor') {
+  const rallyFile = opt.rally ?? `src/rally.${network}.json`;
+  const rally = read(rallyFile);
+  if (rally.minter !== 3) throw new Error('sponsored stamps need a levy rally (StampMinter3)');
+  const n = Number(opt.vouchers ?? 5), value = BigInt(opt.value ?? 1000);
+  const cheapest = Math.min(...rally.merchants.map((m) => m.memberPrice ?? m.price));
+  if (!(value >= 546n && value < BigInt(cheapest))) throw new Error(`--value must be 546..${cheapest - 1}: a subsidy above the cheapest price would pay buyers to buy`);
+  const base = await vout0Coin(BigInt(n) * (value + DUST) + 3_000n);
+  const sponsor = { name: opt.name ?? 'Jelajah sponsor', category: base.txid, vmCategory: binToHex(hexToBin(base.txid).reverse()),
+    value: Number(value), sponsorPub: binToHex(pub), endTime: rally.endTime };
+  const pool = sponsorPool({ ...rally, sponsor }, provider);
+  const tb = new TransactionBuilder({ provider }).addInput(base, signer.unlockP2PKH());
+  for (let i = 0; i < n; i++) tb.addOutput({ to: addr(organizerLock, true), amount: DUST, token: { category: base.txid, amount: 1n } });
+  for (let i = 0; i < n; i++) tb.addOutput({ to: pool.address, amount: value });
+  const { txid } = await tb.addOutput({ to: organizerLock, amount: base.satoshis - BigInt(n) * (value + DUST) - 2_000n }).send();
+  write(rallyFile, { ...rally, sponsor: { ...sponsor, genesisTx: txid } });
+  console.log(`${n} vouchers of ${value} sats for "${rally.name}"`, txid);
+  process.exit(0);
+}
+
+// A passport offer across two rallies: --a and --b are rally files; --value is the passport reward, --vouchers how many
+// passports the pool pays for. Writes scripts/passport.<network>.json.
+if (cmd === 'passport') {
+  const [ra, rb] = [read(opt.a), read(opt.b)];
+  if (ra.category === rb.category) throw new Error('a passport needs two different rallies');
+  const reward = BigInt(opt.value ?? 3000), count = BigInt(opt.vouchers ?? 2);
+  const pool = reward * count + DUST;
+  const base = await vout0Coin(pool + 4_000n);
+  const pp = { network, name: opt.name ?? `${ra.name} × ${rb.name}`, category: base.txid, vmCategory: binToHex(hexToBin(base.txid).reverse()),
+    rallyA: { name: ra.name, category: ra.category, vmCategory: ra.vmCategory }, rallyB: { name: rb.name, category: rb.category, vmCategory: rb.vmCategory },
+    reward: Number(reward), endTime: Math.min(ra.endTime, rb.endTime), organizerPub: binToHex(pub) };
+  const vault = passportVault(pp, provider);
+  const { txid } = await new TransactionBuilder({ provider }).addInput(base, signer.unlockP2PKH())
+    .addOutput({ to: vault.tokenAddress, amount: pool, token: { category: base.txid, amount: 0n, nft: { capability: 'minting', commitment: '' } } })
+    .addOutput({ to: organizerLock, amount: base.satoshis - pool - 2_000n }).send();
+  write(`scripts/passport.${network}.json`, { ...pp, genesisTx: txid });
+  console.log(`passport "${pp.name}" live`, txid);
+  console.log('share link', `https://jelajah-bch.vercel.app/?pp=${deflateRawSync(JSON.stringify({ ...pp, genesisTx: txid })).toString('base64url')}#/passport`);
+  process.exit(0);
+}
+
+// Open a stall mid-rally (levy rallies): the vault itself derives the new stall's minter (RewardVault2.addStall).
+//   node scripts/rally.mjs add-stall --network chipnet --name "Gudeg" --price 3000 --member 2700 [--emoji 🍛] [--merchant-address …]
+if (cmd === 'add-stall') {
+  const rallyFile = opt.rally ?? `src/rally.${network}.json`;
+  const rally = read(rallyFile);
+  let lock = binToHex(organizerLock);
+  if (opt['merchant-address']) { const r = cashAddressToLockingBytecode(opt['merchant-address']); if (typeof r === 'string') throw new Error(r); lock = binToHex(r.bytecode); }
+  const feeCoin = (await provider.getUtxos(addr(organizerLock))).filter((u) => !u.token).sort((a, b) => Number(b.satoshis - a.satoshis))[0];
+  const { builder, rally: next } = await buildAddStall({ rally, provider, signer, changeTo: organizerLock, feeCoin: { utxo: feeCoin, unlocker: signer.unlockP2PKH() },
+    stall: { name: opt.name ?? 'New stall', emoji: opt.emoji ?? '⭐', price: Number(opt.price ?? 3000), memberPrice: Number(opt.member ?? opt.price ?? 3000), lock } });
+  const { txid } = await builder.send();
+  write(rallyFile, next);
+  console.log(`stall #${next.merchants.at(-1).id} "${next.merchants.at(-1).name}" opened`, txid);
+  process.exit(0);
+}
+
 if (cmd === 'bcmr') {
   if (!opt.registry) throw new Error('--registry https://host/bcmr.json is required');
   const rally = read(`src/rally.${network}.json`);
@@ -107,20 +181,7 @@ if (cfg.merchants.some((m) => m.presenceKey)) {
 }
 
 // 1. genesis needs an outpoint with vout 0: consolidate into one if there is none
-let coins = await provider.getUtxos(addr(organizerLock));
-coins = coins.filter((u) => !u.token);
-const total = coins.reduce((s, u) => s + u.satoshis, 0n);
-const need = genesisNeed(cfg);
-if (total < need) throw new Error(`fund ${addr(organizerLock, true)} with at least ${need} sats (has ${total})`);
-let base = coins.find((u) => u.vout === 0 && u.satoshis >= need);
-if (!base) {
-  const fee = 200n + 160n * BigInt(coins.length); // ~148 bytes per P2PKH input at 1 sat/byte, rounded up
-  const tb = new TransactionBuilder({ provider });
-  coins.forEach((u) => tb.addInput(u, signer.unlockP2PKH()));
-  const { txid } = await tb.addOutput({ to: organizerLock, amount: total - fee }).send();
-  console.log('prepared vout-0 coin', txid);
-  base = { txid, vout: 0, satoshis: total - fee, lockingBytecode: binToHex(organizerLock) };
-}
+const base = await vout0Coin(genesisNeed(cfg));
 
 // 2. the rally record, then the optional BCMR registry so wallets show names (stamp type = first commitment byte)
 const rally = planRally({ network, cfg, organizerPub: binToHex(pub), baseTxid: base.txid });

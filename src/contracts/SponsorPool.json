@@ -1,0 +1,48 @@
+{
+  "contractName": "SponsorPool",
+  "constructorInputs": [
+    { "name": "rallyCategory", "type": "bytes32" },
+    { "name": "voucherCategory", "type": "bytes32" },
+    { "name": "voucherValue", "type": "int" },
+    { "name": "sponsor", "type": "pubkey" },
+    { "name": "endTime", "type": "int" }
+  ],
+  "abi": [
+    { "name": "redeem", "inputs": [] },
+    {
+      "name": "reclaim",
+      "inputs": [
+        { "name": "sponsorSig", "type": "sig" }
+      ]
+    }
+  ],
+  "bytecode": "OP_5 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_0 OP_UTXOTOKENCATEGORY OP_OVER OP_2 OP_CAT OP_EQUALVERIFY OP_2 OP_OUTPUTTOKENCATEGORY OP_EQUALVERIFY OP_2 OP_OUTPUTTOKENCOMMITMENT OP_1 OP_SPLIT OP_DROP 00 OP_EQUAL OP_NOT OP_VERIFY OP_INPUTINDEX OP_2 OP_LESSTHANOREQUAL OP_VERIFY OP_INPUTINDEX OP_UTXOVALUE OP_ROT OP_NUMEQUALVERIFY OP_INPUTINDEX OP_1ADD OP_DUP OP_UTXOTOKENCATEGORY OP_ROT OP_EQUALVERIFY OP_UTXOTOKENAMOUNT OP_1 OP_NUMEQUAL OP_NIP OP_NIP OP_NIP OP_ELSE OP_5 OP_ROLL OP_1 OP_NUMEQUALVERIFY OP_4 OP_ROLL OP_CHECKLOCKTIMEVERIFY OP_DROP OP_4 OP_ROLL OP_4 OP_ROLL OP_CHECKSIG OP_NIP OP_NIP OP_NIP OP_ENDIF",
+  "source": "pragma cashscript ^0.14.0;\n\n// Sponsored stamps: a sponsor (a tourism office, a brand) hands out voucher tokens and parks subsidy coins of\n// `voucherValue` sats here. A buyer spends one subsidy coin plus one voucher in a stamp purchase and pays the stall\n// that much less. The stall's minter still guarantees the stall gets its full price, so the subsidy can only end up\n// with a stall, never as a buyer's change, and only in a real stamp purchase of this rally.\n//\n//   in[0]          a minter of the rally (it carries the rally's minting NFT)\n//   in[k]          this subsidy coin (exactly voucherValue sats, consumed whole)\n//   in[k+1]        one voucher: exactly 1 fungible token of voucherCategory, burned\n//   out[2]         must be a stamp of the rally (commitment starts with a stall id, not 0x00 = trophy)\ncontract SponsorPool(bytes32 rallyCategory, bytes32 voucherCategory, int voucherValue, pubkey sponsor, int endTime) {\n    function redeem() {\n        // part of a stamp purchase of this rally: in[0] holds the rally's minting NFT and out[2] is a stamp\n        require(tx.inputs[0].tokenCategory == rallyCategory + 0x02);\n        require(tx.outputs[2].tokenCategory == rallyCategory);\n        require(tx.outputs[2].nftCommitment.split(1)[0] != 0x00);\n\n        // this coin pays exactly one voucher's worth, and sits right after the minter (or after the buyer's trophy at\n        // in[1]); with its voucher right behind it, there is no room for a second subsidy coin in the same purchase\n        require(this.activeInputIndex <= 2);\n        require(tx.inputs[this.activeInputIndex].value == voucherValue);\n\n        // the next input is one voucher, and it is burned (minters let no extra token outputs through)\n        int v = this.activeInputIndex + 1;\n        require(tx.inputs[v].tokenCategory == voucherCategory);\n        require(tx.inputs[v].tokenAmount == 1);\n    }\n\n    // unused subsidy goes back to the sponsor after the offer ends\n    function reclaim(sig sponsorSig) {\n        require(tx.time >= endTime);\n        require(checkSig(sponsorSig, sponsor));\n    }\n}\n",
+  "fingerprint": "22c34099f62114af561426c1aaec7bcc147d11568910e4790b15b241208cb308",
+  "debug": {
+    "bytecode": "5579009c6300ce78527e8852d18852d2517f750100879169c052a169c0c67b9dc08b76ce7b88d0519c77777767557a519d547ab175547a547aac77777768",
+    "sourceMap": "13:4:28:5;;;;;15:26:15:27;:16::42:1;:46::59:0;:62::66;:46:::1;:8::68;16:27:16:28:0;:16::43:1;:8::62;17:27:17:28:0;:16::43:1;:50::51:0;:16::52:1;:::55;:59::63:0;:16:::1;;:8::65;21:16:21:37:0;:41::42;:16:::1;:8::44;22:26:22:47:0;:16::54:1;:58::70:0;:8::72:1;25:16:25:37:0;:::41:1;26:26:26:27:0;:16::42:1;:46::61:0;:8::63:1;27:16:27:40;:44::45:0;:8::47:1;13:22:28:5;;;:4;31::34::0;;;;32:27:32:34;;:8::36:1;;33:25:33:35:0;;:37::44;;:8::47:1;31:37:34:5;;;12:0:35:1",
+    "logs": [],
+    "requires": [
+      { "ip": 15, "line": 15 },
+      { "ip": 18, "line": 16 },
+      { "ip": 27, "line": 17 },
+      { "ip": 31, "line": 21 },
+      { "ip": 35, "line": 22 },
+      { "ip": 41, "line": 26 },
+      { "ip": 45, "line": 27 },
+      { "ip": 55, "line": 32 },
+      { "ip": 62, "line": 33 }
+    ],
+    "sourceTags": "40:42:sc;57:59:sc"
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.14.0",
+    "options": {
+      "enforceFunctionParameterTypes": true,
+      "enforceLocktimeGuard": true
+    }
+  },
+  "updatedAt": "2026-11-20T05:30:05.544Z"
+}

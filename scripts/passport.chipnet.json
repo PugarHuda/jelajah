@@ -1,0 +1,20 @@
+{
+  "network": "chipnet",
+  "name": "Jogja Passport",
+  "category": "705b1ab314b8bba17b5c1add7854d4d46460c79a22f0bbbad86294f90a614449",
+  "vmCategory": "4944610af99462d8babbf0229ac76064d4d45478dd1a5c7ba1bbb814b31a5b70",
+  "rallyA": {
+    "name": "Jelajah Jogja",
+    "category": "1974505eea06ff02f0a0f2ede6d9580957dd975e3986d768551d32489e244438",
+    "vmCategory": "3844249e48321d5568d786395e97dd570958d9e6edf2a0f002ff06ea5e507419"
+  },
+  "rallyB": {
+    "name": "Jelajah Jogja (presence)",
+    "category": "695cf440b26c6617ec185bdbd2d132b1a40c2fe0a28a75ea1dc10a821fd1dfc5",
+    "vmCategory": "c5dfd11f820ac11dea758aa2e02f0ca4b132d1d2db5b18ec17666cb240f45c69"
+  },
+  "reward": 3000,
+  "endTime": 1800336007,
+  "organizerPub": "033f41a2eaf9fa8a2d9a21ada58031094cdce2981627120f09ac80332a32b693cd",
+  "genesisTx": "ce123c94fefb6cc41044e905ebc5938971914451412a52a653fb7784ce012382"
+}

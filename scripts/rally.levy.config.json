@@ -2,7 +2,7 @@
   "name": "Jelajah Jogja",
   "description": "Stamp rally across Yogyakarta street-food stalls. Every stamp pays a levy into the pool, so each set funds its own reward.",
   "needed": 3,
-  "reward": 4000,
+  "reward": 3000,
   "rewardsInPool": 2,
   "durationDays": 60,
   "merchants": [
@@ -12,9 +12,9 @@
       "tagline": "Charcoal coffee by the station",
       "emoji": "☕",
       "color": "#7a4a2b",
-      "price": 4000,
+      "price": 3000,
       "taglineId": "Kopi arang dekat stasiun",
-      "memberPrice": 3600,
+      "memberPrice": 2700,
       "place": "Jl. Wongsodirjan, Yogyakarta"
     },
     {
@@ -23,9 +23,9 @@
       "tagline": "Wood-fire noodles",
       "emoji": "🍜",
       "color": "#c2410c",
-      "price": 4000,
+      "price": 3000,
       "taglineId": "Mi godhog masak tungku",
-      "memberPrice": 3600,
+      "memberPrice": 2700,
       "place": "Kotagede, Yogyakarta"
     },
     {
@@ -34,9 +34,9 @@
       "tagline": "Goat satay on bicycle spokes",
       "emoji": "🍢",
       "color": "#b91c1c",
-      "price": 4000,
+      "price": 3000,
       "taglineId": "Sate kambing tusuk jeruji sepeda",
-      "memberPrice": 3600,
+      "memberPrice": 2700,
       "place": "Jl. Imogiri Timur, Bantul"
     },
     {
@@ -45,14 +45,14 @@
       "tagline": "Iced coconut and palm sugar",
       "emoji": "🥥",
       "color": "#15803d",
-      "price": 4000,
+      "price": 3000,
       "taglineId": "Es kelapa dan gula aren",
-      "memberPrice": 3600,
+      "memberPrice": 2700,
       "place": "Pasar Beringharjo, Yogyakarta"
     }
   ],
   "lanes": 2,
-  "levy": 2200,
+  "levy": 2500,
   "bonusNeeded": 4,
-  "bonusReward": 5500
+  "bonusReward": 4500
 }

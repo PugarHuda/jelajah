@@ -5,6 +5,7 @@ export interface Merchant { id: number; name: string; tagline: string; taglineId
 export interface Rally {
   network: 'chipnet' | 'mainnet'; name: string; description: string; category: string; vmCategory: string;
   needed: number; reward: number; endTime: number; organizerPub: string; merchants: Merchant[]; genesisTx: string; minter?: 2 | 3; lanes?: number; levy?: number; bonusNeeded?: number; bonusReward?: number;
+  sponsor?: { name: string; category: string; vmCategory: string; value: number; sponsorPub: string; endTime: number; genesisTx?: string };
 }
 
 // One rally file per network (written by scripts/rally.mjs). Mainnet wins when it exists;
@@ -37,15 +38,33 @@ function parseRally(json: string | null): Rally | undefined {
       // payouts must be standard P2PKH or P2SH32 scripts
       && r.merchants.every((m) => Number.isInteger(m.id) && /^(76a914[0-9a-f]{40}88ac|aa20[0-9a-f]{64}87)$/.test(m.lock) && Number.isInteger(m.price))
       && [r.needed, r.reward, r.endTime].every(Number.isInteger) && [undefined, 2, 3].includes(r.minter)
+      && (r.sponsor === undefined || (r.minter === 3 && hex(r.sponsor.category, 64) && hex(r.sponsor.vmCategory, 64) && hex(r.sponsor.sponsorPub, 66)
+        && Number.isInteger(r.sponsor.value) && Number.isInteger(r.sponsor.endTime) && r.merchants.every((m) => r.sponsor!.value < (m.memberPrice ?? m.price))))
       && (r.minter !== 3 || Number.isInteger(r.levy)) && (r.bonusNeeded === undefined || (Number.isInteger(r.bonusNeeded) && Number.isInteger(r.bonusReward))) && (r.lanes === undefined || (Number.isInteger(r.lanes) && r.lanes >= 1 && r.lanes <= 8));
     if (!ok) return undefined;
     checkRallyConfig({ ...r, rewardsInPool: 1 }); // the same economic rules the CLI enforces (throws -> ignored below)
+    if (r.sponsor) r.sponsor.name = String(r.sponsor.name ?? 'sponsor').slice(0, 40);
     r.merchants = r.merchants.map((m) => ({ ...m, color: /^#[0-9a-f]{6}$/i.test(m.color) ? m.color : '#7a4a2b', name: String(m.name).slice(0, 40), emoji: String(m.emoji ?? '⭐').slice(0, 4), tagline: String(m.tagline ?? '').slice(0, 80), place: m.place === undefined ? undefined : String(m.place).slice(0, 80) }));
     return r;
   } catch { return undefined; }
 }
 // after the helpers above: they are consts, so using them earlier would hit the temporal dead zone
 export const fromLink = parseRally(params.get('r') ? await inflate(params.get('r')!) : decodeB64(params.get('rally')));
-export const rally: Rally = fromLink ?? (pick ? byNet(pick) : undefined) ?? byNet('mainnet') ?? byNet('chipnet')!;
+// ?pp=<deflate-raw JSON>: a passport offer across two rallies (untrusted: shape-checked)
+export interface Passport { network: 'chipnet' | 'mainnet'; name: string; category: string; vmCategory: string; reward: number; endTime: number; organizerPub: string; genesisTx: string;
+  rallyA: { name: string; category: string; vmCategory: string }; rallyB: { name: string; category: string; vmCategory: string } }
+export const passportFromLink = ((json: string | null): Passport | undefined => {
+  try {
+    if (!json) return undefined;
+    const p = JSON.parse(json) as Passport;
+    const hex = (s: unknown, n: number) => typeof s === 'string' && new RegExp(`^[0-9a-f]{${n}}$`).test(s);
+    const side = (r: Passport['rallyA']) => !!r && hex(r.category, 64) && hex(r.vmCategory, 64);
+    if (!((p.network === 'mainnet' || p.network === 'chipnet') && hex(p.category, 64) && hex(p.vmCategory, 64) && hex(p.organizerPub, 66) && hex(p.genesisTx, 64)
+      && side(p.rallyA) && side(p.rallyB) && p.rallyA.category !== p.rallyB.category && Number.isInteger(p.reward) && Number.isInteger(p.endTime))) return undefined;
+    return { ...p, name: String(p.name).slice(0, 60), rallyA: { ...p.rallyA, name: String(p.rallyA.name).slice(0, 40) }, rallyB: { ...p.rallyB, name: String(p.rallyB.name).slice(0, 40) } };
+  } catch { return undefined; }
+})(params.get('pp') ? await inflate(params.get('pp')!) : null);
+// a passport link runs on its own network (the wallet and provider follow `rally.network`)
+export const rally: Rally = fromLink ?? (passportFromLink ? byNet(passportFromLink.network) : undefined) ?? (pick ? byNet(pick) : undefined) ?? byNet('mainnet') ?? byNet('chipnet')!;
 export const provider = new ElectrumNetworkProvider(rally.network);
 export const { minters, vault } = rallyContracts(rally, provider);
