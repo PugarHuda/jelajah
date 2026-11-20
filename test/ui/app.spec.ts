@@ -61,3 +61,18 @@ test('the language switch flips the UI to Indonesian and back', async ({ page })
   await page.getByRole('button', { name: 'ID' }).click();
   await expect(page.locator('h1')).toContainText('Jajan di 3 warung');
 });
+
+test('the SolidCash page lists every step of the recorded chipnet run', async ({ page }) => {
+  const run = JSON.parse(readFileSync(new URL('../../solidcash/deployments/chipnet.json', import.meta.url), 'utf8'));
+  await page.goto('/?lang=en#/solidcash');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('SolidCash');
+  await expect(page.locator('ol li')).toHaveCount(Object.keys(run.txs).length);
+  await expect(page.locator(`a[href$="${run.txs.redeem}"]`)).toBeVisible();
+});
+
+test('Jelajah ID refuses to search an empty query and shows a Nostr key before any wallet', async ({ page }) => {
+  await page.goto('/?lang=en#/identity');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Bitcoin Cash and Nostr');
+  await expect(page.getByRole('button', { name: 'Verify' })).toBeDisabled();
+  await expect(page.locator('code').first()).toContainText('npub1');
+});
