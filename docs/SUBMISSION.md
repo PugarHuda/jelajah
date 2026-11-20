@@ -11,7 +11,7 @@
 - CashTokens address (EMBER2026 votes / prizes): bitcoincash:zrd56cv5ap5v2kc2dgc8hvt4e9g84pmrjcydclcrgj
 
 **Tracks:** Mainnet Track
-**Bounties:** FoldingCash Reward Claims (`claims/`) · Build with XO + Migrate to XO (`xo/`)
+**Bounties:** FoldingCash Reward Claims (`claims/`) · Build with XO + Migrate to XO (`xo/`). One BUIDL can apply to several bounties: press **Apply** on each bounty card and choose this BUIDL.
 
 **Prior work:** none. Built from scratch during BLAZE; first commit 17 Nov 2026.
 
@@ -28,7 +28,24 @@ Food festivals and malls in Jogja run stamp cards: eat at five stalls and win a 
 
 There is no sign-up, no server and no database. The prize is locked in a covenant, so the organiser can't take it back before the rally ends.
 
-**For the judges, under 2 minutes:** open the demo, connect, buy at 3 stalls (2,000 sats each), then claim.
+**▶ Try it on mainnet in 2 minutes (net cost ≈ 3,000 sats).** Open https://jelajah-bch.vercel.app, press **Connect wallet** and scan with Selene or Paytaca (WizardConnect). Then:
+1. Buy at 3 stalls: 2,000 sats each, plus about 500 in fees.
+2. Press **Claim**: 5,000 sats come back, along with a Trophy NFT.
+3. Optional: buy once more and the button shows **★ member price**. Your trophy is your membership card.
+
+Every step is one wallet prompt, and each one is a real covenant transaction on BCH mainnet.
+
+**How it scores on the four questions**
+- **Cool?** The stamp is printed by the payment itself. The prize sits in a covenant nobody can touch. The trophy is a membership card.
+- **Slick?** One button per step, works on a phone, Bahasa Indonesia / English, rupiah prices, stall posters with QR codes. No sign-up.
+- **Does it work?** The full lifecycle is on mainnet: stamps, claim and trophy (links below). There are 68 VM checks, about 40 of them attack cases, plus 8 Playwright UI tests. Every feature was also run with a real wallet (Selene) over WizardConnect.
+- **Does it make money?** Organisers (malls, festivals, tourism boards) pay per rally. Sponsors fund subsidised stamps. Every stamp is a paid visit the stall can prove on the `#/stats` dashboard.
+
+**What makes it a rally and not a loyalty card.** A loyalty card is one shop paying back its own customers. Jelajah is **many independent stalls behind one prize pool**, and the hard part is keeping that pool honest:
+- the vault loops over stamps from *different* stalls;
+- the anti-farming rule stops a stall from buying its own way to the prize;
+- levy rallies stop stalls from colluding;
+- single-use proof of presence shows the buyer was physically there.
 
 **Why it's a business:** organisers, malls and brands pay per rally, and every stamp is a paid visit they can prove. The anti-farming rule (reward < cheapest full set) means a stall can never profit from buying its own stamps.
 

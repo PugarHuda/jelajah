@@ -6,6 +6,13 @@
 
 **A stamp rally on Bitcoin Cash.** Pay a stall and its stamp NFT is printed in the same transaction. Collect stamps from 3 different stalls, burn them, and the rally's contract pays you back and mints your trophy.
 
+**▶ Try it on mainnet in 2 minutes (net cost ≈ 3,000 sats).** Open https://jelajah-bch.vercel.app, press **Connect wallet** and scan with Selene or Paytaca (WizardConnect). Then:
+1. Buy at 3 stalls: 2,000 sats each, plus about 500 in fees.
+2. Press **Claim**: 5,000 sats come back, along with a Trophy NFT.
+3. Optional: buy once more and the button shows **★ member price**. Your trophy is your membership card.
+
+Every step is one wallet prompt, and each one is a real covenant transaction on BCH mainnet.
+
 *Jelajah* is Indonesian for "to roam, to explore". The demo rally, **Jelajah Jogja**, has four Yogyakarta street-food stalls.
 
 Built from scratch for **BCH BLAZE 2026** (Mainnet track). The first commit is from 17 Nov 2026, and there is no pre-existing code.
