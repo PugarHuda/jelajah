@@ -16,8 +16,9 @@ Jelajah ID links a BCH address and a Nostr key. Each key vouches for the other, 
 3. **Verification** (`verifyLink` in `src/lib/identity.js`) checks four things:
    - the event's Schnorr signature;
    - that the statement matches the address and key;
-   - that the proof tx commits to `sha256(statement)` and the Nostr key;
-   - that the proof tx's first input was a coin of the claimed address.
+   - that the proof tx's OP_RETURN names this Nostr key (the NIP-39 text, or the v1 commitment);
+   - that the proof tx spent a coin of the claimed P2PKH address, signed `SIGHASH_ALL` (so the key committed to the OP_RETURN; an `ANYONECANPAY` coinjoin signature proves nothing);
+   - that every fetched tx hashes to its txid (a lying server can't substitute one).
 
    Neither private key ever crosses networks.
 4. **Standard NIP-39 claim.** The same link is also published in the key's NIP-39 list (kind `10011`) as `["i", "bch:q…", "tx:<proof txid>"]`. This is the on-chain proof form of the `bch` claim type in [TwinKey's spec](https://github.com/samizdatproject/twinkey/blob/main/SPEC.md). Publishing keeps the list's other claims. **Interop check:** TwinKey's live verifier, an independent implementation, shows our mainnet link as **✓ Verified link**: [lookup](https://samizdatproject.github.io/twinkey/?q=npub1x2uldr579mk849v4n80hwkw9ngfy35yrdnzjy6z894dt2u2w0ezsqnx6vk).
@@ -40,6 +41,7 @@ Jelajah ID links a BCH address and a Nostr key. Each key vouches for the other, 
   - link your address with Selene through WizardConnect, signing with a NIP-07 extension or a browser key;
   - verify anyone by npub or by address, and see their rally stamps and trophies (reputation that travels with the identity);
   - pay a verified identity;
+  - see who is verified in the stall dashboard (`#/stats`): collectors with a verified link get a **✓ Nostr** badge. On chipnet, the top collector `bchtest:qp497z…pkyjn` (5/5 stalls, a trophy) is linked: proof [71cf8731…](https://chipnet.imaginary.cash/tx/71cf87318d7f43335efbbbe2dc7cd0da8b9c1918b78b1e44c28b28e9b2640864);
   - log in.
 - **Independent verifier (CLI):**
 

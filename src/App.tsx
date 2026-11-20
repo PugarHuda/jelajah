@@ -794,7 +794,17 @@ const shortAddr = (pkh: string) => { const a = addressOf(hexToBin(`76a914${pkh}8
 function Stats() {
   const [s, setS] = useState<StatsData | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // Jelajah ID: which collectors have a verified Nostr identity (looked up from public relays, verified on chain)
+  const [ids, setIds] = useState<Record<string, string>>({});
   useEffect(() => { rallyStats({ rally, provider, minters, vault }).then(setS, (e) => setErr(String(e))); }, []);
+  useEffect(() => {
+    if (!s?.collectors.length) return;
+    const pool = new SimplePool();
+    Promise.all(s.collectors.map(async (c) => {
+      const r = await findVerified(pool, { address: addressOf(hexToBin(`76a914${c.pkh}88ac`)) }, provider).catch(() => null);
+      return r?.ok ? [c.pkh, r.nostrPubkey!] as const : null;
+    })).then((rows) => { pool.close(RELAYS); setIds(Object.fromEntries(rows.filter((r) => r !== null))); });
+  }, [s]);
   const total = s?.stalls.reduce((a, x) => ({ stamps: a.stamps + x.stamps, revenue: a.revenue + x.revenue }), { stamps: 0, revenue: 0n });
   return (
     <main className="stats">
@@ -821,7 +831,7 @@ function Stats() {
         <h2>{tr('Top collectors', 'Kolektor teratas')}</h2>
         <table>
           <thead><tr><th>{tr('Collector', 'Kolektor')}</th><th>{tr('Stalls visited', 'Warung dikunjungi')}</th><th>Stamp{ID ? '' : 's'}</th><th>{tr('Trophies', 'Trofi')}</th></tr></thead>
-          <tbody>{s.collectors.map((c) => <tr key={c.pkh}><td><code>{shortAddr(c.pkh)}</code></td><td>{c.stalls}/{rally.merchants.length}</td><td>{c.stamps}</td><td>{'🏆'.repeat(Math.min(c.trophies, 5))}{c.trophies > 5 ? ` ×${c.trophies}` : ''}</td></tr>)}</tbody>
+          <tbody>{s.collectors.map((c) => <tr key={c.pkh}><td><code>{shortAddr(c.pkh)}</code>{ids[c.pkh] && <> <a className="small" href={`https://njump.me/${nip19.npubEncode(ids[c.pkh])}`} target="_blank" rel="noreferrer" title={tr('Verified Jelajah ID: this address and this Nostr key prove each other', 'Jelajah ID terverifikasi: alamat ini dan kunci Nostr ini saling membuktikan')}>✓ Nostr</a></>}</td><td>{c.stalls}/{rally.merchants.length}</td><td>{c.stamps}</td><td>{'🏆'.repeat(Math.min(c.trophies, 5))}{c.trophies > 5 ? ` ×${c.trophies}` : ''}</td></tr>)}</tbody>
         </table>
       </>)}
       <a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a>

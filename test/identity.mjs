@@ -74,3 +74,21 @@ console.log('PASS login: the right challenge passes; a wrong challenge, another 
   assert.equal(getPublicKey(attacker).length, 64);
   console.log('PASS publishing keeps the key’s other NIP-39 claims and replaces only this address');
 }
+
+{ // a coin signed SIGHASH_SINGLE|ANYONECANPAY (e.g. in a coinjoin) doesn't commit to the OP_RETURN, so it proves nothing
+  const { verifyLink } = await import('../src/lib/identity.js');
+  const { decodeTransaction, encodeTransaction, decodeAuthenticationInstructions, encodeAuthenticationInstructions, hexToBin: h2b, binToHex: b2h, sha256: sh } = await import('@bitauth/libauth');
+  const iT = fx.event.tags.find((t) => t[0] === 'i');
+  const tx = decodeTransaction(h2b(fx.txs[iT[2]]));
+  const ins = decodeAuthenticationInstructions(tx.inputs[0].unlockingBytecode);
+  ins[0] = { ...ins[0], data: Uint8Array.from([...ins[0].data.slice(0, -1), 0xc3]) }; // SINGLE|FORKID|ANYONECANPAY
+  tx.inputs[0] = { ...tx.inputs[0], unlockingBytecode: encodeAuthenticationInstructions(ins) };
+  const raw = encodeTransaction(tx), id = b2h(sh.hash(sh.hash(raw)).reverse());
+  const txs = { ...fx.txs, [id]: b2h(raw) };
+  const p2 = { getRawTransaction: async (x) => { if (!txs[x]) throw new Error('unknown'); return txs[x]; } };
+  const ev = finalizeEvent({ kind: fx.event.kind, created_at: fx.event.created_at, tags: fx.event.tags.map((t) => (t[0] === 'i' ? [t[0], t[1], id] : t)), content: statement({ address: iT[1].slice(4), nostrPubkey: (await import('nostr-tools/pure')).getPublicKey(attacker) }) }, attacker);
+  assert.equal((await verifyLink(ev, p2)).ok, false);
+  const liar = { getRawTransaction: async (x) => fx.txs[Object.keys(fx.txs).find((k) => k !== x)] }; // a server answering with another tx
+  assert.match((await verifyLink(fx.event, liar)).reason, /different transaction/);
+  console.log('PASS (refused) a proof whose coin was signed ANYONECANPAY, and a server substituting another tx');
+}

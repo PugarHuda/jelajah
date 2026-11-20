@@ -1,6 +1,6 @@
 // Jelajah ID end to end with local keys: link this project's organizer BCH address to a Nostr key, publish, discover,
 // verify, then log in with a challenge. The Nostr key is kept in scripts/.nostr.<network>.json (gitignored).
-//   node scripts/identity-demo.mjs --network mainnet
+//   node scripts/identity-demo.mjs --network mainnet [--key scripts/.buyer.chipnet.json]   (default key: the organizer)
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { ElectrumNetworkProvider, SignatureTemplate } from 'cashscript';
@@ -10,17 +10,19 @@ import { SimplePool } from 'nostr-tools/pool';
 import { nip19 } from 'nostr-tools';
 import { RELAYS, NIP39_KIND, buildProofTx, linkEvent, nip39Event, findLinks, verifyLink, verifyNip39, loginChallenge, loginEvent, checkLogin, findVerified } from '../src/lib/identity.js';
 
-const { values: { network } } = parseArgs({ options: { network: { type: 'string', default: 'mainnet' } } });
+const { values: { network, key } } = parseArgs({ options: { network: { type: 'string', default: 'mainnet' }, key: { type: 'string' } } });
 const provider = new ElectrumNetworkProvider(network);
 const prefix = network === 'mainnet' ? 'bitcoincash' : 'bchtest';
 const explorer = network === 'mainnet' ? 'https://blockchair.com/bitcoin-cash/transaction/' : 'https://chipnet.imaginary.cash/tx/';
 
-// BCH identity: the organizer key
-const priv = decodePrivateKeyWif(JSON.parse(readFileSync(`scripts/.organizer.${network}.json`)).wif).privateKey;
+// BCH identity: the organizer key, or any WIF key file
+const keyFile = key ?? `scripts/.organizer.${network}.json`;
+const keyJson = JSON.parse(readFileSync(keyFile));
+const priv = keyJson.wif ? decodePrivateKeyWif(keyJson.wif).privateKey : hexToBin(keyJson.key); // organizer files hold a WIF, buyer files a hex key
 const lock = encodeLockingBytecodeP2pkh(hash160(secp256k1.derivePublicKeyCompressed(priv)));
 const address = lockingBytecodeToCashAddress({ bytecode: lock, prefix }).address;
 // Nostr identity: a key of its own (never the BCH key)
-const nostrFile = `scripts/.nostr.${network}.json`;
+const nostrFile = key ? key.replace(/\.json$/, '.nostr.json') : `scripts/.nostr.${network}.json`;
 if (!existsSync(nostrFile)) writeFileSync(nostrFile, JSON.stringify({ sk: binToHex(generateSecretKey()) }));
 const sk = hexToBin(JSON.parse(readFileSync(nostrFile)).sk);
 const nostrPubkey = getPublicKey(sk);
