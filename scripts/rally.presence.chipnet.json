@@ -1,0 +1,65 @@
+{
+  "network": "chipnet",
+  "name": "Jelajah Jogja (presence)",
+  "description": "Levy rally where two stalls also require their device to sign for each buyer, proving the buyer was there.",
+  "category": "02e0c3303568888c4f0370194f4997c450bd952c3f77513ee7e02ef316b9b618",
+  "vmCategory": "18b6b916f32ee0e73e51773f2c95bd50c497494f1970034f8c88683530c3e002",
+  "needed": 3,
+  "reward": 4000,
+  "endTime": 1800332196,
+  "organizerPub": "033f41a2eaf9fa8a2d9a21ada58031094cdce2981627120f09ac80332a32b693cd",
+  "lanes": 2,
+  "minter": 3,
+  "levy": 2200,
+  "bonusNeeded": 4,
+  "bonusReward": 5500,
+  "merchants": [
+    {
+      "id": 1,
+      "name": "Kopi Joss",
+      "tagline": "Charcoal coffee by the station",
+      "emoji": "☕",
+      "color": "#7a4a2b",
+      "price": 4000,
+      "taglineId": "Kopi arang dekat stasiun",
+      "memberPrice": 3600,
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "presenceKey": "0210a89781a0b7ad23e8863e61e88270390c81ef23d546e9d632a985b962fb59e1"
+    },
+    {
+      "id": 2,
+      "name": "Bakmi Jawa",
+      "tagline": "Wood-fire noodles",
+      "emoji": "🍜",
+      "color": "#c2410c",
+      "price": 4000,
+      "taglineId": "Mi godhog masak tungku",
+      "memberPrice": 3600,
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "presenceKey": "02519f774f7d31d0ebfd41a568e6ea609d98863062d961ea3e0e5e5e3b8ac9959f"
+    },
+    {
+      "id": 3,
+      "name": "Sate Klathak",
+      "tagline": "Goat satay on bicycle spokes",
+      "emoji": "🍢",
+      "color": "#b91c1c",
+      "price": 4000,
+      "taglineId": "Sate kambing tusuk jeruji sepeda",
+      "memberPrice": 3600,
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+    },
+    {
+      "id": 4,
+      "name": "Es Dawet",
+      "tagline": "Iced coconut and palm sugar",
+      "emoji": "🥥",
+      "color": "#15803d",
+      "price": 4000,
+      "taglineId": "Es kelapa dan gula aren",
+      "memberPrice": 3600,
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+    }
+  ],
+  "genesisTx": "c5dc4f5b32dd132ec491fc968b7e7a1f6c00c2df64a37120bf9425823c8dedee"
+}

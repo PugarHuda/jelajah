@@ -10,8 +10,11 @@ pragma cashscript ^0.14.0;
 //                                                          out[2] stamp NFT to buyer (P2PKH)
 //                                                          out[3] levy to the vault (BCH only, >= levy)
 //                                                          out[4] (no trophy) / out[5] (trophy): optional BCH-only change
-contract StampMinter3(bytes merchantLock, int minPrice, int memberPrice, bytes1 merchantId, bytes vaultLock, int levy) {
-    function stamp() {
+// Proof of presence (optional, per stall): with a presenceKey set, the stall's device must sign
+// rallyCategory ‖ merchantId ‖ buyer pkh. The signature names the buyer, so a screenshot shared with
+// someone else is useless; an empty presenceKey turns the check off.
+contract StampMinter3(bytes merchantLock, int minPrice, int memberPrice, bytes1 merchantId, bytes vaultLock, int levy, bytes presenceKey) {
+    function stamp(datasig presence) {
         require(this.activeInputIndex == 0);
 
         // minter continues unchanged
@@ -29,6 +32,10 @@ contract StampMinter3(bytes merchantLock, int minPrice, int memberPrice, bytes1 
         require(buyerLock == new LockingBytecodeP2PKH(buyerPkh));
         require(tx.outputs[2].nftCommitment == merchantId + buyerPkh);
         require(tx.outputs[2].tokenAmount == 0);
+
+        if (presenceKey.length > 0) {
+            require(checkDataSig(presence, rallyCategory + merchantId + buyerPkh, pubkey(presenceKey)));
+        }
 
         // levy into the vault: separate coins, so buyers never race for the vault coin
         require(tx.outputs[3].lockingBytecode == vaultLock);

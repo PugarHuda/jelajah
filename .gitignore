@@ -25,6 +25,7 @@ dist-ssr
 
 # organizer keys
 scripts/.organizer.*.json
+scripts/.presence.*.json
 
 .vercel
 claims/.demo.*.json

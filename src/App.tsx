@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
 import qrcode from 'qrcode-generator';
-import { hexToBin, binToHex, cashAddressToLockingBytecode } from '@bitauth/libauth';
+import { hexToBin, binToHex, cashAddressToLockingBytecode, secp256k1, sha256, generatePrivateKey } from '@bitauth/libauth';
 import { TransactionBuilder } from 'cashscript';
 import { rally, provider, minters, vault, rallyLink, fromLink, type Merchant, type Rally } from './chain';
-import { buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis } from './lib/tx.js';
+import { buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence } from './lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, receiveZeroCoin, type Coin } from './wallet';
 import { Stamp, Trophy } from './Stamp';
 import { SLIDES_URL, REPO_URL, VOTE_ADDRESS } from './links';
@@ -43,6 +43,7 @@ export default function App() {
   if (stallFromHash) return <StallPoster m={rally.merchants.find((x) => x.id === Number(stallFromHash))} />;
   if (window.location.hash === '#/stats') return <Stats />;
   if (window.location.hash === '#/organize') return <Organize />;
+  if (window.location.hash.startsWith('#/device')) return <Device />;
   if (window.location.hash === '#/art') return ( // press image: every stamp + the trophy
     <main className="art">{rally.merchants.map((m) => <Stamp key={m.id} m={m} inked size={220} />)}<Trophy name={rally.name} size={220} /></main>
   );
@@ -105,11 +106,12 @@ function Rally() {
     } finally { setBusy(null); }
   }
 
-  const buy = (m: Merchant) => run(`${m.emoji} ${tr('Stamped at', 'Dapat stamp di')} ${m.name}`, async () => {
+  const [askPresence, setAskPresence] = useState<Merchant | null>(null);
+  const buy = (m: Merchant, presence?: string) => (m.presenceKey && !presence) ? setAskPresence(m) : run(`${m.emoji} ${tr('Stamped at', 'Dapat stamp di')} ${m.name}`, async () => {
     const fresh = await walletCoins(wc.manager!); // never build on a stale or not-yet-loaded coin list
     const myTrophy = (rally.minter ?? 1) >= 2 ? fresh.find((c) => isRallyNft(rally, c.utxo) && stallOf(c) === 0 && mine(c)) : undefined;
     const price = sats(cost(m, !!myTrophy));
-    const { builder, inputs } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: lock!, coins: fresh, trophy: myTrophy });
+    const { builder, inputs } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: lock!, coins: fresh, trophy: myTrophy, presence: presence ? hexToBin(presence) : undefined });
     return signAndSend(wc.manager!, builder, inputs, myTrophy
       ? tr(`Show your trophy, pay ${m.name} the member price ${price} and get its stamp`, `Tunjukkan trofimu, bayar ${m.name} harga member ${price} dan dapat stamp-nya`)
       : tr(`Pay ${m.name} ${price} and get its Jelajah stamp`, `Bayar ${m.name} ${price} dan dapat stamp Jelajah-nya`));
@@ -236,6 +238,8 @@ function Rally() {
             <p className="hint">{tr(`Each stamp includes a ${sats(rally.levy!)} levy that goes straight into the reward pool, so every set funds its own reward and colluding stalls can't drain it.`,
               `Tiap stamp sudah termasuk levy ${sats(rally.levy!)} yang langsung masuk pool hadiah, jadi setiap set membiayai hadiahnya sendiri dan warung yang berkolusi tidak bisa mengurasnya.`)}</p>
           )}
+          {askPresence && lock && <PresencePanel m={askPresence} buyerPkh={hex(lock.slice(3, 23))} onClose={() => setAskPresence(null)}
+            onSig={(sig) => { const m = askPresence; setAskPresence(null); buy(m, sig); }} />}
           {error && <p className="error" role="alert">{error}</p>}
         </section>
 
@@ -321,7 +325,7 @@ function StallPoster({ m }: { m?: Merchant }) {
 // ---- #/organize: open your own rally from the browser. The genesis is the same code the CLI uses (src/lib/tx.js),
 // signed by the organizer's wallet over WizardConnect; the finished rally travels in its share link.
 const PALETTE = ['#7a4a2b', '#c2410c', '#b91c1c', '#15803d', '#1d4ed8', '#7e22ce'];
-type StallRow = { name: string; emoji: string; price: string; memberPrice: string; address: string };
+type StallRow = { name: string; emoji: string; price: string; memberPrice: string; address: string; presenceKey?: string };
 
 function Organize() {
   const wc = useWizardConnect({ dappName: 'Jelajah', dappIcon: new URL('favicon.svg', location.origin + import.meta.env.BASE_URL).href });
@@ -356,6 +360,7 @@ function Organize() {
     merchants: stalls.map((s, i) => ({
       id: i + 1, name: s.name.trim() || `Stall ${i + 1}`, emoji: s.emoji || '⭐', tagline: '', color: PALETTE[i % PALETTE.length],
       price: Number(s.price), memberPrice: Number(s.memberPrice || s.price), lock: payout(s.address),
+      ...(s.presenceKey?.trim() ? { presenceKey: s.presenceKey.trim().toLowerCase() } : {}),
     })),
   });
   let problem: string | null = null;
@@ -425,6 +430,7 @@ function Organize() {
             <label>{tr('Price', 'Harga')}<input type="number" min={546} value={s.price} onChange={setStall(i, 'price')} /></label>
             <label>{tr('Member price', 'Harga member')}<input type="number" min={546} value={s.memberPrice} onChange={setStall(i, 'memberPrice')} /></label>
             <label className="wide">{tr("Stall's BCH address (empty = yours)", 'Alamat BCH warung (kosong = milikmu)')}<input value={s.address} onChange={setStall(i, 'address')} placeholder="bitcoincash:q…" /></label>
+            <label className="wide">{tr("Proof of presence: the stall device's key from #/device (optional, needs a levy)", 'Bukti kehadiran: kunci perangkat warung dari #/device (opsional, perlu levy)')}<input value={s.presenceKey ?? ''} onChange={setStall(i, 'presenceKey')} placeholder="02…" /></label>
           </div>
         ))}
         <p className="row">
@@ -490,6 +496,96 @@ function Stats() {
         </table>
       </>)}
       <a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a>
+    </main>
+  );
+}
+
+// ---- proof of presence UI: QR codes, a camera scanner (native BarcodeDetector, paste fallback), the stall device page
+
+const qrImage = (text: string) => { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createDataURL(6, 8); };
+
+/** Scan one QR with the camera. Only where the browser has BarcodeDetector; everyone can still paste the code. */
+function ScanQR({ onCode }: { onCode: (code: string) => void }) {
+  const [on, setOn] = useState(false);
+  const [video, setVideo] = useState<HTMLVideoElement | null>(null);
+  useEffect(() => {
+    if (!on || !video) return;
+    let stop = false;
+    let stream: MediaStream | undefined;
+    const Detector = (window as unknown as { BarcodeDetector: new (o: object) => { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> } }).BarcodeDetector;
+    const detector = new Detector({ formats: ['qr_code'] });
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(async (s) => {
+      stream = s;
+      video.srcObject = s;
+      await video.play();
+      while (!stop) {
+        const [code] = await detector.detect(video).catch(() => []);
+        if (code) { onCode(code.rawValue.trim()); setOn(false); return; }
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    }).catch(() => setOn(false));
+    return () => { stop = true; stream?.getTracks().forEach((t) => t.stop()); };
+  }, [on, video, onCode]);
+  if (!('BarcodeDetector' in window)) return null;
+  return on ? <video ref={setVideo} className="scan" muted playsInline /> : <button className="ghost" onClick={() => setOn(true)}>📷 {tr('Scan QR', 'Pindai QR')}</button>;
+}
+
+const validPresence = (m: Merchant, buyerPkh: string, sigHex: string) => /^[0-9a-f]{128}$/.test(sigHex)
+  && secp256k1.verifySignatureSchnorr(hexToBin(sigHex), hexToBin(m.presenceKey!), sha256.hash(presenceMessage(rally, m.id, buyerPkh)));
+
+/** Shown when buying at a stall that wants proof of presence: show your code, get the stall's signature back. */
+function PresencePanel({ m, buyerPkh, onSig, onClose }: { m: Merchant; buyerPkh: string; onSig: (sig: string) => void; onClose: () => void }) {
+  const [code, setCode] = useState('');
+  const ok = validPresence(m, buyerPkh, code);
+  return (
+    <section className="warn presence" role="dialog" aria-label={tr('Proof of presence', 'Bukti kehadiran')}>
+      <b>{m.emoji} {m.name}: {tr('this stall checks that you are really here', 'warung ini memastikan kamu benar-benar datang')}</b>
+      <ol>
+        <li>{tr("Show this code to the stall's device:", 'Tunjukkan kode ini ke perangkat warung:')}<br /><img className="qr small" src={qrImage(buyerPkh)} alt={tr('Your buyer code', 'Kode pembelimu')} /><br /><code>{buyerPkh}</code></li>
+        <li>{tr('Scan or paste the code it shows back:', 'Pindai atau tempel kode balasannya:')}<br />
+          <ScanQR onCode={setCode} />
+          <input className="code" value={code} onChange={(e) => setCode(e.target.value.trim().toLowerCase())} placeholder={tr("stall's code", 'kode warung')} /></li>
+      </ol>
+      {code && !ok && <p className="error">{tr("That code isn't this stall's signature for you.", 'Kode itu bukan tanda tangan warung ini untukmu.')}</p>}
+      <p className="row">
+        <button className="primary" disabled={!ok} onClick={() => onSig(code)}>{tr('Buy with the stall’s code', 'Beli dengan kode warung')}</button>
+        <button className="ghost" onClick={onClose}>{tr('Cancel', 'Batal')}</button>
+      </p>
+    </section>
+  );
+}
+
+/** #/device/<stall id>: the stall's phone. Holds the stall's presence key and signs each buyer's code. */
+function Device() {
+  const id = Number(location.hash.match(/^#\/device\/(\d+)/)?.[1] ?? 0);
+  const m = rally.merchants.find((x) => x.id === id);
+  const [key] = useState(() => {
+    let k: string | null = null;
+    try { k = localStorage.getItem('jelajah-device-key'); } catch { /* private mode */ }
+    if (!k) {
+      k = binToHex(generatePrivateKey());
+      try { localStorage.setItem('jelajah-device-key', k); } catch { /* the key then lives only in this tab */ }
+    }
+    return k;
+  });
+  const pub = binToHex(secp256k1.derivePublicKeyCompressed(hexToBin(key)) as Uint8Array);
+  const [buyer, setBuyer] = useState('');
+  const buyerOk = /^[0-9a-f]{40}$/.test(buyer);
+  const sig = m && buyerOk ? binToHex(signPresence(hexToBin(key), rally, m.id, buyer)) : null;
+  return (
+    <main className="poster device">
+      <p className="eyebrow">{rally.name} · {tr('stall device', 'perangkat warung')}</p>
+      <h1>{m ? `${m.emoji} ${m.name}` : tr('Stall device', 'Perangkat warung')}</h1>
+      <p className="muted small">{tr("This device's presence key (give it to the organizer when the rally is set up):", 'Kunci presence perangkat ini (berikan ke penyelenggara saat rally dibuat):')}<br /><code className="wrap">{pub}</code></p>
+      {m && m.presenceKey !== pub && <p className="error">{tr("This device's key is not the one registered for this stall, so its codes won't work here.", 'Kunci perangkat ini bukan yang terdaftar untuk warung ini, jadi kodenya tidak akan berlaku.')}</p>}
+      {m && (<>
+        <p className="lede">{tr("Scan or paste the buyer's code, then let them scan the reply.", 'Pindai atau tempel kode pembeli, lalu biarkan mereka memindai balasannya.')}</p>
+        <ScanQR onCode={(c) => setBuyer(c.toLowerCase())} />
+        <input className="code" value={buyer} onChange={(e) => setBuyer(e.target.value.trim().toLowerCase())} placeholder={tr("buyer's code", 'kode pembeli')} />
+        {buyer && !buyerOk && <p className="error">{tr('A buyer code is 40 hex characters.', 'Kode pembeli berupa 40 karakter hex.')}</p>}
+        {sig && <><img className="qr" src={qrImage(sig)} alt={tr('Signed code for the buyer', 'Kode bertanda tangan untuk pembeli')} /><code className="wrap small">{sig}</code></>}
+      </>)}
+      <p className="muted small">{tr('The code only works for this buyer, at this stall, in this rally: a screenshot is useless to anyone else.', 'Kode ini hanya berlaku untuk pembeli ini, di warung ini, di rally ini: screenshot tidak berguna bagi orang lain.')}</p>
     </main>
   );
 }

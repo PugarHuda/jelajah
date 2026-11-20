@@ -1,7 +1,7 @@
 import { ElectrumNetworkProvider } from 'cashscript';
 import { rallyContracts, checkRallyConfig } from './lib/tx.js';
 
-export interface Merchant { id: number; name: string; tagline: string; taglineId?: string; emoji: string; color: string; price: number; memberPrice?: number; lock: string }
+export interface Merchant { id: number; name: string; tagline: string; taglineId?: string; emoji: string; color: string; price: number; memberPrice?: number; lock: string; presenceKey?: string }
 export interface Rally {
   network: 'chipnet' | 'mainnet'; name: string; description: string; category: string; vmCategory: string;
   needed: number; reward: number; endTime: number; organizerPub: string; merchants: Merchant[]; genesisTx: string; minter?: 2 | 3; lanes?: number; levy?: number; bonusNeeded?: number; bonusReward?: number;

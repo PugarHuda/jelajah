@@ -1,7 +1,7 @@
 // Transaction builders shared by the web app and the node scripts.
 // Callers pass unlockers, so the same code works with a local key (scripts) or a WizardConnect placeholder (app).
 import { Contract, TransactionBuilder } from 'cashscript';
-import { hexToBin, binToHex, decodeTransaction, cashAddressToLockingBytecode } from '@bitauth/libauth';
+import { hexToBin, binToHex, decodeTransaction, cashAddressToLockingBytecode, secp256k1, sha256 } from '@bitauth/libauth';
 import StampMinter from '../contracts/StampMinter.json' with { type: 'json' };
 import StampMinter2 from '../contracts/StampMinter2.json' with { type: 'json' };
 import StampMinter3 from '../contracts/StampMinter3.json' with { type: 'json' };
@@ -23,7 +23,7 @@ export function rallyContracts(rally, provider) {
   const vaultLock = binToHex(cashAddressToLockingBytecode(vault.address).bytecode);
   const minters = Object.fromEntries(rally.merchants.map((m) => [
     m.id, rally.minter === 3
-      ? new Contract(StampMinter3, [m.lock, BigInt(m.price), BigInt(m.memberPrice), hex2(m.id), vaultLock, BigInt(rally.levy)], { provider })
+      ? new Contract(StampMinter3, [m.lock, BigInt(m.price), BigInt(m.memberPrice), hex2(m.id), vaultLock, BigInt(rally.levy), m.presenceKey ?? ''], { provider })
       : rally.minter === 2
         ? new Contract(StampMinter2, [m.lock, BigInt(m.price), BigInt(m.memberPrice), hex2(m.id)], { provider })
         : new Contract(StampMinter, [m.lock, BigInt(m.price), hex2(m.id)], { provider }),
@@ -46,7 +46,7 @@ export function pickCoins(coins, target) {
 
 /** Buy at one stall and receive its stamp in the same transaction. buyerLock: Uint8Array P2PKH.
  *  trophy (optional, StampMinter2 rallies): the buyer's own Trophy coin { utxo, unlocker } -> member price, trophy comes back. */
-export async function buildStamp({ rally, provider, minters, merchantId, buyerLock, coins, trophy }) {
+export async function buildStamp({ rally, provider, minters, merchantId, buyerLock, coins, trophy, presence }) {
   const merchant = rally.merchants.find((m) => m.id === merchantId);
   const minter = minters[merchantId];
   // a stall may have several minter coins ("lanes"); pick one at random so simultaneous buyers rarely collide.
@@ -58,7 +58,9 @@ export async function buildStamp({ rally, provider, minters, merchantId, buyerLo
   const price = BigInt(member ? merchant.memberPrice : merchant.price);
   const levy = rally.minter === 3 ? BigInt(rally.levy) : 0n;
   const { picked, sum } = pickCoins(coins, price + levy + DUST + STAMP_FEE + DUST);
-  const tb = new TransactionBuilder({ provider }).addInput(minterUtxo, minter.unlock.stamp());
+  // levy rallies take the stall's presence signature (ignored by stalls without a presenceKey)
+  const unlock = rally.minter === 3 ? minter.unlock.stamp(presence ?? new Uint8Array(64)) : minter.unlock.stamp();
+  const tb = new TransactionBuilder({ provider }).addInput(minterUtxo, unlock);
   if (member) tb.addInput(trophy.utxo, trophy.unlocker);
   picked.forEach((c) => tb.addInput(c.utxo, c.unlocker));
   tb.addOutput({ to: minter.tokenAddress, amount: minterUtxo.satoshis, token: minterUtxo.token })
@@ -171,6 +173,15 @@ export async function rallyStats({ rally, provider, minters, vault }) {
   return { stalls, claims: claimTxs.length, collectors };
 }
 
+// ---- proof of presence: the stall's device signs rallyCategory ‖ merchantId ‖ buyer pkh (what StampMinter3 checks)
+export const presenceMessage = (rally, merchantId, buyerPkhHex) => hexToBin(rally.vmCategory + hex2(merchantId) + buyerPkhHex);
+/** Schnorr datasig as OP_CHECKDATASIG expects it (over sha256 of the message). */
+export function signPresence(privateKey, rally, merchantId, buyerPkhHex) {
+  const sig = secp256k1.signMessageHashSchnorr(privateKey, sha256.hash(presenceMessage(rally, merchantId, buyerPkhHex)));
+  if (typeof sig === 'string') throw new Error(sig);
+  return sig;
+}
+
 /** The coin that holds this rally's minting NFT (a minter lane or the vault), not junk sent to the same address. */
 export const isMintingCoin = (rally, u) => u.token?.category === rally.category && u.token.nft?.capability === 'minting';
 
@@ -192,6 +203,8 @@ export function checkRallyConfig(cfg) {
   const cheapest = cfg.merchants.map((m) => m.memberPrice ?? m.price).sort((a, b) => a - b).slice(0, cfg.needed).reduce((a, b) => a + b, 0);
   if (!(cfg.reward < cheapest)) throw new Error(`anti-farming: reward ${cfg.reward} must be < cheapest set ${cheapest}`);
   if (!(cfg.rewardsInPool >= 1)) throw new Error('fund at least one reward');
+  if (cfg.merchants.some((m) => m.presenceKey !== undefined && !/^0[23][0-9a-f]{64}$/.test(m.presenceKey))) throw new Error('a presence key is a 33-byte compressed public key (66 hex)');
+  if (cfg.merchants.some((m) => m.presenceKey) && cfg.levy === undefined) throw new Error('proof of presence needs a levy rally');
   // levy rallies: each set must fund its own reward, or colluding stalls can drain the pool.
   // A merge costs up to 600 sats per coin, so count that against the levies of one set (plus the vault coin's merge).
   if (cfg.levy !== undefined && cfg.needed * (cfg.levy - 600) - 600 < cfg.reward)

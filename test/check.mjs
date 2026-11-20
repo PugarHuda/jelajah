@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Contract, MockNetworkProvider, SignatureTemplate, TransactionBuilder, randomUtxo } from 'cashscript';
-import { secp256k1, hash160, binToHex, hexToBin, encodeLockingBytecodeP2pkh, cashAddressToLockingBytecode } from '@bitauth/libauth';
+import { secp256k1, sha256, hash160, binToHex, hexToBin, encodeLockingBytecodeP2pkh, cashAddressToLockingBytecode } from '@bitauth/libauth';
 
 const artifact = (n) => JSON.parse(readFileSync(new URL(`../src/contracts/${n}.json`, import.meta.url)));
 const StampMinter = artifact('StampMinter');
@@ -14,7 +14,7 @@ const key = (n) => {
   const priv = new Uint8Array(32).fill(n);
   const pub = secp256k1.derivePublicKeyCompressed(priv);
   const pkh = hash160(pub);
-  return { pub, pkh, lock: binToHex(encodeLockingBytecodeP2pkh(pkh)), sig: new SignatureTemplate(priv) };
+  return { priv, pub, pkh, lock: binToHex(encodeLockingBytecodeP2pkh(pkh)), sig: new SignatureTemplate(priv) };
 };
 const alice = key(1), bob = key(2), organizer = key(9);
 const merchants = [key(11), key(12), key(13)];
@@ -147,7 +147,7 @@ const vault2Lock = binToHex(cashAddressToLockingBytecode(vault2.address).bytecod
 provider.addUtxo(vault2.address, randomUtxo({ satoshis: DUST, token: minting })); // seeded with dust only: no organizer money
 const merchants3 = [...merchants, key(14)]; // a 4th stall for the bonus tier
 const m3 = merchants3.map((m, i) => {
-  const c = new Contract(StampMinter3, [m.lock, PRICE, MEMBER, `0${i + 1}`, vault2Lock, LEVY], { provider });
+  const c = new Contract(StampMinter3, [m.lock, PRICE, MEMBER, `0${i + 1}`, vault2Lock, LEVY, ''], { provider });
   provider.addUtxo(c.address, randomUtxo({ satoshis: DUST, token: minting }));
   return c;
 });
@@ -157,7 +157,7 @@ async function buy3(i, buyer, { levy = LEVY, levyTo = vault2Lock } = {}) {
   const [minterUtxo] = (await m3[i].getUtxos()).filter((u) => u.token);
   const coin = fund(buyer);
   return new TransactionBuilder({ provider })
-    .addInput(minterUtxo, m3[i].unlock.stamp())
+    .addInput(minterUtxo, m3[i].unlock.stamp(new Uint8Array(64))) // no presenceKey: the signature is ignored
     .addInput(coin, buyer.sig.unlockP2PKH())
     .addOutput({ to: m3[i].tokenAddress, amount: DUST, token: minterUtxo.token })
     .addOutput({ to: hexToBin(merchants3[i].lock), amount: PRICE })
@@ -256,3 +256,28 @@ async function claim2(stamps, pay) {
   assert.equal((await vaultCoins()).vaultCoin.satoshis, before - BONUS);
   console.log(`PASS dave burned 4 different stalls for the bonus tier (${BONUS} instead of ${REWARD})`);
 }
+
+// ---- proof of presence: this stall's minter wants its device's signature over rally ‖ stall ‖ buyer pkh
+const stallDevice = key(21), otherDevice = key(22), erin = key(5);
+const mP = new Contract(StampMinter3, [merchants3[0].lock, PRICE, MEMBER, '01', vault2Lock, LEVY, binToHex(stallDevice.pub)], { provider });
+provider.addUtxo(mP.address, randomUtxo({ satoshis: DUST, token: minting }));
+const presenceSig = (device, id, buyer) => secp256k1.signMessageHashSchnorr(device.priv, sha256.hash(hexToBin(vmCategory + id + binToHex(buyer.pkh))));
+async function buyP(buyer, presence) {
+  const [minterUtxo] = (await mP.getUtxos()).filter((u) => u.token);
+  const coin = fund(buyer);
+  return new TransactionBuilder({ provider })
+    .addInput(minterUtxo, mP.unlock.stamp(presence))
+    .addInput(coin, buyer.sig.unlockP2PKH())
+    .addOutput({ to: mP.tokenAddress, amount: DUST, token: minterUtxo.token })
+    .addOutput({ to: hexToBin(merchants3[0].lock), amount: PRICE })
+    .addOutput(nftOut(buyer, '01' + binToHex(buyer.pkh)))
+    .addOutput({ to: hexToBin(vault2Lock), amount: LEVY })
+    .addOutput({ to: hexToBin(buyer.lock), amount: coin.satoshis - PRICE - DUST - LEVY - 2_000n })
+    .send();
+}
+await fails('presence stall without the device signature', () => buyP(erin, new Uint8Array()));
+await fails("presence signature made for someone else (a shared screenshot)", () => buyP(erin, presenceSig(stallDevice, '01', dave)));
+await fails('presence signature from another device', () => buyP(erin, presenceSig(otherDevice, '01', erin)));
+await fails('presence signature for another stall', () => buyP(erin, presenceSig(stallDevice, '02', erin)));
+await buyP(erin, presenceSig(stallDevice, '01', erin));
+console.log("PASS erin bought at a presence stall with the stall device's signature over her own pkh");

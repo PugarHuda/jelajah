@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { ElectrumNetworkProvider, SignatureTemplate, TransactionBuilder } from 'cashscript';
 import { rallyContracts, isMintingCoin, checkRallyConfig, genesisNeed, planRally, buildGenesis } from '../src/lib/tx.js'; // one place that knows which contract version a rally uses
 import {
-  secp256k1, hash160, binToHex, encodeLockingBytecodeP2pkh, lockingBytecodeToCashAddress,
+  secp256k1, hash160, binToHex, hexToBin, encodeLockingBytecodeP2pkh, lockingBytecodeToCashAddress,
   encodePrivateKeyWif, decodePrivateKeyWif, cashAddressToLockingBytecode, generatePrivateKey,
 } from '@bitauth/libauth';
 
@@ -19,7 +19,7 @@ const write = (p, v) => writeFileSync(new URL(p, root), JSON.stringify(v, null, 
 
 const { positionals: [cmd], values: opt } = parseArgs({
   allowPositionals: true,
-  options: { network: { type: 'string', default: 'chipnet' }, registry: { type: 'string' }, rally: { type: 'string' }, config: { type: 'string' }, 'merchant-address': { type: 'string' } },
+  options: { network: { type: 'string', default: 'chipnet' }, registry: { type: 'string' }, rally: { type: 'string' }, config: { type: 'string' }, out: { type: 'string' }, 'merchant-address': { type: 'string' } },
 });
 const network = opt.network;
 if (!['chipnet', 'mainnet'].includes(network)) throw new Error('--network must be chipnet or mainnet');
@@ -97,6 +97,20 @@ if (opt['merchant-address']) {
 }
 cfg.merchants = cfg.merchants.map((m) => ({ ...m, lock: binToHex(merchantLock) }));
 
+// proof of presence: stalls marked `presence: true` get a device key; the CLI keeps it next to the organizer key
+// (in a real rally each stall generates its own on the app's #/device page and only hands over the public key)
+const presenceFile = new URL(`scripts/.presence.${network}.json`, root);
+const devices = existsSync(presenceFile) ? JSON.parse(readFileSync(presenceFile)) : {};
+cfg.merchants = cfg.merchants.map(({ presence, ...m }) => {
+  if (!presence) return m;
+  devices[m.id] ??= binToHex(generatePrivateKey());
+  return { ...m, presenceKey: binToHex(secp256k1.derivePublicKeyCompressed(hexToBin(devices[m.id]))) };
+});
+if (cfg.merchants.some((m) => m.presenceKey)) {
+  if (cfg.levy === undefined) throw new Error('proof of presence needs a levy rally (StampMinter3)');
+  writeFileSync(presenceFile, JSON.stringify(devices));
+}
+
 // 1. genesis needs an outpoint with vout 0: consolidate into one if there is none
 let coins = await provider.getUtxos(addr(organizerLock));
 coins = coins.filter((u) => !u.token);
@@ -125,7 +139,9 @@ if (opt.registry) {
 const { builder, vault } = buildGenesis({ provider, rally, rewardsInPool: cfg.rewardsInPool, base: { utxo: base, unlocker: signer.unlockP2PKH() }, organizerLock, bcmr });
 const { txid } = await builder.send();
 
-write(`src/rally.${network}.json`, { ...rally, genesisTx: txid });
+const outFile = opt.out ?? `src/rally.${network}.json`; // --out: keep the app's default rally, e.g. for a link-only rally
+write(outFile, { ...rally, genesisTx: txid });
+if (opt.out) console.log('share link', `https://jelajah-bch.vercel.app/?rally=${Buffer.from(JSON.stringify({ ...rally, genesisTx: txid })).toString('base64url')}`);
 console.log(`rally "${cfg.name}" live on ${network}`);
 console.log('category', rally.category);
 console.log('genesis ', txid);
