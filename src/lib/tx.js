@@ -173,6 +173,19 @@ export async function rallyStats({ rally, provider, minters, vault }) {
   return { stalls, claims: claimTxs.length, collectors };
 }
 
+/** After endTime the organizer takes back the pool: the vault coin (and its minting NFT, retiring the rally) plus any
+ *  unmerged levy coins. signer: a cashscript SignatureTemplate of the organizer key; to: locking bytecode or address.
+ *  Nodes compare a time locktime with the median time past, which runs about an hour behind the clock. */
+export async function buildReclaim({ rally, provider, vault, signer, to }) {
+  const coins = await vault.getUtxos();
+  const vaultCoin = coins.find((u) => isMintingCoin(rally, u));
+  if (!vaultCoin) throw new Error('Nothing to reclaim: the vault is already empty');
+  const total = coins.reduce((s, u) => s + u.satoshis, 0n);
+  const tb = new TransactionBuilder({ provider });
+  coins.forEach((u) => tb.addInput(u, vault.unlock.reclaim(signer)));
+  return { builder: tb.addOutput({ to, amount: total - 600n * BigInt(coins.length), token: vaultCoin.token }).setLocktime(rally.endTime), total };
+}
+
 /** One of the stall's minter coins, at random, so simultaneous buyers rarely collide. */
 export async function pickLane(rally, minter) {
   const lanes = (await minter.getUtxos()).filter((u) => isMintingCoin(rally, u));

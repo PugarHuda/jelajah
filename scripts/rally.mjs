@@ -6,8 +6,9 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { createHash } from 'node:crypto';
+import { deflateRawSync } from 'node:zlib';
 import { ElectrumNetworkProvider, SignatureTemplate, TransactionBuilder } from 'cashscript';
-import { rallyContracts, isMintingCoin, checkRallyConfig, genesisNeed, planRally, buildGenesis } from '../src/lib/tx.js'; // one place that knows which contract version a rally uses
+import { rallyContracts, checkRallyConfig, genesisNeed, planRally, buildGenesis, buildReclaim } from '../src/lib/tx.js'; // one place that knows which contract version a rally uses
 import {
   secp256k1, hash160, binToHex, hexToBin, encodeLockingBytecodeP2pkh, lockingBytecodeToCashAddress,
   encodePrivateKeyWif, decodePrivateKeyWif, cashAddressToLockingBytecode, generatePrivateKey,
@@ -47,14 +48,8 @@ if (cmd === 'address') {
 if (cmd === 'reclaim') {
   const rally = read(opt.rally ?? `src/rally.${network}.json`); // --rally scripts/rally.mainnet-v1.json for a retired rally
   const { vault } = rallyContracts(rally, provider);
-  const coins = await vault.getUtxos(); // the vault coin, plus any unmerged levy coins on levy rallies
-  const v = coins.find((u) => isMintingCoin(rally, u));
-  const tb = new TransactionBuilder({ provider });
-  coins.forEach((u) => tb.addInput(u, vault.unlock.reclaim(signer)));
-  const { txid } = await tb
-    .addOutput({ to: organizerLock, amount: coins.reduce((s, u) => s + u.satoshis, 0n) - 600n * BigInt(coins.length), token: v.token })
-    .setLocktime(rally.endTime)
-    .send();
+  const { builder } = await buildReclaim({ rally, provider, vault, signer, to: organizerLock }); // shared with the app's #/reclaim
+  const { txid } = await builder.send();
   console.log('reclaimed', txid);
   process.exit(0);
 }
@@ -141,7 +136,7 @@ const { txid } = await builder.send();
 
 const outFile = opt.out ?? `src/rally.${network}.json`; // --out: keep the app's default rally, e.g. for a link-only rally
 write(outFile, { ...rally, genesisTx: txid });
-if (opt.out) console.log('share link', `https://jelajah-bch.vercel.app/?rally=${Buffer.from(JSON.stringify({ ...rally, genesisTx: txid })).toString('base64url')}`);
+if (opt.out) console.log('share link', `https://jelajah-bch.vercel.app/?r=${deflateRawSync(JSON.stringify({ ...rally, genesisTx: txid })).toString('base64url')}`);
 console.log(`rally "${cfg.name}" live on ${network}`);
 console.log('category', rally.category);
 console.log('genesis ', txid);

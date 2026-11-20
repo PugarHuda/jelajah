@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
 import qrcode from 'qrcode-generator';
-import { hexToBin, binToHex, cashAddressToLockingBytecode, secp256k1, sha256, generatePrivateKey } from '@bitauth/libauth';
-import { TransactionBuilder, type Utxo } from 'cashscript';
+import { hexToBin, binToHex, cashAddressToLockingBytecode, secp256k1, sha256, generatePrivateKey, encodePrivateKeyWif, decodePrivateKeyWif } from '@bitauth/libauth';
+import { TransactionBuilder, SignatureTemplate, type Utxo } from 'cashscript';
 import { rally, provider, minters, vault, rallyLink, fromLink, type Merchant, type Rally } from './chain';
-import { buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane } from './lib/tx.js';
+import { buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane, buildReclaim } from './lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, receiveZeroCoin, type Coin } from './wallet';
 import { Stamp, Trophy } from './Stamp';
 import { SLIDES_URL, REPO_URL, VOTE_ADDRESS } from './links';
@@ -44,6 +44,7 @@ export default function App() {
   if (window.location.hash === '#/stats') return <Stats />;
   if (window.location.hash === '#/organize') return <Organize />;
   if (window.location.hash.startsWith('#/device')) return <Device />;
+  if (window.location.hash === '#/reclaim') return <Reclaim />;
   if (window.location.hash === '#/art') return ( // press image: every stamp + the trophy
     <main className="art">{rally.merchants.map((m) => <Stamp key={m.id} m={m} inked size={220} />)}<Trophy name={rally.name} size={220} /></main>
   );
@@ -175,6 +176,11 @@ function Rally() {
           )}
         </section>
 
+        {Date.now() / 1000 > rally.endTime && (
+          <section className="warn" role="note">
+            <b>⏰ {tr('This rally has ended', 'Rally ini sudah berakhir')}</b> ({new Date(rally.endTime * 1000).toLocaleDateString(ID ? 'id-ID' : 'en-US')}). {tr('Claims still work until the organizer takes the pool back.', 'Klaim masih bisa sampai penyelenggara mengambil kembali pool-nya.')}
+          </section>
+        )}
         {fromLink && (
           <section className="warn" role="note">
             <b>⚠ {tr('Community rally from a link: not the official Jelajah demo.', 'Rally komunitas dari sebuah link: bukan demo resmi Jelajah.')}</b>{' '}
@@ -284,7 +290,7 @@ function Rally() {
             <dt>{tr('Reward vault', 'Vault hadiah')}</dt><dd><code>{vault.tokenAddress}</code></dd>
             <dt>Genesis</dt><dd><a href={explorerTx(rally.genesisTx)} target="_blank" rel="noreferrer">{rally.genesisTx.slice(0, 16)}…</a></dd>
             <dt>{tr('Stall dashboard', 'Dasbor warung')}</dt><dd><a href="#/stats" onClick={() => setTimeout(() => location.reload())}>{tr('Sales per stall, from the chain', 'Penjualan tiap warung, langsung dari chain')}</a></dd>
-            <dt>{tr('Organizers', 'Penyelenggara')}</dt><dd><a href="#/organize" onClick={() => setTimeout(() => location.reload())}>{tr('Open your own rally →', 'Buka rally-mu sendiri →')}</a></dd>
+            <dt>{tr('Organizers', 'Penyelenggara')}</dt><dd><a href="#/organize" onClick={() => setTimeout(() => location.reload())}>{tr('Open your own rally →', 'Buka rally-mu sendiri →')}</a> · <a href="#/reclaim" onClick={() => setTimeout(() => location.reload())}>{tr('reclaim after the end', 'ambil sisa pool')}</a></dd>
             <dt>{tr('Stall posters', 'Poster warung')}</dt><dd>{rally.merchants.map((m) => <a key={m.id} href={`#/stall/${m.id}`}>{m.emoji} {m.name}</a>)}</dd>
           </dl>
         </section>
@@ -308,7 +314,7 @@ function Banner() {
 
 function StallPoster({ m }: { m?: Merchant }) {
   if (!m) return <main><p>Unknown stall.</p></main>;
-  const url = `${location.origin}${location.pathname}#stall-${m.id}`;
+  const url = `${location.origin}${location.pathname}${location.search}#stall-${m.id}`; // keep ?r= for link rallies
   const qr = qrcode(0, 'M');
   qr.addData(url);
   qr.make();
@@ -348,6 +354,7 @@ function Organize() {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
+  const [reclaimWif, setReclaimWif] = useState<string | null>(null);
 
   const payout = (address: string) => {
     if (!address.trim()) return lock ? binToHex(lock) : '76a914' + '00'.repeat(20) + '88ac'; // default: the organizer
@@ -388,12 +395,17 @@ function Organize() {
         const txid = await signAndSend(m, tb, coins, tr('Prepare one coin to open your Jelajah rally', 'Siapkan satu koin untuk membuka rally Jelajah'), 0);
         base = receiveZeroCoin(m, { txid, vout: 0, satoshis: total - fee });
       }
-      const r = planRally({ network: rally.network, cfg: c, organizerPub: binToHex(m.getPubkey(0, 0n)!), baseTxid: base.utxo.txid });
+      // the rally's organizer key (for reclaim) is made here, not in the wallet: reclaim is then signed locally on #/reclaim
+      const reclaimKey = generatePrivateKey();
+      const r = planRally({ network: rally.network, cfg: c, organizerPub: binToHex(secp256k1.derivePublicKeyCompressed(reclaimKey) as Uint8Array), baseTxid: base.utxo.txid });
       const { builder } = buildGenesis({ provider, rally: r, rewardsInPool: c.rewardsInPool, base, organizerLock: lock! });
       const prize = sats(BigInt(r.reward) * BigInt(c.rewardsInPool));
       setBusy(tr('Approve the rally in your wallet…', 'Setujui pembukaan rally di wallet…'));
       const txid = await signAndSend(m, builder, [base], tr(`Open the rally "${r.name}" and lock ${prize} of prizes`, `Buka rally "${r.name}" dan kunci hadiah ${prize}`), 0);
-      setLink(rallyLink({ ...r, genesisTx: txid } as Rally));
+      const wif = encodePrivateKeyWif(reclaimKey, rally.network === 'mainnet' ? 'mainnet' : 'testnet');
+      try { localStorage.setItem(reclaimStoreKey(r as Rally), wif); } catch { /* shown below for backup anyway */ }
+      setReclaimWif(wif);
+      setLink(await rallyLink({ ...r, genesisTx: txid } as Rally));
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); }
   }
 
@@ -412,6 +424,7 @@ function Organize() {
             <h3>{tr('Your rally is live', 'Rally-mu sudah live')} 🎉</h3>
             <p className="small" style={{ wordBreak: 'break-all' }}><a href={link}>{link}</a></p>
             <p className="muted small">{tr('The rally lives in this link: save it. Stall posters: open the link and add #/stall/1, #/stall/2, …', 'Rally ada di dalam link ini, simpan baik-baik. Poster warung: buka link lalu tambahkan #/stall/1, #/stall/2, …')}</p>
+            {reclaimWif && <p className="warn small">🔑 <b>{tr('Back up your reclaim key.', 'Simpan kunci reclaim-mu.')}</b> {tr('It is the only way to take the leftover pool back after the rally ends (link + #/reclaim). It is also saved in this browser.', 'Hanya dengan kunci ini sisa pool bisa diambil setelah rally berakhir (link + #/reclaim). Kunci ini juga tersimpan di browser ini.')}<br /><code className="wrap">{reclaimWif}</code></p>}
           </div>
         </div>
       ) : (<>
@@ -454,6 +467,53 @@ function Organize() {
           title={tr('Connect with WizardConnect', 'Hubungkan lewat WizardConnect')} subtitle={tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca')} />
       )}
       <p><a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
+    </main>
+  );
+}
+
+// ---- #/reclaim: after a rally ends, its organizer takes back what is left of the pool. Signed locally with the rally's
+// reclaim key (created on #/organize and kept in this browser, or pasted from the backup); no wallet prompt needed.
+const reclaimStoreKey = (r: Rally) => `jelajah-reclaim-${r.category}`;
+const MTP_LAG = 3600; // nodes check a time locktime against the median time past, about an hour behind the clock
+
+function Reclaim() {
+  const [wif, setWif] = useState(() => { try { return localStorage.getItem(reclaimStoreKey(rally)) ?? ''; } catch { return ''; } });
+  const [to, setTo] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const key = (() => { const d = decodePrivateKeyWif(wif.trim()); return typeof d === 'string' ? null : d.privateKey; })();
+  const keyOk = !!key && binToHex(secp256k1.derivePublicKeyCompressed(key) as Uint8Array) === rally.organizerPub;
+  const dest = (() => { const r = cashAddressToLockingBytecode(to.trim()); return typeof r === 'string' ? null : r.bytecode; })();
+  const opensAt = rally.endTime + MTP_LAG;
+  const open = Date.now() / 1000 >= opensAt;
+  async function reclaim() {
+    setBusy(true); setErr(null);
+    try {
+      const { builder } = await buildReclaim({ rally, provider, vault, signer: new SignatureTemplate(key!), to: dest! });
+      setDone((await builder.send()).txid);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  }
+  return (
+    <main className="organize">
+      <p className="eyebrow">{rally.name} · {tr('for the organizer', 'untuk penyelenggara')}</p>
+      <h1>{tr('Take back the leftover pool', 'Ambil kembali sisa pool')}</h1>
+      <p className="lede">{tr(`The vault only lets its organizer take the pool back after the rally ends (${new Date(rally.endTime * 1000).toLocaleString()}). Until then every sat stays for the players.`,
+        `Vault hanya mengizinkan penyelenggara mengambil pool setelah rally berakhir (${new Date(rally.endTime * 1000).toLocaleString('id-ID')}). Sampai saat itu setiap sat tetap untuk pemain.`)}</p>
+      {done ? <p className="hint">✅ {tr('Reclaimed', 'Berhasil diambil')}: <a href={explorerTx(done)} target="_blank" rel="noreferrer">{done.slice(0, 16)}…</a></p> : (<>
+        <div className="form">
+          <label className="wide">{tr("This rally's reclaim key (saved in this browser when you opened it, or from your backup)", 'Kunci reclaim rally ini (tersimpan di browser saat kamu membukanya, atau dari backup)')}
+            <input className="code" value={wif} onChange={(e) => setWif(e.target.value)} placeholder="K… / L… / c…" /></label>
+          <label className="wide">{tr('Send the pool to (a BCH address; token-aware, it also receives the retired minting NFT)', 'Kirim pool ke (alamat BCH; yang mendukung token, karena minting NFT ikut dikirim)')}
+            <input className="code" value={to} onChange={(e) => setTo(e.target.value)} placeholder={rally.network === 'mainnet' ? 'bitcoincash:z…' : 'bchtest:z…'} /></label>
+        </div>
+        {wif && !keyOk && <p className="error">{tr("That key doesn't belong to this rally's organizer.", 'Kunci itu bukan milik penyelenggara rally ini.')}</p>}
+        {to && !dest && <p className="error">{tr('Not a valid address.', 'Alamat tidak valid.')}</p>}
+        {!open && <p className="hint">{tr(`Opens at ${new Date(opensAt * 1000).toLocaleString()}.`, `Bisa dilakukan mulai ${new Date(opensAt * 1000).toLocaleString('id-ID')}.`)}</p>}
+        <button className="primary big" disabled={!keyOk || !dest || !open || busy} onClick={reclaim}>{busy ? tr('Sending…', 'Mengirim…') : tr('Reclaim the pool', 'Ambil pool')}</button>
+        {err && <p className="error" role="alert">{err}</p>}
+      </>)}
+      <p><a href={location.pathname + location.search} onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
     </main>
   );
 }
