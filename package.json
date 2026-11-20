@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "contracts": "cashc contracts/StampMinter.cash -o src/contracts/StampMinter.json && cashc contracts/RewardVault.cash -o src/contracts/RewardVault.json && cashc contracts/StampMinter2.cash -o src/contracts/StampMinter2.json && cashc contracts/StampMinter3.cash -o src/contracts/StampMinter3.json && node scripts/gen-vault.mjs && cashc contracts/RewardVault2.cash -o src/contracts/RewardVault2.json && cashc contracts/PassportVault.cash -o src/contracts/PassportVault.json && cashc contracts/SponsorPool.cash -o src/contracts/SponsorPool.json",
-    "check": "npm run contracts && node test/check.mjs && npm run claims:check",
+    "check": "npm run contracts && node test/check.mjs && node test/identity.mjs && npm run claims:check",
     "claims:contracts": "cashc claims/contracts/ClaimPool.cash -o claims/artifacts/ClaimPool.json && cashc claims/contracts/RootKeeper.cash -o claims/artifacts/RootKeeper.json && cashc claims/contracts/RootProposal.cash -o claims/artifacts/RootProposal.json",
     "test:ui": "playwright test",
     "claims:check": "npm run claims:contracts && node claims/test/check.mjs"
@@ -20,6 +20,7 @@
     "@wizardconnect/dapp": "^0.2.7",
     "@wizardconnect/react": "^0.2.6",
     "cashscript": "^0.14.0",
+    "nostr-tools": "^2.26.1",
     "qrcode-generator": "^1.5.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

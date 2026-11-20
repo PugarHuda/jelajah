@@ -27,6 +27,7 @@ dist-ssr
 scripts/.organizer.*.json
 scripts/.presence.*.json
 scripts/.buyer.*.json
+scripts/.nostr.*.json
 
 .vercel
 claims/.demo.*.json
