@@ -64,6 +64,12 @@ node scripts/rally.mjs bcmr    --network chipnet --registry https://<host>/bcmr.
 ```
 **Open your own rally:** `#/organize`. Fill in stalls, prices, the prize and an optional levy. The same rule checks and genesis builder as the CLI (`checkRallyConfig`, `planRally`, `buildGenesis` in `src/lib/tx.js`) run in the browser, and the organizer's wallet signs over WizardConnect. If no vout-0 coin exists, it first signs one send-to-self. The finished rally travels in its share link (`?r=<base64url of the deflate-raw JSON>`, about half the old `?rally=` size so a stall poster's QR stays scannable; old links still work), so there is still no server. The organizer's **reclaim key** is created in the browser, saved there and shown once for backup. After the rally ends, `#/reclaim` signs the vault's `reclaim()` locally with it and sends the leftover pool to any address, with no wallet prompt. The CLI's `reclaim` uses the same `buildReclaim`. After `endTime` the rally page says it has ended. The link is treated as untrusted input: it is shape-checked, and stall colours and text are sanitised.
 
+**Stall locations:** a stall can carry a `place` (an address or `lat,lng`), shown as a 📍 OpenStreetMap link on its card and poster. No map library is needed.
+
+**Stall device key:** `#/device` shows the secret key under "Back up or move this key" and can import one, so a stall can change phones without a new rally.
+
+**Quality:** Lighthouse (mobile) scores 100 for accessibility, best practices and SEO. `oxlint` reports no warnings.
+
 **Stall dashboard:** open `#/stats` in the app. Stamps sold, unique buyers, sats paid to each stall and sets claimed, all recomputed in the browser from each covenant's history, plus a **top-collectors** board (stalls visited, stamps, trophies per address). Prices also show a rupiah estimate (a CoinGecko rate, nothing about the user is sent). A transaction only counts if it really spent the covenant (the rally's minting NFT goes back to it at out[0]), so nobody can inflate the numbers by sending junk to a minter address.
 `scripts/rally.config.json` sets the stalls, prices, reward and duration. `--merchant-address` pays real stall wallets.
 

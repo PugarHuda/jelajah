@@ -23,7 +23,8 @@
       "price": 4000,
       "taglineId": "Kopi arang dekat stasiun",
       "memberPrice": 3600,
-      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "place": "Jl. Wongsodirjan, Yogyakarta"
     },
     {
       "id": 2,
@@ -34,7 +35,8 @@
       "price": 4000,
       "taglineId": "Mi godhog masak tungku",
       "memberPrice": 3600,
-      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "place": "Kotagede, Yogyakarta"
     },
     {
       "id": 3,
@@ -45,7 +47,8 @@
       "price": 4000,
       "taglineId": "Sate kambing tusuk jeruji sepeda",
       "memberPrice": 3600,
-      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "place": "Jl. Imogiri Timur, Bantul"
     },
     {
       "id": 4,
@@ -56,7 +59,8 @@
       "price": 4000,
       "taglineId": "Es kelapa dan gula aren",
       "memberPrice": 3600,
-      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac",
+      "place": "Pasar Beringharjo, Yogyakarta"
     }
   ],
   "genesisTx": "a7ba3a4976fda7a91c3d94fd58915e67174cae908d580ca489364b31949859c4"

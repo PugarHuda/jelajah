@@ -14,7 +14,8 @@
       "color": "#7a4a2b",
       "price": 2000,
       "taglineId": "Kopi arang dekat stasiun",
-      "memberPrice": 1800
+      "memberPrice": 1800,
+      "place": "Jl. Wongsodirjan, Yogyakarta"
     },
     {
       "id": 2,
@@ -24,7 +25,8 @@
       "color": "#c2410c",
       "price": 2000,
       "taglineId": "Mi godhog masak tungku",
-      "memberPrice": 1800
+      "memberPrice": 1800,
+      "place": "Kotagede, Yogyakarta"
     },
     {
       "id": 3,
@@ -34,7 +36,8 @@
       "color": "#b91c1c",
       "price": 2000,
       "taglineId": "Sate kambing tusuk jeruji sepeda",
-      "memberPrice": 1800
+      "memberPrice": 1800,
+      "place": "Jl. Imogiri Timur, Bantul"
     },
     {
       "id": 4,
@@ -44,7 +47,8 @@
       "color": "#15803d",
       "price": 2000,
       "taglineId": "Es kelapa dan gula aren",
-      "memberPrice": 1800
+      "memberPrice": 1800,
+      "place": "Pasar Beringharjo, Yogyakarta"
     }
   ],
   "lanes": 2

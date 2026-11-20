@@ -1,7 +1,7 @@
 import { ElectrumNetworkProvider } from 'cashscript';
 import { rallyContracts, checkRallyConfig } from './lib/tx.js';
 
-export interface Merchant { id: number; name: string; tagline: string; taglineId?: string; emoji: string; color: string; price: number; memberPrice?: number; lock: string; presenceKey?: string }
+export interface Merchant { id: number; name: string; tagline: string; taglineId?: string; emoji: string; color: string; price: number; memberPrice?: number; lock: string; presenceKey?: string; place?: string }
 export interface Rally {
   network: 'chipnet' | 'mainnet'; name: string; description: string; category: string; vmCategory: string;
   needed: number; reward: number; endTime: number; organizerPub: string; merchants: Merchant[]; genesisTx: string; minter?: 2 | 3; lanes?: number; levy?: number; bonusNeeded?: number; bonusReward?: number;
@@ -40,7 +40,7 @@ function parseRally(json: string | null): Rally | undefined {
       && (r.minter !== 3 || Number.isInteger(r.levy)) && (r.bonusNeeded === undefined || (Number.isInteger(r.bonusNeeded) && Number.isInteger(r.bonusReward))) && (r.lanes === undefined || (Number.isInteger(r.lanes) && r.lanes >= 1 && r.lanes <= 8));
     if (!ok) return undefined;
     checkRallyConfig({ ...r, rewardsInPool: 1 }); // the same economic rules the CLI enforces (throws -> ignored below)
-    r.merchants = r.merchants.map((m) => ({ ...m, color: /^#[0-9a-f]{6}$/i.test(m.color) ? m.color : '#7a4a2b', name: String(m.name).slice(0, 40), emoji: String(m.emoji ?? '⭐').slice(0, 4), tagline: String(m.tagline ?? '').slice(0, 80) }));
+    r.merchants = r.merchants.map((m) => ({ ...m, color: /^#[0-9a-f]{6}$/i.test(m.color) ? m.color : '#7a4a2b', name: String(m.name).slice(0, 40), emoji: String(m.emoji ?? '⭐').slice(0, 4), tagline: String(m.tagline ?? '').slice(0, 80), place: m.place === undefined ? undefined : String(m.place).slice(0, 80) }));
     return r;
   } catch { return undefined; }
 }

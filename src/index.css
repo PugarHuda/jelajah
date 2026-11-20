@@ -150,3 +150,4 @@ input.code { font: inherit; font-family: ui-monospace, monospace; font-size: .85
 video.scan { width: 100%; max-width: 360px; border-radius: 12px; display: block; margin: .4rem 0; }
 code.wrap { word-break: break-all; }
 .device input.code { max-width: 420px; }
+.place { display: inline-block; margin: .1rem 0 .5rem; color: var(--muted); text-decoration: none; } .place:hover { text-decoration: underline; }

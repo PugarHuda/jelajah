@@ -1,0 +1,17 @@
+# Jelajah
+
+> A stamp rally on Bitcoin Cash. Pay a stall and its stamp NFT is minted in the same transaction. Burn stamps from 3 different stalls, and the rally's covenant pays you back and mints a trophy that works as a membership card.
+
+Everything is on chain (CashScript covenants, CashTokens). There is no server and no database. Built for BCH BLAZE 2026.
+
+## Links
+- [Live app](https://jelajah-bch.vercel.app): the mainnet rally. Add `?net=chipnet` for the test rally.
+- [Source code and README](https://github.com/PugarHuda/jelajah): contracts, threat model, test suite and transaction proofs.
+- [Deck](https://jelajah-bch.vercel.app/deck.pdf)
+
+## App routes
+- `#/stats`: per-stall sales and top collectors, recomputed from covenant history.
+- `#/organize`: open your own rally with a WizardConnect wallet. The rally is shared as a `?r=` link.
+- `#/device/<stall id>`: a stall's phone that signs buyers' proof-of-presence codes.
+- `#/reclaim`: the organizer takes back the leftover pool after the rally ends.
+- `#/stall/<stall id>`: a printable stall poster with a QR code.

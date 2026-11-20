@@ -9,6 +9,8 @@ import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, receiveZero
 import { Stamp, Trophy } from './Stamp';
 import { SLIDES_URL, REPO_URL, VOTE_ADDRESS } from './links';
 
+// ponytail: one clock reading per page load; every route change here reloads the page anyway
+const LOADED_AT = Date.now() / 1000;
 const sats = (n: number | bigint) => `${Number(n).toLocaleString('en-US')} sats`;
 
 // Rupiah hint next to sat prices. One public price lookup, nothing about the user is sent; no rate -> no hint.
@@ -60,7 +62,7 @@ function Rally() {
   const [pool, setPool] = useState<bigint | null>(null);
   const [idr, setIdr] = useState(idrPerBch !== null);
   useEffect(() => { idrRate.then(() => setIdr(idrPerBch !== null)); }, []); // re-render once the rate lands
-  if (import.meta.env.DEV) (window as unknown as { __wc: unknown }).__wc = wc; // debugging aid in dev only
+  useEffect(() => { if (import.meta.env.DEV) (window as unknown as { __wc: unknown }).__wc = wc; }, [wc]); // debugging aid in dev only
   const lock = wc.state === 'connected' ? buyerLock(wc.manager) : null;
   const connected = !!lock; // connected AND the wallet shared its keys
   const [, tick] = useState(0);
@@ -77,6 +79,8 @@ function Rally() {
   }, [connected, wc.manager]);
 
   useEffect(() => {
+    // polling the chain is syncing with an external system; refresh() only sets state once Electrum answers
+    // eslint-disable-next-line react/set-state-in-effect
     refresh();
     const t = setInterval(refresh, 12_000);
     return () => clearInterval(t);
@@ -176,7 +180,7 @@ function Rally() {
           )}
         </section>
 
-        {Date.now() / 1000 > rally.endTime && (
+        {LOADED_AT > rally.endTime && (
           <section className="warn" role="note">
             <b>⏰ {tr('This rally has ended', 'Rally ini sudah berakhir')}</b> ({new Date(rally.endTime * 1000).toLocaleDateString(ID ? 'id-ID' : 'en-US')}). {tr('Claims still work until the organizer takes the pool back.', 'Klaim masih bisa sampai penyelenggara mengambil kembali pool-nya.')}
           </section>
@@ -209,6 +213,7 @@ function Rally() {
                   <Stamp m={m} inked={have} />
                   <h3>{m.name}</h3>
                   <p className="muted small">{ID ? m.taglineId ?? m.tagline : m.tagline}</p>
+                  {m.place && <a className="small place" href={mapUrl(m.place)} target="_blank" rel="noreferrer">📍 {m.place}</a>}
                   {idr && <p className="muted small idr">{sats(cost(m, member))}{rupiah(cost(m, member))}</p>}
                   <button className={have ? 'ghost' : 'primary'} disabled={!connected || !!busy}
                     onClick={() => buy(m)} title={connected ? undefined : tr('Connect your wallet first', 'Hubungkan wallet dulu')}>
@@ -323,6 +328,7 @@ function StallPoster({ m }: { m?: Merchant }) {
       <p className="eyebrow">{rally.name} · stamp rally</p>
       <Stamp m={m} inked size={180} />
       <h1>{m.name}</h1>
+      {m.place && <a className="place" href={mapUrl(m.place)} target="_blank" rel="noreferrer">📍 {m.place}</a>}
       <p className="lede">{tr(`Pay here with Bitcoin Cash and get the ${m.name} stamp. Collect ${rally.needed} → get paid back.`, `Bayar di sini pakai Bitcoin Cash dan dapat stamp ${m.name}. Kumpulkan ${rally.needed} → uangmu kembali.`)}</p>
       <img className="qr" src={qr.createDataURL(8, 16)} alt={tr(`QR code to ${m.name}'s stall in the rally`, `Kode QR ke warung ${m.name} di rally`)} />
       <p className="muted small">{url}</p>
@@ -334,7 +340,7 @@ function StallPoster({ m }: { m?: Merchant }) {
 // ---- #/organize: open your own rally from the browser. The genesis is the same code the CLI uses (src/lib/tx.js),
 // signed by the organizer's wallet over WizardConnect; the finished rally travels in its share link.
 const PALETTE = ['#7a4a2b', '#c2410c', '#b91c1c', '#15803d', '#1d4ed8', '#7e22ce'];
-type StallRow = { name: string; emoji: string; price: string; memberPrice: string; address: string; presenceKey?: string };
+type StallRow = { name: string; emoji: string; price: string; memberPrice: string; address: string; presenceKey?: string; place?: string };
 
 function Organize() {
   const wc = useWizardConnect({ dappName: 'Jelajah', dappIcon: new URL('favicon.svg', location.origin + import.meta.env.BASE_URL).href });
@@ -371,6 +377,7 @@ function Organize() {
       id: i + 1, name: s.name.trim() || `Stall ${i + 1}`, emoji: s.emoji || '⭐', tagline: '', color: PALETTE[i % PALETTE.length],
       price: Number(s.price), memberPrice: Number(s.memberPrice || s.price), lock: payout(s.address),
       ...(s.presenceKey?.trim() ? { presenceKey: s.presenceKey.trim().toLowerCase() } : {}),
+      ...(s.place?.trim() ? { place: s.place.trim().slice(0, 80) } : {}),
     })),
   });
   let problem: string | null = null;
@@ -447,6 +454,7 @@ function Organize() {
             <label>{tr('Member price', 'Harga member')}<input type="number" min={546} value={s.memberPrice} onChange={setStall(i, 'memberPrice')} /></label>
             <label className="wide">{tr("Stall's BCH address (empty = yours)", 'Alamat BCH warung (kosong = milikmu)')}<input value={s.address} onChange={setStall(i, 'address')} placeholder="bitcoincash:q…" /></label>
             <label className="wide">{tr("Proof of presence: the stall device's key from #/device (optional, needs a levy)", 'Bukti kehadiran: kunci perangkat warung dari #/device (opsional, perlu levy)')}<input value={s.presenceKey ?? ''} onChange={setStall(i, 'presenceKey')} placeholder="02…" /></label>
+            <label className="wide">{tr('Location (address or lat,lng; optional, shown as a map link)', 'Lokasi (alamat atau lat,lng; opsional, tampil sebagai link peta)')}<input value={s.place ?? ''} onChange={setStall(i, 'place')} placeholder="Jl. Malioboro, Yogyakarta" maxLength={80} /></label>
           </div>
         ))}
         <p className="row">
@@ -486,7 +494,7 @@ function Reclaim() {
   const keyOk = !!key && binToHex(secp256k1.derivePublicKeyCompressed(key) as Uint8Array) === rally.organizerPub;
   const dest = (() => { const r = cashAddressToLockingBytecode(to.trim()); return typeof r === 'string' ? null : r.bytecode; })();
   const opensAt = rally.endTime + MTP_LAG;
-  const open = Date.now() / 1000 >= opensAt;
+  const open = LOADED_AT >= opensAt;
   async function reclaim() {
     setBusy(true); setErr(null);
     try {
@@ -565,6 +573,12 @@ function Stats() {
 
 // ---- proof of presence UI: QR codes, a camera scanner (native BarcodeDetector, paste fallback), the stall device page
 
+// a stall's place opens in OpenStreetMap: coordinates as a pin, anything else as a search
+const mapUrl = (place: string) => {
+  const ll = /^\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$/.exec(place);
+  return ll ? `https://www.openstreetmap.org/?mlat=${ll[1]}&mlon=${ll[2]}#map=18/${ll[1]}/${ll[2]}` : `https://www.openstreetmap.org/search?query=${encodeURIComponent(place)}`;
+};
+
 const qrImage = (text: string) => { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createDataURL(6, 8); };
 
 /** Scan one QR with the camera. Only where the browser has BarcodeDetector; everyone can still paste the code. */
@@ -623,7 +637,7 @@ function PresencePanel({ m, lane, buyerPkh, onSig, onClose }: { m: Merchant; lan
 function Device() {
   const id = Number(location.hash.match(/^#\/device\/(\d+)/)?.[1] ?? 0);
   const m = rally.merchants.find((x) => x.id === id);
-  const [key] = useState(() => {
+  const [key, setKey] = useState(() => {
     let k: string | null = null;
     try { k = localStorage.getItem('jelajah-device-key'); } catch { /* private mode */ }
     if (!k) {
@@ -641,6 +655,18 @@ function Device() {
       <p className="eyebrow">{rally.name} · {tr('stall device', 'perangkat warung')}</p>
       <h1>{m ? `${m.emoji} ${m.name}` : tr('Stall device', 'Perangkat warung')}</h1>
       <p className="muted small">{tr("This device's presence key (give it to the organizer when the rally is set up):", 'Kunci presence perangkat ini (berikan ke penyelenggara saat rally dibuat):')}<br /><code className="wrap">{pub}</code></p>
+      <details className="muted small">
+        <summary>{tr('Back up or move this key', 'Backup atau pindahkan kunci ini')}</summary>
+        <p>{tr('Secret key (keep it private; paste it on a new phone to take over this stall):', 'Kunci rahasia (jangan dibagikan; tempel di ponsel baru untuk mengambil alih warung ini):')}<br /><code className="wrap">{key}</code></p>
+        <label>{tr('Use another key (64 hex characters):', 'Pakai kunci lain (64 karakter hex):')}
+          <input className="code" placeholder="…" onChange={(e) => {
+            const k = e.target.value.trim().toLowerCase();
+            if (/^[0-9a-f]{64}$/.test(k) && secp256k1.validatePrivateKey(hexToBin(k))) {
+              try { localStorage.setItem('jelajah-device-key', k); } catch { /* this tab only */ }
+              setKey(k);
+            }
+          }} /></label>
+      </details>
       {m && m.presenceKey !== pub && <p className="error">{tr("This device's key is not the one registered for this stall, so its codes won't work here.", 'Kunci perangkat ini bukan yang terdaftar untuk warung ini, jadi kodenya tidak akan berlaku.')}</p>}
       {m && (<>
         <p className="lede">{tr("Scan or paste the buyer's code, then let them scan the reply.", 'Pindai atau tempel kode pembeli, lalu biarkan mereka memindai balasannya.')}</p>
