@@ -11,7 +11,7 @@
 - CashTokens address (EMBER2026 votes / prizes): bitcoincash:zrd56cv5ap5v2kc2dgc8hvt4e9g84pmrjcydclcrgj
 
 **Tracks:** Mainnet Track
-**Bounties:** FoldingCash Reward Claims (`claims/`) · Build with XO + Migrate to XO (`xo/`). One BUIDL can apply to several bounties: press **Apply** on each bounty card and choose this BUIDL.
+**Bounties:** FoldingCash Reward Claims (`claims/`) · Build with XO + Migrate to XO (`xo/`) · SolidCash (`solidcash/`) · Decentralised Identity (`docs/IDENTITY.md`). One BUIDL can apply to several bounties: press **Apply** on each bounty card and choose this BUIDL.
 
 **Prior work:** none. Built from scratch during BLAZE; first commit 17 Nov 2026.
 
@@ -63,6 +63,26 @@ Pull-based Merkle claims built on a **second "claimed" Merkle tree** that shares
 - a push vs pull cost table (operator: 45,792 sats/month for 62 folders vs ~1,000 sats/epoch at any scale).
 
 See `claims/README.md`.
+
+### SolidCash bounty (`solidcash/`)
+The stall's loyalty card, ported to SolidCash as `StampCard.scash`:
+- what it uses: a covenant-verified `mapping(bytes20 => Card)`, a struct, an enum, a `library` with a loop, modifiers, events and custom errors;
+- customers redeem with their own `checkSig`, and the stall uses its signature to pause or withdraw;
+- a constructor rule means a full card always costs more than its reward;
+- size: 6,657 bytes (the framed build was 16.6 kB, over the 10 kB limit);
+- tests: 7 solidhat tests;
+- the full lifecycle ran on chipnet ([deploy `d898cd1a…`](https://chipnet.imaginary.cash/tx/d898cd1aa5fb079c996ab3fa82a5bdd2a3b6eb1d6a1e75923f788321014937f6) → fund → 3 visits → [redeem `196b364e…`](https://chipnet.imaginary.cash/tx/196b364edf351aaa684e2f4aecbb15d03393e7fdd78ffeab91387c1a0a81931c)), shown at `#/solidcash`.
+
+Upstream fix: [solidcash/solidcash#14](https://github.com/solidcash/solidcash/pull/14). The compiler printed each warning up to 3 times (8 lines for 3 sites); it now prints each once.
+
+### Decentralised Identity bounty (`docs/IDENTITY.md`)
+Jelajah ID links a BCH address and a Nostr key, with no identity server:
+- the address spends a coin in a proof tx whose OP_RETURN commits to the statement and the Nostr key;
+- the Nostr key signs a kind-30078 event naming the address and that proof;
+- anyone can find the link by npub or by address and verify both sides from public relays and the chain (`scripts/verify-identity.mjs`, `#/identity`);
+- extras: challenge login bound to the site origin, the rally reputation of the verified address, and pay-by-identity.
+
+Live on mainnet: proof [`da731db2…`](https://blockchair.com/bitcoin-cash/transaction/da731db2956c3ab85474339e96c338155073869cb7fcb40d1a26ce3cc0dd437f). Offline tests refuse 5 forgery shapes, shadowing by junk events, and wrong-site logins.
 
 ### Build with XO / Migrate to XO (`xo/`)
 Jelajah's buy-and-stamp step as an XO template. Its locking script assembles byte-for-byte to the live StampMinter covenant, so the XO engine spends the same minters as the web app. Executed on chipnet ([`ef106294…`](https://chipnet.imaginary.cash/tx/ef106294af3bd134fad1b7dc02a00ad5402abd306648a39bde67d798ad2c1f00)) and inspected in blaze.xo.cash. The invitation and template JSON are in the repo.

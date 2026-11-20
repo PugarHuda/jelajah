@@ -140,6 +140,8 @@ CashScript 0.14 · libauth · WizardConnect (`@wizardconnect/react`) · React + 
 ## Bounties in this repo
 - **FoldingCash Reward Claims:** [`claims/`](claims/README.md). Pull-based Merkle claims built on a second, on-chain "claimed" tree, run on real FoldingCash distro data on chipnet.
 - **Build with XO / Migrate to XO:** [`xo/`](xo/README.md). Jelajah's buy-and-stamp step as an XO template that assembles byte-for-byte to the live StampMinter covenant, executed through the XO engine on chipnet.
+- **SolidCash:** [`solidcash/`](solidcash/contracts/StampCard.scash). The stall's loyalty card in SolidCash: a covenant-verified card mapping, structs, an enum, a library with a loop, modifiers, events and custom errors, with checkSig auth. It is 6.6 kB and has 7 solidhat tests. The full lifecycle ran on chipnet: deploy → fund → 3 visits → redeem (see [`solidcash/deployments/`](solidcash/deployments/) and the app's `#/solidcash` page). Upstream PR: [solidcash#14](https://github.com/solidcash/solidcash/pull/14), which prints each compiler warning once.
+- **Decentralised Identity:** [`docs/IDENTITY.md`](docs/IDENTITY.md). Jelajah ID links a BCH address and a Nostr key, each vouching for the other: an on-chain proof tx, a signed Nostr event, an independent verifier CLI and page (`#/identity`), and challenge login. It is live on mainnet.
 
 ## Not yet
 - Prices and rewards in PUSD (ParyonUSD).
