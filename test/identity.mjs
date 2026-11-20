@@ -39,7 +39,20 @@ await refused('a claim for another address reusing this proof tx',
 
 const sk = generateSecretKey();
 const ans = finalizeEvent(loginEvent('ab'.repeat(16), 'https://example.org'), sk);
-assert.equal(checkLogin(ans, 'ab'.repeat(16)), null);
-assert.equal(checkLogin(ans, 'cd'.repeat(16)), 'wrong challenge');
-assert.equal(checkLogin({ ...ans, content: 'tampered' }, 'ab'.repeat(16)), 'bad signature');
-console.log('PASS login: the right challenge passes; a wrong challenge or a tampered answer is refused');
+const O = 'https://example.org';
+assert.equal(checkLogin(ans, 'ab'.repeat(16), O), null);
+assert.equal(checkLogin(ans, 'cd'.repeat(16), O), 'wrong challenge');
+assert.equal(checkLogin(ans, 'ab'.repeat(16), 'https://evil.example'), 'answer was made for another site');
+assert.equal(checkLogin({ ...ans, content: 'tampered' }, 'ab'.repeat(16), O), 'bad signature');
+console.log('PASS login: the right challenge passes; a wrong challenge, another site, or a tampered answer is refused');
+
+{ // a junk event tagged with the victim's address, newer than the real link, must not shadow it
+  const { findVerified } = await import('../src/lib/identity.js');
+  const junk = finalizeEvent({ kind: fx.event.kind, created_at: fx.event.created_at + 100, tags: fx.event.tags, content: 'junk' }, attacker);
+  const future = finalizeEvent({ kind: fx.event.kind, created_at: Math.floor(Date.now() / 1000) + 86400, tags: fx.event.tags, content: fx.event.content }, attacker);
+  const pool = { querySync: async () => [future, junk, fx.event] };
+  const r = await findVerified(pool, { address: iTag[1].slice(4) }, provider);
+  assert.equal(r.ok, true, r.reason);
+  assert.equal(r.nostrPubkey, fx.event.pubkey);
+  console.log('PASS a newer junk or future-dated event cannot shadow the real link');
+}

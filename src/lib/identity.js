@@ -55,6 +55,7 @@ export const linkEvent = ({ address, nostrPubkey, txid, network }) => ({
 export async function verifyLink(event, provider) {
   const fail = (reason) => ({ ok: false, reason, nostrPubkey: event?.pubkey });
   if (!event || event.kind !== LINK_KIND || !verifyFresh(event)) return fail('the Nostr signature does not verify');
+  if (event.created_at > Date.now() / 1000 + 600) return fail('the event is dated in the future');
   if (!event.tags.some((t) => t[0] === 'd' && t[1] === LINK_D)) return fail('not a Jelajah ID event');
   const i = event.tags.find((t) => t[0] === 'i' && t[1]?.startsWith('bch:'));
   if (!i || !/^[0-9a-f]{64}$/.test(i[2] ?? '')) return fail('no BCH address or proof txid in the event');
@@ -84,13 +85,28 @@ export async function findLinks(pool, { nostrPubkey, address }, relays = RELAYS)
   return events.sort((a, b) => b.created_at - a.created_at);
 }
 
+/** The newest link that actually verifies: anyone can publish an event tagged with your address, so an unverified
+ *  (or future-dated) event must never shadow the real one. */
+export async function findVerified(pool, who, provider, relays = RELAYS) {
+  let last = null;
+  for (const ev of await findLinks(pool, who, relays)) {
+    const r = await verifyLink(ev, provider);
+    if (r.ok && (!who.nostrPubkey || r.nostrPubkey === who.nostrPubkey) && (!who.address || r.address === who.address)) return r;
+    last = r;
+  }
+  return last ?? { ok: false, reason: 'no Jelajah ID found on public relays' };
+}
+
 /** Login: the app hands out a random challenge; the user signs a one-off event with their Nostr key; the app checks
  *  the signature and freshness, then resolves the verified BCH address from the published link. */
 export const loginChallenge = () => binToHex(crypto.getRandomValues(new Uint8Array(16)));
 export const loginEvent = (challenge, origin) => ({ kind: LOGIN_KIND, created_at: Math.floor(Date.now() / 1000), tags: [['challenge', challenge], ['u', origin]], content: 'Log in to a Jelajah ID app' });
-export function checkLogin(event, challenge, maxAge = 300) {
+// ponytail: the caller must issue each challenge once and forget it after use (a verifier keeps that state).
+export function checkLogin(event, challenge, origin, maxAge = 300) {
   if (!event || event.kind !== LOGIN_KIND || !verifyFresh(event)) return 'bad signature';
   if (!event.tags.some((t) => t[0] === 'challenge' && t[1] === challenge)) return 'wrong challenge';
+  const u = event.tags.filter((t) => t[0] === 'u');
+  if (u.length !== 1 || u[0][1] !== origin) return 'answer was made for another site';
   if (Math.abs(Date.now() / 1000 - event.created_at) > maxAge) return 'stale answer';
   return null;
 }

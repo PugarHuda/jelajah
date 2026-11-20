@@ -6,7 +6,7 @@ import { TransactionBuilder, SignatureTemplate, type Utxo } from 'cashscript';
 import { generateSecretKey, getPublicKey, finalizeEvent, type NostrEvent } from 'nostr-tools/pure';
 import { SimplePool } from 'nostr-tools/pool';
 import { nip19 } from 'nostr-tools';
-import { RELAYS, buildProofTx, linkEvent, findLinks, verifyLink, loginChallenge, loginEvent, checkLogin } from './lib/identity.js';
+import { RELAYS, buildProofTx, linkEvent, findVerified, loginChallenge, loginEvent, checkLogin } from './lib/identity.js';
 import { rally, provider, minters, vault, rallyLink, fromLink, passportFromLink, type Merchant, type Rally } from './chain';
 import { isVoucher, buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane, buildReclaim, buildAddStall, buildPassportClaim, isTrophyOf } from './lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, receiveZeroCoin, type Coin } from './wallet';
@@ -692,10 +692,8 @@ function IdentityPage() {
     try {
       const q = query.trim();
       const pool = new SimplePool();
-      const events = await findLinks(pool, q.includes(':') ? { address: q } : { nostrPubkey: q.startsWith('npub') ? (nip19.decode(q).data as string) : q });
+      const r = await findVerified(pool, q.includes(':') ? { address: q } : { nostrPubkey: q.startsWith('npub') ? (nip19.decode(q).data as string) : q }, provider);
       pool.close(RELAYS);
-      if (!events.length) { setFound({ ok: false, reason: tr('no Jelajah ID found on public relays', 'tidak ada Jelajah ID di relay publik') }); return; }
-      const r = await verifyLink(events[0], provider);
       if (r.ok) { // reputation that travels: this rally's stamps and trophies held by the verified address
         const held = (await provider.getUtxos(r.address!)).filter((u) => isRallyNft(rally, u));
         setFound({ ...r, stamps: held.filter((u) => !u.token!.nft!.commitment.startsWith('00')).length, trophies: held.filter((u) => u.token!.nft!.commitment.startsWith('00')).length });
@@ -708,12 +706,11 @@ function IdentityPage() {
     try {
       const challenge = loginChallenge(); // a real app would issue this and remember it
       const answer = await signer!.sign(loginEvent(challenge, location.origin));
-      const problem = checkLogin(answer, challenge);
+      const problem = checkLogin(answer, challenge, location.origin);
       if (problem) throw new Error(problem);
       const pool = new SimplePool();
-      const [ev] = await findLinks(pool, { nostrPubkey: answer.pubkey });
+      const r = await findVerified(pool, { nostrPubkey: answer.pubkey }, provider);
       pool.close(RELAYS);
-      const r = ev ? await verifyLink(ev, provider) : null;
       setLogin(r?.ok ? { address: r.address! } : { note: tr('Signature OK, but no verified BCH link yet. Link first.', 'Tanda tangan OK, tapi belum ada tautan BCH terverifikasi. Tautkan dulu.') });
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   }

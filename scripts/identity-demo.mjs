@@ -8,7 +8,7 @@ import { decodePrivateKeyWif, secp256k1, hash160, encodeLockingBytecodeP2pkh, lo
 import { generateSecretKey, getPublicKey, finalizeEvent } from 'nostr-tools/pure';
 import { SimplePool } from 'nostr-tools/pool';
 import { nip19 } from 'nostr-tools';
-import { RELAYS, buildProofTx, linkEvent, findLinks, verifyLink, loginChallenge, loginEvent, checkLogin } from '../src/lib/identity.js';
+import { RELAYS, buildProofTx, linkEvent, findLinks, verifyLink, loginChallenge, loginEvent, checkLogin, findVerified } from '../src/lib/identity.js';
 
 const { values: { network } } = parseArgs({ options: { network: { type: 'string', default: 'mainnet' } } });
 const provider = new ElectrumNetworkProvider(network);
@@ -52,10 +52,9 @@ for (const [label, q] of [['by Nostr key', { nostrPubkey }], ['by BCH address', 
 // 4. challenge-response login
 const challenge = loginChallenge();
 const answer = finalizeEvent(loginEvent(challenge, 'https://jelajah-bch.vercel.app'), sk);
-const problem = checkLogin(answer, challenge);
-const [link] = await findLinks(pool, { nostrPubkey: answer.pubkey });
-const verified = link && (await verifyLink(link, provider));
+const problem = checkLogin(answer, challenge, 'https://jelajah-bch.vercel.app');
+const verified = await findVerified(pool, { nostrPubkey: answer.pubkey }, provider);
 console.log('login             ', problem ?? (verified?.ok ? `logged in as ${verified.address}` : 'no verified link'));
-console.log('forged login      ', checkLogin({ ...answer, tags: [['challenge', 'ff'.repeat(16)]] }, challenge) ?? 'ACCEPTED?!');
+console.log('forged login      ', checkLogin({ ...answer, tags: [['challenge', 'ff'.repeat(16)]] }, challenge, 'https://jelajah-bch.vercel.app') ?? 'ACCEPTED?!');
 pool.close(RELAYS);
 process.exit(0);
