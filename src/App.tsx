@@ -763,7 +763,7 @@ function IdentityPage() {
 // ---- #/solidcash: the StampCard ported to SolidCash, and its recorded runs (deploy -> fund -> 3 visits -> redeem).
 const SOLIDCASH_RUNS = import.meta.glob('../solidcash/deployments/*.json', { eager: true, import: 'default' }) as Record<string, { network: string; address: string; stall: string; customer: string; txs: Record<string, string> }>;
 function SolidCashPage() {
-  const runs = Object.values(SOLIDCASH_RUNS);
+  const runs = Object.values(SOLIDCASH_RUNS).sort((a, b) => (a.network === 'mainnet' ? -1 : b.network === 'mainnet' ? 1 : 0));
   const link = (net: string, id: string) => (net === 'mainnet' ? `https://blockchair.com/bitcoin-cash/transaction/${id}` : `https://chipnet.imaginary.cash/tx/${id}`);
   return (
     <main className="organize">

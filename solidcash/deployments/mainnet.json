@@ -1,0 +1,14 @@
+{
+  "network": "mainnet",
+  "address": "bitcoincash:rdrsk0x7kun97txyfnzmdpu8297mnfhtg47c0aax4d8srpldvrn82kgg3xxpz",
+  "stall": "bitcoincash:qpmp5gshxs5g2fyc54krgc435vl20gtmtga2x7agke",
+  "customer": "bitcoincash:qqn5x76m3ayj2h0sgfmg3ukx5za8swz7tyd8yr85hz",
+  "txs": {
+    "deploy": "14d3ce94683315902f4d278c14b49781e6799b8b44d61e1cd39692d773af15d8",
+    "fund": "960df8632a4a848b7aa3dd8c58c3c37d2a20a4c9a78667ce6ba576e79b7a6c98",
+    "visit1": "739db1a706f0e4df4f86a58d5682dfa97dee2a9c3754c89e94dc6487300e6834",
+    "visit2": "fa774ccdc7172a7ff1f552bedede74ce77644fb7276d70ca091c7d3c59d2e0ef",
+    "visit3": "56108aeb98185d3763436cc1fa092b23471f98813de6e3f748730a9b3185d19a",
+    "redeem": "8d122760c076254b72ee42f9dbdfcee26fe0ad940a6181b53a5fa11399202994"
+  }
+}
