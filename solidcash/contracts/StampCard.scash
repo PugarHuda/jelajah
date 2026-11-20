@@ -1,0 +1,113 @@
+pragma solidcash ^0.51.0;
+
+// Jelajah StampCard: a single stall's loyalty card on Bitcoin Cash, written in SolidCash.
+// Every paid visit adds a stamp to the customer's card; `needed` stamps redeem for `reward` sats from the stall's pot.
+// The card ledger is covenant state (a verified mapping keyed by the customer's pubkey hash), so the stall can't edit
+// anyone's card and the pot only pays a customer who earned it. Authority is BCH-native: the customer's own
+// signature redeems their card (checkSig), the stall's signature pauses or withdraws.
+
+enum Tier { Visitor, Regular, Loyal, Legend }
+
+struct Card {
+    uint32 stamps;   // stamps not yet redeemed
+    uint32 lifetime; // every stamp ever collected
+    uint32 redeemed; // rewards taken
+}
+
+error NotEnoughStamps(uint256 have, uint256 needed);
+error Underpaid(uint256 paid, uint256 price);
+error Paused();
+
+// Tiers by rewards taken, a library so other cards (or a rally) can reuse it.
+library Tiers {
+    function tierFor(uint32 redeemed) internal pure returns (Tier) {
+        uint32[3] memory steps = [uint32(1), uint32(3), uint32(10)];
+        Tier tier = Tier.Visitor;
+        for (uint256 i = 0; i < 3; i++) {
+            if (redeemed >= steps[i]) tier = Tier(i + 1);
+        }
+        return tier;
+    }
+}
+
+contract StampCard {
+    using Tiers for uint32;
+
+    pubkey public owner;
+    uint256 public price;
+    uint32 public needed;
+    uint256 public reward;
+    bool public paused;
+    uint256 public visits;
+    uint256 public rewardsPaid;
+    mapping(bytes20 customer => Card) public cards;
+
+    event Funded(uint256 amount);
+    event Stamped(bytes20 indexed customer, uint32 stamps, uint32 lifetime);
+    event Redeemed(bytes20 indexed customer, uint256 reward, Tier tier);
+    event PausedSet(bool paused);
+
+    modifier onlyOwner(sig s) {
+        require(checkSig(s, this.owner));
+        _;
+    }
+
+    modifier whenOpen() {
+        if (this.paused) revert Paused();
+        _;
+    }
+
+    constructor(pubkey owner_, uint256 price_, uint32 needed_, uint256 reward_) {
+        // anti-farming: a full card always costs more than its reward
+        require(reward_ < price_ * needed_);
+        this.owner = owner_;
+        this.price = price_;
+        this.needed = needed_;
+        this.reward = reward_;
+    }
+
+    // the stall, or a sponsor, tops up the reward pot
+    function fund() payable {
+        require(msg.value > 0);
+        emit Funded(msg.value);
+    }
+
+    // pay the stall's price, get a stamp on a card (anyone may pay for anyone's stamp)
+    function visit(bytes20 customer) payable whenOpen {
+        if (msg.value < this.price) revert Underpaid(msg.value, this.price);
+        Card memory card = this.cards[customer];
+        card.stamps += 1;
+        card.lifetime += 1;
+        this.cards[customer] = card;
+        this.visits += 1;
+        emit Stamped(customer, card.stamps, card.lifetime);
+    }
+
+    // only the card's owner, by signature, redeems a full card; the reward goes to their own P2PKH address
+    function redeem(pubkey pk, sig s) whenOpen {
+        require(checkSig(s, pk));
+        bytes20 customer = hash160(pk);
+        Card memory card = this.cards[customer];
+        if (card.stamps < this.needed) revert NotEnoughStamps(card.stamps, this.needed);
+        card.stamps -= this.needed;
+        card.redeemed += 1;
+        this.cards[customer] = card;
+        this.rewardsPaid += this.reward;
+        payable(address(new LockingBytecodeP2PKH(customer))).transfer(this.reward);
+        emit Redeemed(customer, this.reward, card.redeemed.tierFor());
+    }
+
+    function tierOf(bytes20 customer) public view returns (Tier) {
+        return this.cards[customer].redeemed.tierFor();
+    }
+
+    function setPaused(sig s, bool p) onlyOwner(s) {
+        this.paused = p;
+        emit PausedSet(p);
+    }
+
+    // the stall takes its takings (the visits paid in) to its own address
+    function withdraw(sig s, uint256 amount) onlyOwner(s) {
+        payable(address(new LockingBytecodeP2PKH(hash160(this.owner)))).transfer(amount);
+    }
+}
