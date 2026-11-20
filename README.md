@@ -72,6 +72,7 @@ The live demo runs **Jelajah Jogja on BCH mainnet** with `StampMinter2` (member 
 - Genesis: [`4c96cba2…`](https://blockchair.com/bitcoin-cash/transaction/4c96cba232afc690f841ffa7b4e10680de7b3123df4836da50700fa208a2601d) (8 minter coins + vault) · category `082ad61858ea6ad7c75c7f2b1d2cbf8293a61e91fa46464b2e66c0dadcec24ad`
 - Reward vault: `bitcoincash:rv603w2k07qrq9dcasfl3u2es204lfzjk42njsnayqgk0gxz2p4xcmuvyrzjf`
 - BCMR metadata with stamp and trophy icons, hash-committed in the genesis: [`bcmr.json`](https://pugarhuda.github.io/jelajah/bcmr.json)
+- First v2 stamp on mainnet, bought through the `StampMinter2` covenant from a throwaway buyer that was swept back afterwards: [`8b3d8dec…`](https://blockchair.com/bitcoin-cash/transaction/8b3d8deccc37c42ec9e8850dc6483591ee524e5d4c672d89e04eb579ee5bd596). The `#/stats` dashboard picks it up.
 
 ## Mainnet rally v1 (19 Nov 2026, retired)
 The first mainnet rally, on the original `StampMinter`. It is no longer the demo, but its history is the mainnet end-to-end proof. Its remaining pool comes back after it ends (18 Jan 2027) with `node scripts/rally.mjs reclaim --network mainnet --rally scripts/rally.mainnet-v1.json`. The pool was 30,000 sats but only 5 rewards were claimable, because the vault must keep 1,000 sats of dust under its minting NFT. The deploy script now adds that dust on top of the pool.
@@ -99,6 +100,10 @@ Levy rally where **Kopi Joss and Bakmi Jawa require their device's signature**, 
 - Genesis: [`aa5c20f5…`](https://chipnet.imaginary.cash/tx/aa5c20f53240528ab3fd4ea581cf6a8a42c28cdbdc2a43ffe3035239478dbffc)
 - Stamps: [`abaafd90…`](https://chipnet.imaginary.cash/tx/abaafd903a316c9290013e4698ce974cc687195552fc5f3b6c6c0ff3f93de9b9) · [`b3d2ae3b…`](https://chipnet.imaginary.cash/tx/b3d2ae3bd6fcf910ee9f6798620dc10a3a321ce816a5b01205d166dd9fc1c292) · [`a4d05c49…`](https://chipnet.imaginary.cash/tx/a4d05c49b719b044196134335a4af6f4cca38d6329f5b79bebbf31cc6a113aa9)
 - Claim + trophy: [`33d11924…`](https://chipnet.imaginary.cash/tx/33d119246e891151d6735d0159392e7c30b6eda67e84f33af8fd98f52b9c93b9)
+
+## Real-wallet tests of the new features (Selene, chipnet, 20 Nov 2026)
+- **Organizer page:** Selene paired over WizardConnect on `#/organize`, then signed the genesis of "Selene organizer test": 3 stalls × 2 lanes plus the vault. Genesis: [`c2ba873d…`](https://chipnet.imaginary.cash/tx/c2ba873dd6f615ca1cb36d531beebe0c7c4e85fde1f852a74262cb91f8b3c197). The share link it produced loaded with the community-rally warning, and the wallet session carried over.
+- **Proof of presence:** on the presence rally, the buyer panel showed Selene's code (pkh + lane coin), a second tab running `#/device/1` signed it, the panel verified it locally, and Selene approved the purchase showing the `01 ‖ pkh` stamp: [`732fc91b…`](https://chipnet.imaginary.cash/tx/732fc91b55ba015d5317c7798cf71fcf544811b7310957a802dba5f4d6f1c58b).
 
 ## Real-wallet test (Selene, chipnet, 17 Nov 2026)
 Selene Wallet connected over WizardConnect, signed three purchases and the claim. The burned stamps (`01`, `02`, `03`) and the minted trophy (`00`) showed up in Selene's own signing screen:
