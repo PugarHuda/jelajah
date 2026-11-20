@@ -11,7 +11,7 @@
 //     funded the proof tx's first input. Neither private key is shared or reused across the two networks.
 // Used by the app (#/identity) and by the standalone verifier (scripts/verify-identity.mjs).
 import { TransactionBuilder } from 'cashscript';
-import { binToHex, hexToBin, sha256, utf8ToBin, decodeTransaction, decodeAuthenticationInstructions, cashAddressToLockingBytecode, lockingBytecodeToCashAddress } from '@bitauth/libauth';
+import { binToHex, hexToBin, sha256, utf8ToBin, decodeTransaction, decodeAuthenticationInstructions, createVirtualMachineBch2025, cashAddressToLockingBytecode, lockingBytecodeToCashAddress } from '@bitauth/libauth';
 import { verifyEvent } from 'nostr-tools/pure';
 import { npubEncode } from 'nostr-tools/nip19';
 
@@ -83,23 +83,40 @@ async function checkProofTx(provider, txid, address, nostrPubkey, v1Statement) {
   if (!opret || !(v1 || v2)) return 'the proof transaction does not commit to this statement and key';
   // a coin of the claimed address, signed with SIGHASH_ALL: the key committed to every output, the OP_RETURN included.
   // (SIGHASH_SINGLE/ANYONECANPAY signatures, e.g. from a coinjoin, would let someone else attach their own OP_RETURN.)
-  for (const input of tx.inputs.slice(0, MAX_INPUTS)) {
+  if (tx.inputs.length > MAX_INPUTS) return 'the proof transaction has too many inputs';
+  // every spent output, from txid-checked parents, then the BCH VM checks every signature itself: no trust in the server
+  const sourceOutputs = [];
+  for (const input of tx.inputs) {
+    const prev = await fetchTx(provider, binToHex(input.outpointTransactionHash));
+    const out = typeof prev === 'string' ? undefined : prev.outputs[input.outpointIndex];
+    if (!out) return 'a coin spent by the proof transaction was not found';
+    sourceOutputs.push(out);
+  }
+  if (vm().verify({ transaction: tx, sourceOutputs }) !== true) return 'the proof transaction does not verify';
+  const signedByAddress = tx.inputs.some((input, i) => {
+    if (binToHex(sourceOutputs[i].lockingBytecode) !== binToHex(lock.bytecode)) return false;
     const sigPush = decodeAuthenticationInstructions(input.unlockingBytecode)[0];
     const sig = sigPush && 'data' in sigPush ? sigPush.data : undefined;
-    if (!sig || sig.length < 65 || !commitsToAllOutputs(sig[sig.length - 1])) continue;
-    const prev = await fetchTx(provider, binToHex(input.outpointTransactionHash));
-    if (typeof prev !== 'string' && binToHex(prev.outputs[input.outpointIndex]?.lockingBytecode ?? new Uint8Array()) === binToHex(lock.bytecode)) return null;
-  }
-  return 'the proof was not signed (SIGHASH_ALL) by a coin of the claimed address';
+    return !!sig && sig.length >= 65 && commitsToAllOutputs(sig[sig.length - 1]);
+  });
+  return signedByAddress ? null : 'the proof was not signed (SIGHASH_ALL) by a coin of the claimed address';
 }
+let vmInstance;
+const vm = () => (vmInstance ??= createVirtualMachineBch2025());
 
-const MAX_INPUTS = 4, MAX_CLAIMS = 4, MAX_EVENTS = 8; // bound the chain lookups an attacker's event can cause
+// Bound the chain lookups an attacker's events can cause. A forged link can only point at a tx that doesn't exist (one
+// failed lookup) or at someone's real proof (fetched once, then cached), so a generous event cap stays cheap.
+const MAX_INPUTS = 4, MAX_CLAIMS = 4, MAX_EVENTS = 50;
 // base type ALL (0x01) with FORKID (0x40), never ANYONECANPAY (0x80); SIGHASH_UTXOS (0x20, CashScript's default) is fine
 const commitsToAllOutputs = (t) => (t & 0x1f) === 0x01 && (t & 0x40) !== 0 && (t & 0x80) === 0;
 /** A tx from the network, checked against its txid so a lying server can't substitute one. */
+const rawCache = new WeakMap(); // provider -> Map(txid -> raw hex promise)
 async function fetchTx(provider, txid) {
+  if (!rawCache.has(provider)) rawCache.set(provider, new Map());
+  const cache = rawCache.get(provider);
+  if (!cache.has(txid)) cache.set(txid, Promise.resolve().then(() => provider.getRawTransaction(txid)));
   let raw;
-  try { raw = hexToBin(await provider.getRawTransaction(txid)); } catch { return 'the proof transaction is not on this network'; }
+  try { raw = hexToBin(await cache.get(txid)); } catch { cache.delete(txid); return 'the proof transaction is not on this network'; } // a just-sent tx may show up later
   if (binToHex(sha256.hash(sha256.hash(raw)).reverse()) !== txid) return 'the server returned a different transaction';
   const tx = decodeTransaction(raw);
   return typeof tx === 'string' ? 'the proof transaction does not decode' : tx;
@@ -154,7 +171,19 @@ export async function findLinks(pool, { nostrPubkey, address }, relays = RELAYS)
 export async function findVerified(pool, who, provider, relays = RELAYS) {
   let last = null;
   const nip39 = await pool.querySync(relays, { kinds: [NIP39_KIND], ...(who.nostrPubkey ? { authors: [who.nostrPubkey] } : {}), ...(who.address ? { '#i': [nip39Id(who.address)] } : {}) }, { maxWait: 4000 });
-  const events = [...await findLinks(pool, who, relays), ...nip39].sort((a, b) => b.created_at - a.created_at).slice(0, MAX_EVENTS);
+  // Cheap checks first (signature, date, the event naming this very address), then the newest event per author and kind
+  // (both kinds are replaceable): junk events, however many, can't push the real one past the cap on chain lookups.
+  const now = Date.now() / 1000, newest = new Map();
+  for (const ev of [...await findLinks(pool, who, relays), ...nip39]) {
+    if (ev.created_at > now + 600 || !verifyFresh(ev)) continue;
+    if (who.nostrPubkey && ev.pubkey !== who.nostrPubkey) continue;
+    if (who.address && !(ev.kind === NIP39_KIND
+      ? ev.tags.some((t) => t[0] === 'i' && t[1] === nip39Id(who.address))
+      : ev.content === statement({ address: who.address, nostrPubkey: ev.pubkey }))) continue;
+    const key = `${ev.pubkey}:${ev.kind}`;
+    if (!newest.has(key) || newest.get(key).created_at < ev.created_at) newest.set(key, ev);
+  }
+  const events = [...newest.values()].sort((a, b) => b.created_at - a.created_at).slice(0, MAX_EVENTS);
   for (const ev of events) {
     const r = ev.kind === NIP39_KIND ? await verifyNip39(ev, provider, who.address) : await verifyLink(ev, provider);
     if (r.ok && (!who.nostrPubkey || r.nostrPubkey === who.nostrPubkey) && (!who.address || r.address === who.address)) return r;

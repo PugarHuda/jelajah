@@ -92,3 +92,27 @@ console.log('PASS login: the right challenge passes; a wrong challenge, another 
   assert.match((await verifyLink(fx.event, liar)).reason, /different transaction/);
   console.log('PASS (refused) a proof whose coin was signed ANYONECANPAY, and a server substituting another tx');
 }
+
+{ // twenty newer, validly signed junk events tagged with the victim's address can't push the real link out
+  const { findVerified } = await import('../src/lib/identity.js');
+  const { generateSecretKey: gen } = await import('nostr-tools/pure');
+  const junk = Array.from({ length: 20 }, (_, i) => finalizeEvent({ kind: fx.event.kind, created_at: fx.event.created_at + 100 + i, tags: fx.event.tags, content: fx.event.content }, gen()));
+  const pool = { querySync: async () => [...junk, fx.event] };
+  const r = await findVerified(pool, { address: iTag[1].slice(4) }, provider);
+  assert.equal(r.ok, true, r.reason);
+  console.log('PASS 20 newer junk events from 20 keys cannot push the real link out');
+}
+
+{ // 30 self-consistent forgeries (each key claims the victim's address and points at the real proof) still lose
+  const { findVerified, statement: st } = await import('../src/lib/identity.js');
+  const { generateSecretKey: gen, getPublicKey: gpk } = await import('nostr-tools/pure');
+  let fetches = 0;
+  const counting = { getRawTransaction: async (id) => { fetches++; return provider.getRawTransaction(id); } };
+  const addr = iTag[1].slice(4);
+  const forged = Array.from({ length: 30 }, (_, i) => { const k = gen();
+    return finalizeEvent({ kind: fx.event.kind, created_at: fx.event.created_at + 100 + i, tags: fx.event.tags, content: st({ address: addr, nostrPubkey: gpk(k) }) }, k); });
+  const r = await findVerified({ querySync: async () => [...forged, fx.event] }, { address: addr }, counting);
+  assert.equal(r.ok, true, r.reason);
+  assert.ok(fetches <= 4, `${fetches} chain lookups`);
+  console.log(`PASS 30 self-consistent forgeries pointing at the real proof still lose (${fetches} chain lookups in all)`);
+}
