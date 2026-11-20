@@ -2,15 +2,17 @@
   "network": "chipnet",
   "name": "Jelajah Jogja",
   "description": "Stamp rally across Yogyakarta street-food stalls. Every stamp pays a levy into the pool, so each set funds its own reward.",
-  "category": "4de6a158e8a52157bc225dbc08e511a238c52c5ee2d644d38ca3813e6a69a547",
-  "vmCategory": "47a5696a3e81a38cd344d6e25e2cc538a211e508bc5d22bc5721a5e858a1e64d",
+  "category": "d673919feb76c0f26fe484c92d1e35e7b3deeb4e06688320776c35e8f9e07b26",
+  "vmCategory": "267be0f9e8356c77208368064eebdeb3e7351e2dc984e46ff2c076eb9f9173d6",
   "needed": 3,
   "reward": 4000,
-  "endTime": 1800239439,
+  "endTime": 1800331450,
   "organizerPub": "033f41a2eaf9fa8a2d9a21ada58031094cdce2981627120f09ac80332a32b693cd",
   "lanes": 2,
   "minter": 3,
   "levy": 2200,
+  "bonusNeeded": 4,
+  "bonusReward": 5500,
   "merchants": [
     {
       "id": 1,
@@ -57,5 +59,5 @@
       "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
     }
   ],
-  "genesisTx": "390bfc2485fe96e4f940c2a6393de93f0072ded9f92ed0898d7404be5fb59dd1"
+  "genesisTx": "954fff8c5b7362e7cee779fcee2fe8528e49cfdf56fedb0349c375538a400f5f"
 }

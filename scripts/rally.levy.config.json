@@ -3,7 +3,7 @@
   "description": "Stamp rally across Yogyakarta street-food stalls. Every stamp pays a levy into the pool, so each set funds its own reward.",
   "needed": 3,
   "reward": 4000,
-  "rewardsInPool": 1,
+  "rewardsInPool": 2,
   "durationDays": 60,
   "merchants": [
     {
@@ -48,5 +48,7 @@
     }
   ],
   "lanes": 2,
-  "levy": 2200
+  "levy": 2200,
+  "bonusNeeded": 4,
+  "bonusReward": 5500
 }

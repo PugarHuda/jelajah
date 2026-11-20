@@ -12,13 +12,26 @@ pragma cashscript ^0.14.0;
 //   in[needed+1+]  fee coins      -> out[3+] BCH-only change
 // Stamps are burned: no other output may carry any token.
 // Anti-farming invariant, checked by the deploy script: reward < sum of every merchant's price.
-contract RewardVault2(bytes32 rallyCategory, int needed, int reward, pubkey organizer, int endTime) {
+// Tiers: burn `bonusNeeded` stamps from different stalls (more than `needed`) for `bonusReward` instead.
+// The claim is a bonus claim exactly when input `bonusNeeded` is also a rally token; bonusNeeded = 0 turns tiers off.
+contract RewardVault2(bytes32 rallyCategory, int needed, int reward, int bonusNeeded, int bonusReward, pubkey organizer, int endTime) {
     function claim() {
         require(this.activeInputIndex == 0);
 
+        int n = needed;
+        int pay = reward;
+        if (bonusNeeded > needed) {
+            if (tx.inputs.length > bonusNeeded) {
+                if (tx.inputs[bonusNeeded].tokenCategory == rallyCategory) {
+                    n = bonusNeeded;
+                    pay = bonusReward;
+                }
+            }
+        }
+
         bytes20 buyer = unsafe_bytes20(tx.inputs[1].nftCommitment.split(1)[1]);
         int prev = 0;
-        for (int i = 1; i <= needed; i++) {
+        for (int i = 1; i <= n; i++) {
             require(tx.inputs[i].tokenCategory == rallyCategory);
             bytes commitment = tx.inputs[i].nftCommitment;
             require(commitment.length == 21);
@@ -32,11 +45,11 @@ contract RewardVault2(bytes32 rallyCategory, int needed, int reward, pubkey orga
         require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
         require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
         require(tx.outputs[0].nftCommitment == tx.inputs[0].nftCommitment);
-        require(tx.outputs[0].value == tx.inputs[0].value - reward);
+        require(tx.outputs[0].value == tx.inputs[0].value - pay);
 
         bytes buyerLock = new LockingBytecodeP2PKH(buyer);
         require(tx.outputs[1].lockingBytecode == buyerLock);
-        require(tx.outputs[1].value >= reward);
+        require(tx.outputs[1].value >= pay);
         require(tx.outputs[1].tokenCategory == 0x);
 
         require(tx.outputs[2].lockingBytecode == buyerLock);

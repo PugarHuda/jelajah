@@ -25,7 +25,8 @@ const buyer = wallet(generatePrivateKey());
 // fund the buyer
 const fund = (await organizer.coins()).filter((c) => !c.utxo.token).sort((a, b) => Number(b.utxo.satoshis - a.utxo.satoshis))[0];
 // each stamp: price + stamp dust + change dust + fee; plus the claim fee. Leftovers are swept back below.
-const need = rally.merchants.slice(0, rally.needed).reduce((s, m) => s + BigInt(m.price) + BigInt(rally.levy ?? 0) + 3500n, 0n) + 5000n + BigInt(rally.levy ?? 0);
+const tier = rally.bonusNeeded ?? rally.needed; // bonus rallies: go for the bonus tier
+const need = rally.merchants.slice(0, tier).reduce((s, m) => s + BigInt(m.price) + BigInt(rally.levy ?? 0) + 3500n, 0n) + 5000n + BigInt(rally.levy ?? 0);
 const funded = await new TransactionBuilder({ provider })
   .addInput(fund.utxo, fund.unlocker)
   .addOutput({ to: buyer.lock, amount: need })
@@ -34,7 +35,7 @@ const funded = await new TransactionBuilder({ provider })
 console.log('funded buyer      ', explorer + funded.txid);
 
 const { minters, vault } = rallyContracts(rally, provider);
-for (const m of rally.merchants.slice(0, rally.needed)) {
+for (const m of rally.merchants.slice(0, tier)) {
   const { builder } = await buildStamp({ rally, provider, minters, merchantId: m.id, buyerLock: buyer.lock, coins: await buyer.coins() });
   const { txid } = await builder.send();
   console.log(`stamp ${m.emoji} ${m.name.padEnd(12)}`, explorer + txid);
@@ -44,7 +45,7 @@ const merged = await mergeLevies({ rally, provider, vault }); // levy rallies: f
 if (merged) console.log('merge levies      ', explorer + merged.txid);
 const all = await buyer.coins();
 const { builder } = await buildClaim({
-  rally, provider, vault, buyerLock: buyer.lock, vaultUtxo: merged ?? undefined,
+  rally, provider, vault, buyerLock: buyer.lock, vaultUtxo: merged ?? undefined, bonus: !!rally.bonusNeeded,
   stamps: all.filter((c) => isRallyNft(rally, c.utxo)),
   coins: all.filter((c) => !c.utxo.token),
 });

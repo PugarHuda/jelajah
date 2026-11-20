@@ -141,10 +141,12 @@ console.log('PASS two lanes of one stall both mint, and both lanes stay open');
 // ---- StampMinter3 + RewardVault2: every stamp pays a levy into the vault, so a set funds its own reward
 const StampMinter3 = artifact('StampMinter3'), RewardVault2 = artifact('RewardVault2');
 const LEVY = 7_500n; // 3 x 7,500 covers REWARD 20,000 + merge fees + vault dust: colluding stalls pay the reward themselves
-const vault2 = new Contract(RewardVault2, [vmCategory, 3n, REWARD, binToHex(organizer.pub), END], { provider });
+const BONUS = 26_000n; // 4 stalls: 4 x (7,500 - 600) - 600 >= 26,000, so the bonus tier is collusion-proof too
+const vault2 = new Contract(RewardVault2, [vmCategory, 3n, REWARD, 4n, BONUS, binToHex(organizer.pub), END], { provider });
 const vault2Lock = binToHex(cashAddressToLockingBytecode(vault2.address).bytecode);
 provider.addUtxo(vault2.address, randomUtxo({ satoshis: DUST, token: minting })); // seeded with dust only: no organizer money
-const m3 = merchants.map((m, i) => {
+const merchants3 = [...merchants, key(14)]; // a 4th stall for the bonus tier
+const m3 = merchants3.map((m, i) => {
   const c = new Contract(StampMinter3, [m.lock, PRICE, MEMBER, `0${i + 1}`, vault2Lock, LEVY], { provider });
   provider.addUtxo(c.address, randomUtxo({ satoshis: DUST, token: minting }));
   return c;
@@ -158,7 +160,7 @@ async function buy3(i, buyer, { levy = LEVY, levyTo = vault2Lock } = {}) {
     .addInput(minterUtxo, m3[i].unlock.stamp())
     .addInput(coin, buyer.sig.unlockP2PKH())
     .addOutput({ to: m3[i].tokenAddress, amount: DUST, token: minterUtxo.token })
-    .addOutput({ to: hexToBin(merchants[i].lock), amount: PRICE })
+    .addOutput({ to: hexToBin(merchants3[i].lock), amount: PRICE })
     .addOutput(nftOut(buyer, `0${i + 1}` + binToHex(buyer.pkh)))
     .addOutput({ to: hexToBin(levyTo), amount: levy })
     .addOutput({ to: hexToBin(buyer.lock), amount: coin.satoshis - PRICE - DUST - levy - 2_000n })
@@ -197,7 +199,7 @@ console.log('PASS anyone merged the levies into the vault coin, unsigned:', pool
   const { vaultCoin } = await vaultCoins();
   await fails('merge of the vault coin alone, paying the fee out of the pool', () => new TransactionBuilder({ provider })
     .addInput(vaultCoin, vault2.unlock.merge())
-    .addOutput({ to: vault2.tokenAddress, amount: vaultCoin.satoshis - 500n, token: vaultCoin.token })
+    .addOutput({ to: vault2.tokenAddress, amount: vaultCoin.satoshis - 590n, token: vaultCoin.token }) // within the 600/input fee rule, so only the pool rule can reject it
     .send());
 }
 
@@ -227,3 +229,30 @@ await buy3(0, bob); // a fresh levy coin for the next attack
     .send();
 }
 console.log(`PASS carol's set was paid from its own levies (paid ${3n * LEVY} in levies, got ${REWARD} back): collusion earns nothing`);
+
+// ---- tiers: 4 different stalls -> BONUS instead of REWARD
+const dave = key(4);
+for (const i of [0, 1, 2, 2, 3]) await buy3(i, dave); // stall 3 twice, for the duplicate attack
+await merge();
+async function claim2(stamps, pay) {
+  const { vaultCoin } = await vaultCoins();
+  const tb = new TransactionBuilder({ provider }).addInput(vaultCoin, vault2.unlock.claim());
+  stamps.forEach((s) => tb.addInput(s, dave.sig.unlockP2PKH()));
+  tb.addInput(fund(dave, 10_000n), dave.sig.unlockP2PKH()); // fee coin
+  return tb
+    .addOutput({ to: vault2.tokenAddress, amount: vaultCoin.satoshis - pay, token: vaultCoin.token })
+    .addOutput({ to: hexToBin(dave.lock), amount: pay + 8_000n })
+    .addOutput(nftOut(dave, '00' + binToHex(dave.pkh)))
+    .send();
+}
+{
+  const all = await stampsOf(dave); // sorted: 01, 02, 03, 03, 04
+  const four = [all[0], all[1], all[2], all[4]];
+  await fails('bonus paid for only 3 stamps', () => claim2(four.slice(0, 3), BONUS));
+  await fails('normal reward taken while burning 4 stamps (the vault forces the bonus path)', () => claim2(four, REWARD));
+  await fails('bonus with a duplicate stall', () => claim2([all[0], all[1], all[2], all[3]], BONUS));
+  const before = (await vaultCoins()).vaultCoin.satoshis;
+  await claim2(four, BONUS);
+  assert.equal((await vaultCoins()).vaultCoin.satoshis, before - BONUS);
+  console.log(`PASS dave burned 4 different stalls for the bonus tier (${BONUS} instead of ${REWARD})`);
+}

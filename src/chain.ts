@@ -4,7 +4,7 @@ import { rallyContracts, checkRallyConfig } from './lib/tx.js';
 export interface Merchant { id: number; name: string; tagline: string; taglineId?: string; emoji: string; color: string; price: number; memberPrice?: number; lock: string }
 export interface Rally {
   network: 'chipnet' | 'mainnet'; name: string; description: string; category: string; vmCategory: string;
-  needed: number; reward: number; endTime: number; organizerPub: string; merchants: Merchant[]; genesisTx: string; minter?: 2 | 3; lanes?: number; levy?: number;
+  needed: number; reward: number; endTime: number; organizerPub: string; merchants: Merchant[]; genesisTx: string; minter?: 2 | 3; lanes?: number; levy?: number; bonusNeeded?: number; bonusReward?: number;
 }
 
 // One rally file per network (written by scripts/rally.mjs). Mainnet wins when it exists;
@@ -35,7 +35,7 @@ function rallyFromLink(b64: string | null): Rally | undefined {
       // payouts must be standard P2PKH or P2SH32 scripts
       && r.merchants.every((m) => Number.isInteger(m.id) && /^(76a914[0-9a-f]{40}88ac|aa20[0-9a-f]{64}87)$/.test(m.lock) && Number.isInteger(m.price))
       && [r.needed, r.reward, r.endTime].every(Number.isInteger) && [undefined, 2, 3].includes(r.minter)
-      && (r.minter !== 3 || Number.isInteger(r.levy)) && (r.lanes === undefined || (Number.isInteger(r.lanes) && r.lanes >= 1 && r.lanes <= 8));
+      && (r.minter !== 3 || Number.isInteger(r.levy)) && (r.bonusNeeded === undefined || (Number.isInteger(r.bonusNeeded) && Number.isInteger(r.bonusReward))) && (r.lanes === undefined || (Number.isInteger(r.lanes) && r.lanes >= 1 && r.lanes <= 8));
     if (!ok) return undefined;
     checkRallyConfig({ ...r, rewardsInPool: 1 }); // the same economic rules the CLI enforces (throws -> ignored below)
     r.merchants = r.merchants.map((m) => ({ ...m, color: /^#[0-9a-f]{6}$/i.test(m.color) ? m.color : '#7a4a2b', name: String(m.name).slice(0, 40), emoji: String(m.emoji ?? '⭐').slice(0, 4), tagline: String(m.tagline ?? '').slice(0, 80) }));

@@ -16,8 +16,10 @@ const hex2 = (n) => n.toString(16).padStart(2, '0');
 
 export function rallyContracts(rally, provider) {
   // rally.minter: 3 = StampMinter3 + RewardVault2 (levy), 2 = StampMinter2 (member price), else the original StampMinter
-  const vault = new Contract(rally.minter === 3 ? RewardVault2 : RewardVault,
-    [rally.vmCategory, BigInt(rally.needed), BigInt(rally.reward), rally.organizerPub, BigInt(rally.endTime)], { provider });
+  const vault = rally.minter === 3
+    ? new Contract(RewardVault2, [rally.vmCategory, BigInt(rally.needed), BigInt(rally.reward),
+      BigInt(rally.bonusNeeded ?? 0), BigInt(rally.bonusReward ?? 0), rally.organizerPub, BigInt(rally.endTime)], { provider })
+    : new Contract(RewardVault, [rally.vmCategory, BigInt(rally.needed), BigInt(rally.reward), rally.organizerPub, BigInt(rally.endTime)], { provider });
   const vaultLock = binToHex(cashAddressToLockingBytecode(vault.address).bytecode);
   const minters = Object.fromEntries(rally.merchants.map((m) => [
     m.id, rally.minter === 3
@@ -72,13 +74,15 @@ export async function buildStamp({ rally, provider, minters, merchantId, buyerLo
 
 /** Burn `needed` stamps from distinct stalls for the reward + a Trophy NFT.
  *  stamps, coins: [{ utxo, unlocker }] — coins top up the fee when the stamps' dust is not enough.
- *  @param {{ rally: any, provider: any, vault: any, buyerLock: Uint8Array, stamps: any[], coins?: any[], vaultUtxo?: any }} args */
-export async function buildClaim({ rally, provider, vault, buyerLock, stamps, coins = [], vaultUtxo = undefined }) {
+ *  @param {{ rally: any, provider: any, vault: any, buyerLock: Uint8Array, stamps: any[], coins?: any[], vaultUtxo?: any, bonus?: boolean }} args */
+export async function buildClaim({ rally, provider, vault, buyerLock, stamps, coins = [], vaultUtxo = undefined, bonus = false }) {
   vaultUtxo ??= (await vault.getUtxos()).find((u) => isMintingCoin(rally, u)); // levy coins (and junk) share the vault's address
   if (!vaultUtxo) throw new Error('This rally is over (vault not found)');
-  const reward = BigInt(rally.reward);
-  if (vaultUtxo.satoshis - reward < DUST) throw new Error('The reward pool is empty');
-  const set = pickSet(rally, stamps);
+  // bonus tier (RewardVault2): burn bonusNeeded different stalls for bonusReward
+  const tier = bonus && rally.bonusNeeded ? rally.bonusNeeded : rally.needed;
+  const reward = BigInt(tier === rally.needed ? rally.reward : rally.bonusReward);
+  if (vaultUtxo.satoshis - reward < DUST) throw new Error('The reward pool is too low for this claim');
+  const set = pickSet(rally, stamps, tier);
   const stampDust = set.reduce((s, x) => s + x.utxo.satoshis, 0n);
   const shortfall = DUST + CLAIM_FEE - stampDust; // the trophy and the fee come out of the stamps' dust first
   const { picked, sum } = shortfall > 0n ? pickCoins(coins, shortfall) : { picked: [], sum: 0n };
@@ -118,14 +122,14 @@ export async function mergeLevies({ rally, provider, vault }) {
 const rallyVaultAddress = (rally, provider) => rallyContracts(rally, provider).vault.address;
 
 /** One stamp per stall, lowest stall ids first, ordered as the vault requires. */
-export function pickSet(rally, stamps) {
+export function pickSet(rally, stamps, n = rally.needed) {
   const byStall = new Map();
   for (const s of stamps) {
     const id = parseInt(s.utxo.token.nft.commitment.slice(0, 2), 16);
     if (id > 0 && !byStall.has(id)) byStall.set(id, s);
   }
-  const set = [...byStall.entries()].sort((a, b) => a[0] - b[0]).slice(0, rally.needed).map(([, s]) => s);
-  if (set.length < rally.needed) throw new Error(`Collect stamps from ${rally.needed} different stalls first (${set.length} so far)`);
+  const set = [...byStall.entries()].sort((a, b) => a[0] - b[0]).slice(0, n).map(([, s]) => s);
+  if (set.length < n) throw new Error(`Collect stamps from ${n} different stalls first (${set.length} so far)`);
   return set;
 }
 
@@ -192,6 +196,16 @@ export function checkRallyConfig(cfg) {
   // A merge costs up to 600 sats per coin, so count that against the levies of one set (plus the vault coin's merge).
   if (cfg.levy !== undefined && cfg.needed * (cfg.levy - 600) - 600 < cfg.reward)
     throw new Error(`anti-collusion: ${cfg.needed} levies of ${cfg.levy} (minus merge fees) must cover the reward ${cfg.reward}`);
+  // bonus tier: more stalls, bigger reward; same anti-farming and anti-collusion rules at that size
+  if (cfg.bonusNeeded !== undefined) {
+    if (cfg.levy === undefined) throw new Error('a bonus tier needs a levy rally');
+    if (!(cfg.bonusNeeded > cfg.needed && cfg.bonusNeeded <= cfg.merchants.length)) throw new Error(`bonus stalls must be ${cfg.needed + 1}..${cfg.merchants.length}`);
+    if (!(cfg.bonusReward > cfg.reward)) throw new Error('the bonus reward must be bigger than the reward');
+    const cheapestBonus = cfg.merchants.map((m) => m.memberPrice ?? m.price).sort((a, b) => a - b).slice(0, cfg.bonusNeeded).reduce((a, b) => a + b, 0);
+    if (!(cfg.bonusReward < cheapestBonus)) throw new Error(`anti-farming: bonus ${cfg.bonusReward} must be < cheapest bonus set ${cheapestBonus}`);
+    if (cfg.bonusNeeded * (cfg.levy - 600) - 600 < cfg.bonusReward)
+      throw new Error(`anti-collusion: ${cfg.bonusNeeded} levies of ${cfg.levy} (minus merge fees) must cover the bonus ${cfg.bonusReward}`);
+  }
 }
 
 /** Sats the genesis needs: the pool (+ dust the vault keeps after its last claim), a coin per minter lane, identity, fees. */
@@ -207,6 +221,7 @@ export function planRally({ network, cfg, organizerPub, baseTxid }) {
     needed: cfg.needed, reward: cfg.reward, endTime: Math.floor(Date.now() / 1000) + cfg.durationDays * 86400,
     organizerPub, lanes: cfg.lanes ?? 1,
     ...(cfg.levy !== undefined ? { minter: 3, levy: cfg.levy } : { minter: 2 }),
+    ...(cfg.bonusNeeded !== undefined ? { bonusNeeded: cfg.bonusNeeded, bonusReward: cfg.bonusReward } : {}),
     merchants: cfg.merchants.map((m) => ({ ...m, memberPrice: m.memberPrice ?? m.price })),
   };
 }

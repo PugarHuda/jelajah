@@ -88,6 +88,10 @@ function Rally() {
   const collected = new Set(stamps.map(stallOf));
   const bch = coins.filter((c) => !c.utxo.token).reduce((s, c) => s + c.utxo.satoshis, 0n);
   const ready = collected.size >= rally.needed;
+  // bonus tier: enough different stalls -> the claim takes the bigger reward (the vault forces it when the stamps are there)
+  const bonus = !!rally.bonusNeeded && collected.size >= rally.bonusNeeded;
+  const prize = BigInt(bonus ? rally.bonusReward! : rally.reward);
+  const burn = bonus ? rally.bonusNeeded! : rally.needed;
   const rewardsLeft = pool === null ? null : Number((pool - 1000n) / BigInt(rally.reward)); // vault keeps 1000 sats dust
 
   async function run(label: string, fn: () => Promise<string>) {
@@ -119,9 +123,9 @@ function Rally() {
     const { builder, inputs } = await buildClaim({
       rally, provider, vault, buyerLock: lock!, vaultUtxo,
       stamps: fresh.filter((c) => isRallyNft(rally, c.utxo) && stallOf(c) > 0 && c.utxo.token!.nft!.commitment.slice(2) === hexPkh),
-      coins: fresh.filter((c) => !c.utxo.token),
+      coins: fresh.filter((c) => !c.utxo.token), bonus,
     });
-    return signAndSend(wc.manager!, builder, inputs, tr(`Burn ${rally.needed} stamps for ${sats(rally.reward)} + a trophy`, `Bakar ${rally.needed} stamp untuk ${sats(rally.reward)} + trofi`));
+    return signAndSend(wc.manager!, builder, inputs, tr(`Burn ${burn} stamps for ${sats(prize)} + a trophy`, `Bakar ${burn} stamp untuk ${sats(prize)} + trofi`));
   });
 
   return (
@@ -211,11 +215,13 @@ function Rally() {
               <p className="muted small">
                 {tr(`Burns one stamp from each of ${rally.needed} stalls → ${sats(rally.reward)}${rupiah(rally.reward)} + a ${rally.name} Trophy NFT.`,
                   `Membakar satu stamp dari tiap ${rally.needed} warung → ${sats(rally.reward)}${rupiah(rally.reward)} + NFT Trofi ${rally.name}.`)}
+                {rally.bonusNeeded && tr(` Bonus tier: ${rally.bonusNeeded} different stalls → ${sats(rally.bonusReward!)}${rupiah(rally.bonusReward!)}.`,
+                  ` Tingkat bonus: ${rally.bonusNeeded} warung berbeda → ${sats(rally.bonusReward!)}${rupiah(rally.bonusReward!)}.`)}
                 {rewardsLeft !== null && tr(` ${Math.max(rewardsLeft, 0)} rewards left in the pool.`, ` Sisa ${Math.max(rewardsLeft, 0)} hadiah di pool.`)}
               </p>
             </div>
             <button className="primary big" disabled={!ready || !!busy} onClick={claim}>
-              {busy?.startsWith('🏆') ? tr('Approve in wallet…', 'Setujui di wallet…') : tr(`Claim ${sats(rally.reward)} + trophy`, `Klaim ${sats(rally.reward)} + trofi`)}
+              {busy?.startsWith('🏆') ? tr('Approve in wallet…', 'Setujui di wallet…') : tr(`Claim ${bonus ? 'bonus ' : ''}${sats(prize)} + trophy`, `Klaim ${bonus ? 'bonus ' : ''}${sats(prize)} + trofi`)}
             </button>
           </div>
           {!connected && <p className="hint">{tr("Connect a wallet (Selene, Paytaca, Cashonize) to start. Each stamp costs the stall's price plus a tiny network fee.", 'Hubungkan wallet (Selene, Paytaca, Cashonize) untuk mulai. Tiap stamp seharga warungnya ditambah biaya jaringan yang sangat kecil.')}</p>}
@@ -326,7 +332,7 @@ function Organize() {
     const t = setInterval(() => tick((n) => n + 1), 500);
     return () => clearInterval(t);
   }, [wc.state, lock]);
-  const [f, setF] = useState({ name: '', needed: '3', reward: '4000', rewardsInPool: '2', durationDays: '30', levy: '' });
+  const [f, setF] = useState({ name: '', needed: '3', reward: '4000', rewardsInPool: '2', durationDays: '30', levy: '', bonusNeeded: '', bonusReward: '' });
   const [stalls, setStalls] = useState<StallRow[]>([
     { name: '', emoji: '🍜', price: '5000', memberPrice: '4500', address: '' },
     { name: '', emoji: '☕', price: '5000', memberPrice: '4500', address: '' },
@@ -346,6 +352,7 @@ function Organize() {
     name: f.name.trim() || 'My rally', description: '', needed: Number(f.needed), reward: Number(f.reward),
     rewardsInPool: Number(f.rewardsInPool), durationDays: Number(f.durationDays), lanes: 2,
     ...(f.levy.trim() ? { levy: Number(f.levy) } : {}),
+    ...(f.bonusNeeded.trim() ? { bonusNeeded: Number(f.bonusNeeded), bonusReward: Number(f.bonusReward) } : {}),
     merchants: stalls.map((s, i) => ({
       id: i + 1, name: s.name.trim() || `Stall ${i + 1}`, emoji: s.emoji || '⭐', tagline: '', color: PALETTE[i % PALETTE.length],
       price: Number(s.price), memberPrice: Number(s.memberPrice || s.price), lock: payout(s.address),
@@ -407,6 +414,8 @@ function Organize() {
           <label>{tr('Rewards to fund now', 'Jumlah hadiah didanai')}<input type="number" min={1} value={f.rewardsInPool} onChange={set('rewardsInPool')} /></label>
           <label>{tr('Days open', 'Lama (hari)')}<input type="number" min={1} value={f.durationDays} onChange={set('durationDays')} /></label>
           <label>{tr('Levy per stamp (sats, optional)', 'Levy per stamp (sats, opsional)')}<input type="number" min={0} value={f.levy} onChange={set('levy')} placeholder={tr('none', 'tanpa')} /></label>
+          <label>{tr('Bonus tier: stalls (optional, needs a levy)', 'Tingkat bonus: jumlah warung (opsional, perlu levy)')}<input type="number" min={2} value={f.bonusNeeded} onChange={set('bonusNeeded')} placeholder={tr('none', 'tanpa')} /></label>
+          <label>{tr('Bonus reward (sats)', 'Hadiah bonus (sats)')}<input type="number" min={1} value={f.bonusReward} onChange={set('bonusReward')} disabled={!f.bonusNeeded.trim()} /></label>
         </div>
         <h2>{tr('Stalls', 'Warung')}</h2>
         {stalls.map((s, i) => (
@@ -472,7 +481,7 @@ function Stats() {
           <tfoot><tr><td>Total</td><td>{total.stamps}</td><td /><td>{sats(total.revenue)}</td></tr></tfoot>
         </table>
       )}
-      {s && <p>{tr('Sets completed', 'Set selesai')}: <b>{s.claims}</b> · {tr('rewards paid', 'hadiah dibayar')}: <b>{sats(BigInt(s.claims) * BigInt(rally.reward))}</b></p>}
+      {s && <p>{tr('Sets completed', 'Set selesai')}: <b>{s.claims}</b> {!rally.bonusNeeded && <> · {tr('rewards paid', 'hadiah dibayar')}: <b>{sats(BigInt(s.claims) * BigInt(rally.reward))}</b></>}</p>}
       {s && s.collectors.length > 0 && (<>
         <h2>{tr('Top collectors', 'Kolektor teratas')}</h2>
         <table>
