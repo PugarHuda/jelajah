@@ -139,7 +139,7 @@ export async function verifyNip39(event, provider, address) {
   if (!event || event.kind !== NIP39_KIND || !verifyFresh(event)) return fail('the Nostr signature does not verify');
   if (event.created_at > Date.now() / 1000 + 600) return fail('the event is dated in the future');
   const claims = event.tags.filter((t) => t[0] === 'i' && /^bch(test)?:q[0-9a-z]+$/.test(t[1] ?? '') && /^tx:[0-9a-f]{64}$/.test(t[2] ?? ''))
-    .filter((t) => !address || t[1] === nip39Id(address)).slice(0, MAX_CLAIMS);
+    .filter((t) => !address || t[1] === nip39Id(address)).slice(0, address ? 1 : MAX_CLAIMS); // one claim per event when the address is known
   let last = fail('no on-chain bch claim in the NIP-39 list');
   for (const [, id, proof] of claims) {
     const [platform, payload] = id.split(':');
