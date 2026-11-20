@@ -1,15 +1,19 @@
 // Jelajah ID: link a Bitcoin Cash address and a Nostr key, each key vouching for the other, with no identity server.
 //
 //  1. BCH side (proof of control of the address): the wallet spends a coin *from that address* in a transaction whose
-//     OP_RETURN commits to the statement and the Nostr key:  "JLID" ‖ sha256(statement) ‖ nostr pubkey (32 bytes).
+//     OP_RETURN is NIP-39's verification text naming the Nostr key ("Verifying that I control the following Nostr
+//     public key: npub1…"). v1 proofs committed "JLID" ‖ sha256(statement) ‖ nostr pubkey instead; both verify.
 //  2. Nostr side: the Nostr key signs a replaceable event (kind 30078, d = "jelajah-bch-link") whose content is that
 //     statement, tagged ["i", "bch:<address>", "<proof txid>"] so anyone can find it by Nostr key OR by BCH address.
+//     The same link is also published as a standard NIP-39 claim (kind 10011, ["i", "bch:<q…>", "tx:<txid>"]), the
+//     on-chain proof form TwinKey specifies, so other Nostr apps and verifiers can read it.
 //  3. Verification needs only public data: the event's Schnorr signature, the proof tx's OP_RETURN, and the address that
 //     funded the proof tx's first input. Neither private key is shared or reused across the two networks.
 // Used by the app (#/identity) and by the standalone verifier (scripts/verify-identity.mjs).
 import { TransactionBuilder } from 'cashscript';
 import { binToHex, hexToBin, sha256, utf8ToBin, decodeTransaction, cashAddressToLockingBytecode, lockingBytecodeToCashAddress } from '@bitauth/libauth';
 import { verifyEvent } from 'nostr-tools/pure';
+import { npubEncode } from 'nostr-tools/nip19';
 
 // nostr-tools caches a passed verification on the event object (a symbol property that object spread copies), so a
 // tampered copy of a verified event would skip the check: always verify a plain JSON copy.
@@ -18,6 +22,7 @@ const verifyFresh = (event) => verifyEvent(JSON.parse(JSON.stringify(event)));
 export const RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net'];
 export const LINK_KIND = 30078;
 export const LINK_D = 'jelajah-bch-link';
+export const NIP39_KIND = 10011;
 export const LOGIN_KIND = 27235; // a signed one-off event answering a login challenge (never published)
 const MAGIC = '4a4c4944'; // "JLID"
 
@@ -25,8 +30,12 @@ const MAGIC = '4a4c4944'; // "JLID"
 export const statement = ({ address, nostrPubkey }) =>
   `Jelajah ID v1: the Bitcoin Cash address ${address} and the Nostr key ${nostrPubkey} belong to the same person.`;
 
-/** OP_RETURN payload of the BCH proof (pushes: "JLID", sha256(statement), nostr pubkey). */
+/** v1 OP_RETURN payload (pushes: "JLID", sha256(statement), nostr pubkey). Still verified, no longer made. */
 export const proofPushes = (text, nostrPubkey) => ['JLID', `0x${binToHex(sha256.hash(utf8ToBin(text)))}`, `0x${nostrPubkey}`];
+/** NIP-39's verification text: the v2 OP_RETURN, and what other NIP-39 verifiers look for. */
+export const nip39Text = (nostrPubkey) => `Verifying that I control the following Nostr public key: ${npubEncode(nostrPubkey)}`;
+/** NIP-39 identity for an address: the cashaddr payload without prefix, platform bch (mainnet) or bchtest. */
+export const nip39Id = (address) => { const [prefix, payload] = address.split(':'); return `${prefix === 'bitcoincash' ? 'bch' : 'bchtest'}:${payload}`; };
 
 /** The BCH proof tx: every input comes from the claimed address, so only that address's key could have signed it.
  *  coins: [{ utxo, unlocker }] at that address (BCH only). */
@@ -38,7 +47,7 @@ export function buildProofTx({ provider, coins, address, nostrPubkey }) {
   if (total < fee + 546n) throw new Error(`Send at least ${fee + 546n} sats to ${address} first: the proof spends a coin from that very address`);
   const tb = new TransactionBuilder({ provider });
   own.forEach((c) => tb.addInput(c.utxo, c.unlocker));
-  tb.addOpReturnOutput(proofPushes(statement({ address, nostrPubkey }), nostrPubkey));
+  tb.addOpReturnOutput([nip39Text(nostrPubkey)]);
   return { builder: tb.addOutput({ to: address, amount: total - fee }), inputs: own };
 }
 
@@ -49,6 +58,35 @@ export const linkEvent = ({ address, nostrPubkey, txid, network }) => ({
   tags: [['d', LINK_D], ['i', `bch:${address}`, txid], ['network', network], ['alt', 'Jelajah ID: a Bitcoin Cash address linked to this Nostr key']],
   content: statement({ address, nostrPubkey }),
 });
+
+/** The NIP-39 list to publish: the author's current kind-10011 tags, minus any older claim for this address, plus ours.
+ *  It is replaceable, so keeping the other tags matters (other platforms, other addresses). */
+export const nip39Event = (current, { address, txid }) => {
+  const id = nip39Id(address);
+  const keep = (current?.tags ?? []).filter((t) => !(t[0] === 'i' && t[1] === id));
+  return { kind: NIP39_KIND, created_at: Math.max(Math.floor(Date.now() / 1000), (current?.created_at ?? 0) + 1), tags: [...keep, ['i', id, `tx:${txid}`]], content: current?.content ?? '' };
+};
+
+/** The proof tx spends a coin of `address` and its OP_RETURN names this Nostr key (v2 NIP-39 text, or v1 commitment).
+ *  Returns null when it holds, else the reason. */
+async function checkProofTx(provider, txid, address, nostrPubkey, v1Statement) {
+  const lock = cashAddressToLockingBytecode(address);
+  if (typeof lock === 'string') return 'invalid BCH address';
+  let tx;
+  try { tx = decodeTransaction(hexToBin(await provider.getRawTransaction(txid))); } catch { return 'the proof transaction is not on this network'; }
+  if (typeof tx === 'string') return 'the proof transaction does not decode';
+  const opret = tx.outputs.map((o) => binToHex(o.lockingBytecode)).find((h) => h.startsWith('6a'));
+  const has = (hex) => opret?.includes(hex.replace(/^0x/, ''));
+  const v2 = has(binToHex(utf8ToBin(nip39Text(nostrPubkey))));
+  const v1 = v1Statement !== undefined && has(MAGIC) && proofPushes(v1Statement, nostrPubkey).slice(1).every(has);
+  if (!opret || !(v1 || v2)) return 'the proof transaction does not commit to this statement and key';
+  // a spent coin of the claimed address: only its key could sign that input
+  for (const input of tx.inputs) {
+    const prev = decodeTransaction(hexToBin(await provider.getRawTransaction(binToHex(input.outpointTransactionHash))));
+    if (typeof prev !== 'string' && binToHex(prev.outputs[input.outpointIndex].lockingBytecode) === binToHex(lock.bytecode)) return null;
+  }
+  return 'the proof was not spent from the claimed address';
+}
 
 /** Check a link event end to end.
  *  @returns {Promise<{ ok: boolean, reason?: string, address?: string, nostrPubkey?: string, txid?: string, created_at?: number }>} */
@@ -61,20 +99,28 @@ export async function verifyLink(event, provider) {
   if (!i || !/^[0-9a-f]{64}$/.test(i[2] ?? '')) return fail('no BCH address or proof txid in the event');
   const address = i[1].slice(4), txid = i[2];
   if (event.content !== statement({ address, nostrPubkey: event.pubkey })) return fail('the signed statement does not match the address and key');
-  const lock = cashAddressToLockingBytecode(address);
-  if (typeof lock === 'string') return fail('invalid BCH address');
-  let tx;
-  try { tx = decodeTransaction(hexToBin(await provider.getRawTransaction(txid))); } catch { return fail('the proof transaction is not on this network'); }
-  if (typeof tx === 'string') return fail('the proof transaction does not decode');
-  const want = [...proofPushes(event.content, event.pubkey)];
-  const opret = tx.outputs.map((o) => binToHex(o.lockingBytecode)).find((h) => h.startsWith('6a'));
-  const has = (hex) => opret?.includes(hex.replace(/^0x/, ''));
-  if (!opret || !has(MAGIC) || !has(want[1]) || !has(want[2])) return fail('the proof transaction does not commit to this statement and key');
-  // the first input must have been the claimed address's coin: only its key could sign it
-  const prev = decodeTransaction(hexToBin(await provider.getRawTransaction(binToHex(tx.inputs[0].outpointTransactionHash))));
-  if (typeof prev === 'string' || binToHex(prev.outputs[tx.inputs[0].outpointIndex].lockingBytecode) !== binToHex(lock.bytecode))
-    return fail('the proof was not spent from the claimed address');
+  const problem = await checkProofTx(provider, txid, address, event.pubkey, event.content);
+  if (problem) return fail(problem);
   return { ok: true, address, nostrPubkey: event.pubkey, txid, created_at: event.created_at };
+}
+
+/** Check a NIP-39 list (kind 10011) for an on-chain `bch:` claim; `address` picks one when it holds several.
+ *  @returns {Promise<{ ok: boolean, reason?: string, address?: string, nostrPubkey?: string, txid?: string, created_at?: number, nip39?: boolean }>} */
+export async function verifyNip39(event, provider, address) {
+  const fail = (reason) => ({ ok: false, reason, nostrPubkey: event?.pubkey });
+  if (!event || event.kind !== NIP39_KIND || !verifyFresh(event)) return fail('the Nostr signature does not verify');
+  if (event.created_at > Date.now() / 1000 + 600) return fail('the event is dated in the future');
+  const claims = event.tags.filter((t) => t[0] === 'i' && /^bch(test)?:q[0-9a-z]+$/.test(t[1] ?? '') && /^tx:[0-9a-f]{64}$/.test(t[2] ?? ''))
+    .filter((t) => !address || t[1] === nip39Id(address));
+  let last = fail('no on-chain bch claim in the NIP-39 list');
+  for (const [, id, proof] of claims) {
+    const [platform, payload] = id.split(':');
+    const addr = `${platform === 'bch' ? 'bitcoincash' : 'bchtest'}:${payload}`;
+    const problem = await checkProofTx(provider, proof.slice(3), addr, event.pubkey);
+    if (!problem) return { ok: true, address: addr, nostrPubkey: event.pubkey, txid: proof.slice(3), created_at: event.created_at, nip39: true };
+    last = fail(problem);
+  }
+  return last;
 }
 
 /** Find link events by Nostr key (hex) or by BCH address; newest first. pool: a nostr-tools SimplePool.
@@ -87,10 +133,13 @@ export async function findLinks(pool, { nostrPubkey, address }, relays = RELAYS)
 
 /** The newest link that actually verifies: anyone can publish an event tagged with your address, so an unverified
  *  (or future-dated) event must never shadow the real one. */
+/** @returns {Promise<{ ok: boolean, reason?: string, address?: string, nostrPubkey?: string, txid?: string, created_at?: number, nip39?: boolean }>} */
 export async function findVerified(pool, who, provider, relays = RELAYS) {
   let last = null;
-  for (const ev of await findLinks(pool, who, relays)) {
-    const r = await verifyLink(ev, provider);
+  const nip39 = await pool.querySync(relays, { kinds: [NIP39_KIND], ...(who.nostrPubkey ? { authors: [who.nostrPubkey] } : {}), ...(who.address ? { '#i': [nip39Id(who.address)] } : {}) }, { maxWait: 4000 });
+  const events = [...await findLinks(pool, who, relays), ...nip39].sort((a, b) => b.created_at - a.created_at);
+  for (const ev of events) {
+    const r = ev.kind === NIP39_KIND ? await verifyNip39(ev, provider, who.address) : await verifyLink(ev, provider);
     if (r.ok && (!who.nostrPubkey || r.nostrPubkey === who.nostrPubkey) && (!who.address || r.address === who.address)) return r;
     last = r;
   }

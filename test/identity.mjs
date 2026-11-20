@@ -56,3 +56,21 @@ console.log('PASS login: the right challenge passes; a wrong challenge, another 
   assert.equal(r.nostrPubkey, fx.event.pubkey);
   console.log('PASS a newer junk or future-dated event cannot shadow the real link');
 }
+
+{ // v2: the same link as a standard NIP-39 claim (kind 10011) with an on-chain proof, as TwinKey's verifier reads it
+  const { verifyNip39, nip39Event } = await import('../src/lib/identity.js');
+  const { getPublicKey } = await import('nostr-tools/pure');
+  const r = await verifyNip39(fx.nip39, provider);
+  assert.equal(r.ok, true, r.reason);
+  console.log('PASS the published NIP-39 claim (kind 10011) verifies:', r.address);
+  const claim = fx.nip39.tags.find((t) => t[0] === 'i' && t[1].startsWith('bch:'));
+  const resign = (tags) => finalizeEvent({ kind: 10011, created_at: fx.nip39.created_at, tags, content: '' }, attacker);
+  assert.equal((await verifyNip39(resign([claim]), provider)).ok, false); // another key reusing the proof
+  assert.equal((await verifyNip39(resign([['i', 'bch:qr6m7j9njldwwzlg9v7v53unlr4jkmx6eylep8ekg2', claim[2]]]), provider)).ok, false);
+  assert.equal((await verifyNip39({ ...fx.nip39, tags: [['i', 'bch:qr6m7j9njldwwzlg9v7v53unlr4jkmx6eylep8ekg2', claim[2]]] }, provider)).ok, false);
+  console.log('PASS (refused) NIP-39: another key reusing the proof, a proof for another address, an edited list');
+  const merged = nip39Event({ created_at: 10, tags: [['i', 'github:someone', 'gist'], ['i', claim[1], 'tx:' + '00'.repeat(32)]] }, { address: r.address, txid: r.txid });
+  assert.deepEqual(merged.tags, [['i', 'github:someone', 'gist'], ['i', claim[1], `tx:${r.txid}`]]);
+  assert.equal(getPublicKey(attacker).length, 64);
+  console.log('PASS publishing keeps the key’s other NIP-39 claims and replaces only this address');
+}

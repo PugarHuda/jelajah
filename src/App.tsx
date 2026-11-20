@@ -6,7 +6,7 @@ import { TransactionBuilder, SignatureTemplate, type Utxo } from 'cashscript';
 import { generateSecretKey, getPublicKey, finalizeEvent, type NostrEvent } from 'nostr-tools/pure';
 import { SimplePool } from 'nostr-tools/pool';
 import { nip19 } from 'nostr-tools';
-import { RELAYS, buildProofTx, linkEvent, findVerified, loginChallenge, loginEvent, checkLogin } from './lib/identity.js';
+import { RELAYS, NIP39_KIND, buildProofTx, linkEvent, nip39Event, findVerified, loginChallenge, loginEvent, checkLogin } from './lib/identity.js';
 import { rally, provider, minters, vault, rallyLink, fromLink, passportFromLink, type Merchant, type Rally } from './chain';
 import { isVoucher, buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane, buildReclaim, buildAddStall, buildPassportClaim, isTrophyOf } from './lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, receiveZeroCoin, type Coin } from './wallet';
@@ -176,17 +176,19 @@ function Rally() {
           {ID
             ? <h1>Jajan di {rally.needed} warung.<br />Kumpulkan {rally.needed} stamp.<br /><em>Uangmu kembali.</em></h1>
             : <h1>Eat at {rally.needed} stalls.<br />Collect {rally.needed} stamps.<br /><em>Get paid back.</em></h1>}
-          {ID ? (
+          {ID ? (<>
             <p className="lede">
               Bayar di warung dan stamp NFT-nya tercetak <b>di transaksi yang sama</b>. Bakar satu set lengkap, kontrak rally
               membayarmu {sats(rally.reward)} dan mencetak trofimu. Tanpa daftar, tanpa server, tanpa ada yang memegang uang hadiah.
             </p>
-          ) : (
+            <p className="muted small">Bukan kartu loyalitas satu toko: banyak warung, satu pool hadiah bersama, dan hanya stamp dari warung <b>berbeda</b> yang dihitung.</p>
+          </>) : (<>
             <p className="lede">
               Paying a stall prints its stamp NFT <b>in the same transaction</b>. Burn a full set and the rally's
               contract pays you {sats(rally.reward)} and mints your trophy. No sign-up, no server, no one holding the prize money.
             </p>
-          )}
+            <p className="muted small">Not one shop's loyalty card: many stalls, one shared prize pool, and only stamps from <b>different</b> stalls count.</p>
+          </>)}
         </section>
 
         {LOADED_AT > rally.endTime && (
@@ -684,6 +686,9 @@ function IdentityPage() {
       const event = await signer!.sign(linkEvent({ address: address!, nostrPubkey: signer!.pubkey, txid, network: rally.network }));
       const pool = new SimplePool();
       const res = await Promise.allSettled(pool.publish(RELAYS, event));
+      // also a standard NIP-39 claim, keeping the other claims in this key's list
+      const [current] = (await pool.querySync(RELAYS, { kinds: [NIP39_KIND], authors: [signer!.pubkey] }, { maxWait: 4000 })).sort((a, b) => b.created_at - a.created_at);
+      await Promise.allSettled(pool.publish(RELAYS, await signer!.sign(nip39Event(current, { address: address!, txid }))));
       pool.close(RELAYS);
       setLinked({ txid, relays: res.filter((r) => r.status === 'fulfilled').length });
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); }

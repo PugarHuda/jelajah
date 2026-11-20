@@ -4,6 +4,8 @@
 
 **One-liner (Vision field):** A stamp rally on Bitcoin Cash: pay a stall, get its stamp NFT in the same transaction, burn a set of 3 to get paid back.
 
+**Not a loyalty card, a rally.** A loyalty card is one shop paying back its own customers. Jelajah puts **many independent stalls behind one shared prize pool** that pays only for stamps from *different* stalls, and the pool can't be drained even if stalls collude: in a levy rally, colluding stalls end up paying the prize themselves.
+
 **Links**
 - Live demo: https://jelajah-bch.vercel.app
 - Code: https://github.com/PugarHuda/jelajah
@@ -80,6 +82,7 @@ Jelajah ID links a BCH address and a Nostr key, with no identity server:
 - the address spends a coin in a proof tx whose OP_RETURN commits to the statement and the Nostr key;
 - the Nostr key signs a kind-30078 event naming the address and that proof;
 - anyone can find the link by npub or by address and verify both sides from public relays and the chain (`scripts/verify-identity.mjs`, `#/identity`);
+- the link is also a standard **NIP-39** claim (kind 10011), and an independent verifier (TwinKey's) shows it as ✓ Verified;
 - extras: challenge login bound to the site origin, the rally reputation of the verified address, and pay-by-identity.
 
 Live on mainnet: proof [`da731db2…`](https://blockchair.com/bitcoin-cash/transaction/da731db2956c3ab85474339e96c338155073869cb7fcb40d1a26ce3cc0dd437f). Offline tests refuse 5 forgery shapes, shadowing by junk events, and wrong-site logins.

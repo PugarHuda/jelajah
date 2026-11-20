@@ -8,7 +8,7 @@ import { decodePrivateKeyWif, secp256k1, hash160, encodeLockingBytecodeP2pkh, lo
 import { generateSecretKey, getPublicKey, finalizeEvent } from 'nostr-tools/pure';
 import { SimplePool } from 'nostr-tools/pool';
 import { nip19 } from 'nostr-tools';
-import { RELAYS, buildProofTx, linkEvent, findLinks, verifyLink, loginChallenge, loginEvent, checkLogin, findVerified } from '../src/lib/identity.js';
+import { RELAYS, NIP39_KIND, buildProofTx, linkEvent, nip39Event, findLinks, verifyLink, verifyNip39, loginChallenge, loginEvent, checkLogin, findVerified } from '../src/lib/identity.js';
 
 const { values: { network } } = parseArgs({ options: { network: { type: 'string', default: 'mainnet' } } });
 const provider = new ElectrumNetworkProvider(network);
@@ -40,9 +40,17 @@ const pool = new SimplePool();
 const event = finalizeEvent(linkEvent({ address, nostrPubkey, txid, network }), sk);
 const published = await Promise.allSettled(pool.publish(RELAYS, event));
 console.log('published to      ', published.filter((p) => p.status === 'fulfilled').length, 'of', RELAYS.length, 'relays; event', event.id);
+// the same link as a standard NIP-39 claim, keeping whatever else the key's list already claims
+const [current] = (await pool.querySync(RELAYS, { kinds: [NIP39_KIND], authors: [nostrPubkey] }, { maxWait: 4000 })).sort((a, b) => b.created_at - a.created_at);
+const nip39 = finalizeEvent(nip39Event(current, { address, txid }), sk);
+const p39 = await Promise.allSettled(pool.publish(RELAYS, nip39));
+console.log('NIP-39 (10011)    ', p39.filter((p) => p.status === 'fulfilled').length, 'of', RELAYS.length, 'relays; event', nip39.id);
 
 // 3. discovery + verification from public data only, both ways
 await new Promise((r) => setTimeout(r, 2500));
+{ const [l] = (await pool.querySync(RELAYS, { kinds: [NIP39_KIND], authors: [nostrPubkey] }, { maxWait: 4000 })).sort((a, b) => b.created_at - a.created_at);
+  const r = l ? await verifyNip39(l, provider, address) : { ok: false, reason: 'not found' };
+  console.log('NIP-39 claim      ', r.ok ? `VERIFIED -> ${r.address}` : `FAILED: ${r.reason}`); }
 for (const [label, q] of [['by Nostr key', { nostrPubkey }], ['by BCH address', { address }]]) {
   const found = await findLinks(pool, q);
   const r = found.length ? await verifyLink(found[0], provider) : { ok: false, reason: 'not found' };

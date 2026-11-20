@@ -6,6 +6,8 @@
 
 **A stamp rally on Bitcoin Cash.** Pay a stall and its stamp NFT is printed in the same transaction. Collect stamps from 3 different stalls, burn them, and the rally's contract pays you back and mints your trophy.
 
+**Not a loyalty card, a rally.** A loyalty card is one shop paying back its own customers. Jelajah puts **many independent stalls behind one shared prize pool** that pays only for stamps from *different* stalls, and the pool can't be drained even if stalls collude: in a levy rally, colluding stalls end up paying the prize themselves.
+
 **▶ Try it on mainnet in 2 minutes (net cost ≈ 3,000 sats).** Open https://jelajah-bch.vercel.app, press **Connect wallet** and scan with Selene or Paytaca (WizardConnect). Then:
 1. Buy at 3 stalls: 2,000 sats each, plus about 500 in fees.
 2. Press **Claim**: 5,000 sats come back, along with a Trophy NFT.
