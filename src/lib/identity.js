@@ -104,19 +104,13 @@ async function checkProofTx(provider, txid, address, nostrPubkey, v1Statement) {
 let vmInstance;
 const vm = () => (vmInstance ??= createVirtualMachineBch2025());
 
-// Bound the chain lookups an attacker's events can cause. A forged link can only point at a tx that doesn't exist (one
-// failed lookup) or at someone's real proof (fetched once, then cached), so a generous event cap stays cheap.
-const MAX_INPUTS = 4, MAX_CLAIMS = 4, MAX_EVENTS = 50;
+const MAX_INPUTS = 4, MAX_CLAIMS = 4, LOOKUP_BUDGET = 80;
 // base type ALL (0x01) with FORKID (0x40), never ANYONECANPAY (0x80); SIGHASH_UTXOS (0x20, CashScript's default) is fine
 const commitsToAllOutputs = (t) => (t & 0x1f) === 0x01 && (t & 0x40) !== 0 && (t & 0x80) === 0;
 /** A tx from the network, checked against its txid so a lying server can't substitute one. */
-const rawCache = new WeakMap(); // provider -> Map(txid -> raw hex promise)
 async function fetchTx(provider, txid) {
-  if (!rawCache.has(provider)) rawCache.set(provider, new Map());
-  const cache = rawCache.get(provider);
-  if (!cache.has(txid)) cache.set(txid, Promise.resolve().then(() => provider.getRawTransaction(txid)));
   let raw;
-  try { raw = hexToBin(await cache.get(txid)); } catch { cache.delete(txid); return 'the proof transaction is not on this network'; } // a just-sent tx may show up later
+  try { raw = hexToBin(await provider.getRawTransaction(txid)); } catch { return 'the proof transaction is not on this network'; }
   if (binToHex(sha256.hash(sha256.hash(raw)).reverse()) !== txid) return 'the server returned a different transaction';
   const tx = decodeTransaction(raw);
   return typeof tx === 'string' ? 'the proof transaction does not decode' : tx;
@@ -168,8 +162,20 @@ export async function findLinks(pool, { nostrPubkey, address }, relays = RELAYS)
 /** The newest link that actually verifies: anyone can publish an event tagged with your address, so an unverified
  *  (or future-dated) event must never shadow the real one. */
 /** @returns {Promise<{ ok: boolean, reason?: string, address?: string, nostrPubkey?: string, txid?: string, created_at?: number, nip39?: boolean }>} */
-export async function findVerified(pool, who, provider, relays = RELAYS) {
+export async function findVerified(pool, who, rawProvider, relays = RELAYS) {
   let last = null;
+  // One search, one budget: every tx (found or not) is looked up once, and the whole search does at most LOOKUP_BUDGET
+  // lookups. Forged events can only point at txs that don't exist (one lookup each) or at a real proof (shared, cached).
+  // ponytail: an attacker publishing more than ~LOOKUP_BUDGET forged events for one *address* can hide a link from an
+  // address search (denial, never a false match); a search by npub only reads that key's own events and is unaffected.
+  const seen = new Map();
+  const provider = { getRawTransaction: (txid) => {
+    if (!seen.has(txid)) {
+      if (seen.size >= LOOKUP_BUDGET) return Promise.reject(new Error('lookup budget spent'));
+      seen.set(txid, Promise.resolve().then(() => rawProvider.getRawTransaction(txid)));
+    }
+    return seen.get(txid);
+  } };
   const nip39 = await pool.querySync(relays, { kinds: [NIP39_KIND], ...(who.nostrPubkey ? { authors: [who.nostrPubkey] } : {}), ...(who.address ? { '#i': [nip39Id(who.address)] } : {}) }, { maxWait: 4000 });
   // Cheap checks first (signature, date, the event naming this very address), then the newest event per author and kind
   // (both kinds are replaceable): junk events, however many, can't push the real one past the cap on chain lookups.
@@ -183,7 +189,7 @@ export async function findVerified(pool, who, provider, relays = RELAYS) {
     const key = `${ev.pubkey}:${ev.kind}`;
     if (!newest.has(key) || newest.get(key).created_at < ev.created_at) newest.set(key, ev);
   }
-  const events = [...newest.values()].sort((a, b) => b.created_at - a.created_at).slice(0, MAX_EVENTS);
+  const events = [...newest.values()].sort((a, b) => b.created_at - a.created_at);
   for (const ev of events) {
     const r = ev.kind === NIP39_KIND ? await verifyNip39(ev, provider, who.address) : await verifyLink(ev, provider);
     if (r.ok && (!who.nostrPubkey || r.nostrPubkey === who.nostrPubkey) && (!who.address || r.address === who.address)) return r;

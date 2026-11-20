@@ -116,3 +116,17 @@ console.log('PASS login: the right challenge passes; a wrong challenge, another 
   assert.ok(fetches <= 4, `${fetches} chain lookups`);
   console.log(`PASS 30 self-consistent forgeries pointing at the real proof still lose (${fetches} chain lookups in all)`);
 }
+
+{ // forged events pointing at non-existent txs cost one lookup each, bounded per search; the real link still wins
+  const { findVerified, statement: st } = await import('../src/lib/identity.js');
+  const { generateSecretKey: gen, getPublicKey: gpk } = await import('nostr-tools/pure');
+  let lookups = 0;
+  const counting = { getRawTransaction: async (id) => { lookups++; return provider.getRawTransaction(id); } };
+  const addr = iTag[1].slice(4);
+  const forged = Array.from({ length: 40 }, (_, i) => { const k = gen();
+    return finalizeEvent({ kind: fx.event.kind, created_at: fx.event.created_at + 100 + i, tags: [['d', 'jelajah-bch-link'], ['i', `bch:${addr}`, i.toString(16).padStart(64, '0')]], content: st({ address: addr, nostrPubkey: gpk(k) }) }, k); });
+  const r = await findVerified({ querySync: async () => [...forged, fx.event] }, { address: addr }, counting);
+  assert.equal(r.ok, true, r.reason);
+  assert.ok(lookups <= 80, `${lookups} lookups`);
+  console.log(`PASS 40 forgeries with fake txids still lose (${lookups} lookups, budget 80)`);
+}

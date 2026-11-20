@@ -63,3 +63,5 @@ Jelajah ID links a BCH address and a Nostr key. Each key vouches for the other, 
 
 - A link proves control at the time of the proof. If the address's key is later lost or sold, publish a new link event; it replaces the old one, because it is replaceable.
 - Discovery depends on the relays carrying the event. Verification does not depend on trusting them.
+- Verification runs the proof tx through the BCH VM and checks every fetched tx against its txid, so it doesn't trust the Electrum server either. It doesn't require the proof to be confirmed: the signature is the proof.
+- A search **by address** has a lookup budget (80 per search). Someone publishing more forged events for one address than that could hide its link from an address search. That is denial only, never a false match. A search **by npub** reads only that key's own events and is unaffected.
