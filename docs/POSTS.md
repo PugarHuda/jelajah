@@ -29,6 +29,11 @@ Show it to any stall and the covenant charges you the member price, then hands t
 Levy rallies: every stamp pays a levy into the pool, and one set's levies cover its own reward. Colluders just pay themselves. Anyone can merge levies into the vault, unsigned, and it can only grow.
 
 **5/**
+New: Jelajah ID 🪪 links your BCH address to your Nostr key. Each key vouches for the other: a NIP-39 claim plus an on-chain proof. No server.
+
+TwinKey's independent verifier already shows our mainnet link as ✓ Verified. Your stamps and trophies travel with your npub, and you can log in with Nostr.
+
+**6/**
 Also in:
 📊 a stall dashboard computed live from covenant history (nobody can inflate it)
 🇮🇩 UI in Bahasa Indonesia / English
@@ -45,6 +50,8 @@ Halo semua! Update dari **Jelajah** (stamp rally di Bitcoin Cash, dari Jogja) �
 🏆 **Trofi = kartu member**: harga lebih murah di semua warung, dan trofinya langsung kembali (dijamin covenant)
 🛡️ **Levy rally**: setiap set membiayai hadiahnya sendiri, jadi warung yang berkolusi tidak bisa menguras pool
 📊 Dasbor penjualan per warung langsung dari chain · UI Bahasa Indonesia / English
+🪪 **Jelajah ID**: alamat BCH ↔ kunci Nostr (NIP-39 + bukti on-chain), terverifikasi juga oleh verifier TwinKey; stamp & trofi ikut ke npub-mu
+🧪 Kontrak StampCard di **SolidCash** (+ PR upstream ke solidcash)
 
 Demo: https://jelajah-bch.vercel.app
 Code: https://github.com/PugarHuda/jelajah
@@ -58,4 +65,6 @@ Hi all! Update from **Jelajah**, a stamp rally on Bitcoin Cash from Jogja 🍜
 🏆 Trophy = membership card: member price at every stall, and the trophy comes straight back (covenant-enforced)
 🛡️ Levy rallies: each set funds its own reward, so colluding stalls can't drain the pool
 📊 Live per-stall sales from the chain · ID/EN UI
+🪪 Jelajah ID: BCH address ↔ Nostr key (NIP-39 + on-chain proof), also ✓ in TwinKey's independent verifier
+🧪 A StampCard contract in SolidCash (+ an upstream PR)
 Demo / code / BUIDL links above.
