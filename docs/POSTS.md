@@ -103,3 +103,18 @@ Demo / code / BUIDL links above.
 If you hold EMBER2026 and liked Jelajah, a vote is a send to our CashTokens address: bitcoincash:zrd56cv5ap5v2kc2dgc8hvt4e9g84pmrjcydclcrgj 🙏 Try a set first: https://jelajah-bch.vercel.app (Selene / Paytaca, a few cents).
 
 Indonesian: Kalau kamu pegang EMBER2026 dan suka Jelajah, vote cukup dengan mengirimnya ke alamat CashTokens kami: bitcoincash:zrd56cv5ap5v2kc2dgc8hvt4e9g84pmrjcydclcrgj 🙏 Coba satu set dulu: https://jelajah-bch.vercel.app
+
+## X, 22 Nov: two short posts (quote post A)
+
+**Post 5: the pool pays for itself (attach a screenshot of "How the pool pays for itself" on the home page, opened)**
+How does a shared prize pool stay honest when the stalls could collude?
+Every Jelajah stamp pays a 2,500-sat levy into the pool. 3 stamps = 7,500 in, 3,000 out.
+One full set on BCH mainnet, in 3 transactions: stamps → merge → claim. Links on the home page 👇
+https://jelajah-bch.vercel.app
+@bchblaze #BCHBLAZE
+
+**Post 6: sponsors (attach public/sponsor-voucher.mp4, 20 s)**
+A tourism office wants people to try street food. On Jelajah it turns its vouchers into links: one link, one voucher.
+The buyer taps it, takes it into their wallet, and the next stamp costs 1,000 sats less. The stall still gets its full price, paid by the sponsor's on-chain pool.
+https://jelajah-bch.vercel.app/#/sponsor (chipnet demo: add ?net=chipnet)
+@bchblaze #BCHBLAZE

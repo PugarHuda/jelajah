@@ -76,11 +76,11 @@
   "genesisTx": "e34531670dbf5edaaf6c4aab41098d582417ca8e45b607e4d34f617d1e0d5812",
   "sponsor": {
     "name": "Dinas Pariwisata Jogja (demo)",
-    "category": "7b2b93df5db090dd1d916461e4765c83028cc1da9a83e110d3ae043b8f4625e4",
-    "vmCategory": "e425468f3b04aed310e1839adac18c02835c76e46164911ddd90b05ddf932b7b",
+    "category": "e9ac95eb85ff8c0a5dec7a1809b23fbe996645557cd3a16ef277d3b4bfe7136d",
+    "vmCategory": "6d13e7bfb4d377f26ea1d37c55456699be3fb209187aec5d0a8cff85eb95ace9",
     "value": 1000,
     "sponsorPub": "033f41a2eaf9fa8a2d9a21ada58031094cdce2981627120f09ac80332a32b693cd",
     "endTime": 1800336007,
-    "genesisTx": "2459de959a69dd74712a2cd604278f78daf8ca833c4a0ee5be08b48e4bebf7b1"
+    "genesisTx": "94ea0d673d4b40ef683dddfaeb466a11fe34082a1898065416680f31f8094a1d"
   }
 }

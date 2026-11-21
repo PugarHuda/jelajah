@@ -3,6 +3,7 @@ import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
 import { secp256k1, generatePrivateKey, encodePrivateKeyWif, encodeLockingBytecodeP2pkh, hash160 } from '@bitauth/libauth';
 import { TransactionBuilder } from 'cashscript';
 import { rally, provider } from '../chain';
+import { sponsorPool } from '../lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, addressOf, explorerTx, type Coin } from '../wallet';
 import { sats, tr, qrImage, back } from '../shared';
 
@@ -26,6 +27,12 @@ export function Sponsor() {
     const t = setInterval(() => tick((x) => x + 1), 500);
     return () => clearInterval(t);
   }, [wc.state, lock]);
+  // the sponsor's dashboard, from the chain: what is left in the subsidy pool
+  const [pool, setPool] = useState<{ coins: number; sats: bigint; address: string } | null>(null);
+  useEffect(() => {
+    const c = sponsorPool(rally, provider);
+    if (c) c.getUtxos().then((u: { satoshis: bigint }[]) => setPool({ coins: u.length, sats: u.reduce((s, x) => s + x.satoshis, 0n), address: c.address })).catch(() => {});
+  }, []);
   useEffect(() => { if (lock) walletCoins(wc.manager!).then(setCoins).catch((e) => setErr(String(e))); }, [lock, wc.manager]);
 
   if (!sp) return <main className="organize"><h1>{tr('Sponsor vouchers', 'Voucher sponsor')}</h1><p>{tr('This rally has no sponsor.', 'Rally ini tidak punya sponsor.')}</p>{back}</main>;
@@ -64,6 +71,7 @@ export function Sponsor() {
       <h1>🎟 {tr('Hand out vouchers', 'Bagikan voucher')}</h1>
       <p className="lede">{tr(`Each voucher takes ${sats(sp.value)} off one stamp, paid from your subsidy pool, so the stall still gets its full price. Turn the vouchers in your wallet into links: one link, one voucher. Send them to newsletter sign-ups, print them on flyers, give them at the tourist desk.`,
         `Tiap voucher memotong ${sats(sp.value)} dari satu stamp, dibayar dari pool subsidimu, jadi warung tetap menerima harga penuh. Ubah voucher di wallet-mu jadi link: satu link, satu voucher. Kirim ke pendaftar newsletter, cetak di brosur, bagikan di meja informasi wisata.`)}</p>
+      {pool && <p className="hint">📊 {tr(`Subsidy pool: ${pool.coins} sponsored stamp${pool.coins === 1 ? '' : 's'} left (${sats(pool.sats)}).`, `Pool subsidi: sisa ${pool.coins} stamp bersponsor (${sats(pool.sats)}).`)} <a href={`${rally.network === 'mainnet' ? 'https://blockchair.com/bitcoin-cash/address/' : 'https://chipnet.imaginary.cash/address/'}${pool.address}`} target="_blank" rel="noreferrer">{tr('Every use, on chain →', 'Setiap pemakaian, di chain →')}</a></p>}
       <p className="muted small">{tr('Sponsor', 'Sponsor')}: <b>{sp.name}</b> · {tr('voucher category', 'kategori voucher')} <code className="wrap">{sp.category}</code></p>
       {links ? (
         <div className="claim ready"><div>

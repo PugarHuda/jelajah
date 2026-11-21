@@ -80,16 +80,18 @@ export class TestWallet {
       if (status.status !== 'connected' || this.client === client) return;
       this.client = client;
       client.on('message', (m) => this.onMessage(m).catch((e) => console.error('[test wallet]', e)));
-      void this.ready(binToHex(relay.walletPublicKey), relay.secret);
+      this.hello = (discovered) => this.ready(binToHex(relay.walletPublicKey), relay.secret, discovered);
+      void this.hello(false);
     }, { uri, walletPrivateKey: walletKey });
     this.cleanup = relay.cleanup;
   }
 
-  private ready(publicKey: string, secret: string) {
+  private hello?: (dappDiscovered: boolean) => Promise<void>;
+  private ready(publicKey: string, secret: string, dappDiscovered = false) {
     const xpub = (name: string) => ({ name, xpub: encodeHdPublicKey({ network: 'mainnet', node: deriveHdPublicNode(this.branches[name]) }).hdPublicKey });
     return this.client!.relay({
       action: RelayMsgAction.WalletReady, time: Math.floor(Date.now() / 1000), wallet_name: 'Jelajah test wallet', wallet_icon: '',
-      dapp_discovered: false, supported_protocols: ['hdwalletv1'], public_key: publicKey, secret,
+      dapp_discovered: dappDiscovered, supported_protocols: ['hdwalletv1'], public_key: publicKey, secret,
       session: { hdwalletv1: { paths: [xpub('receive'), xpub('change')] } }, extensions: { chunk: chunkExtensionAdvertisement() }, // like Selene: big requests come in chunks
     } as never);
   }
@@ -97,6 +99,8 @@ export class TestWallet {
   private async onMessage(m: { action: string }) {
     const now = Math.floor(Date.now() / 1000);
     if (m.action === RelayMsgAction.Ping) return this.client!.relay({ action: RelayMsgAction.Pong, time: now });
+    // a dapp page that restored its session (a reload, another page of the app) announces itself: answer like a phone does
+    if (m.action === RelayMsgAction.DappReady) return this.hello?.(true);
     if (m.action !== RelayMsgAction.SignTransactionRequest) return;
     console.log('[test wallet] sign request', (m as SignTransactionRequest).sequence);
     const req = m as SignTransactionRequest;
@@ -112,7 +116,7 @@ export class TestWallet {
     await this.client!.relay({ action: RelayMsgAction.SignTransactionResponse, time: now, sequence: req.sequence, signedTransaction: binToHex(encodeTransaction(tx)) } as never);
   }
 
-  close() { this.cleanup?.(); }
+  close() { this.cleanup?.(); this.client = undefined; }
 }
 
 // relay JSON -> libauth source output: hex byte fields, "<bigint: Xn>" values, nested token data

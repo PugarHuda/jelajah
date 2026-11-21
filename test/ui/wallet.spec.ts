@@ -14,15 +14,25 @@ const FUNDERS = [demo.demo1, demo.demo2, read('scripts/.buyer.chipnet.json').key
 
 // click Connect, "scan" the QR (the wallet reads the wiz:// URI under it), wait until the page shows it is paired
 async function pair(page: Page, w: TestWallet, connect: RegExp, paired: ReturnType<Page['locator']>) {
-  await page.getByRole('button', { name: connect }).click();
-  w.connect(await page.getByText(/^wiz:\/\//).innerText());
-  await expect(paired).toBeVisible({ timeout: 90_000 });
+  const button = page.getByRole('button', { name: connect });
+  // an app page that kept its WizardConnect session (opened from another page) reconnects by itself: give it a moment
+  // (the Connect button can flash before the restored session takes over)
+  if (await paired.waitFor({ timeout: 20_000 }).then(() => true, () => false)) return;
+  for (let attempt = 1; ; attempt++) { // public relays drop a socket now and then: like a person, scan again once
+    await button.click();
+    w.connect(await page.getByText(/^wiz:\/\//).innerText());
+    try { await expect(paired).toBeVisible({ timeout: 60_000 }); return; } catch (e) {
+      if (attempt === 2) throw e;
+      w.close();
+      await page.reload();
+    }
+  }
 }
 
 // the app either logs the transaction or shows why it failed; fail with the app's own message
-async function done(page: Page, logLine: string) {
+async function done(page: Page, success: string | ReturnType<Page['locator']>) {
   const alert = page.getByRole('alert');
-  await expect(alert.or(page.locator('.log', { hasText: logLine }))).toBeVisible({ timeout: 120_000 });
+  await expect(alert.or(typeof success === 'string' ? page.locator('.log', { hasText: success }) : success)).toBeVisible({ timeout: 120_000 });
   if (await alert.count()) throw new Error(`app error: ${await alert.innerText()}`);
 }
 
@@ -82,7 +92,7 @@ test('a collector links their BCH address to a Nostr key and anyone can verify i
   const link = page.getByRole('button', { name: 'Link my BCH address and Nostr key' });
   await pair(page, w, /^Connect wallet$/, link);
   await link.click();
-  await expect(page.getByText(/Linked: .*published to [1-9] relays/)).toBeVisible({ timeout: 120_000 });
+  await done(page, page.getByText(/Linked: .*published to [1-9] relays/));
   expect(w.signed.at(-1)).toContain('Jelajah ID');
   // a stranger checks it: type the address, click Verify
   await page.getByPlaceholder('npub1… / bitcoincash:q…').fill(w.address());
@@ -160,27 +170,34 @@ test('a sponsor turns a voucher into a link, a buyer takes it and pays less for 
   await page.getByRole('button', { name: 'Make 1 voucher link' }).click();
   await expect(page.getByRole('heading', { name: /1 voucher link/ })).toBeVisible({ timeout: 120_000 });
   const link = (await page.getByRole('textbox', { name: 'Voucher links' }).inputValue()).trim();
+  writeFileSync(new URL('./.voucher-links.chipnet.txt', import.meta.url), `${link}\n`, { flag: 'a' }); // gitignored: a voucher is never lost to a failed run
   w.close();
   // the buyer: opens the link, takes the voucher, buys a stamp with it
-  const buyer = await (await browser.newContext()).newPage();
+  // the buyer's phone, recorded: the clip for the sponsor story (test-results/sponsor-clip/*.webm)
+  const buyerCtx = await browser.newContext({ viewport: { width: 390, height: 780 }, recordVideo: { dir: 'test-results/sponsor-clip', size: { width: 390, height: 780 } } });
+  const buyer = await buyerCtx.newPage();
+  buyer.on('pageerror', (e) => console.log('[buyer pageerror]', e.message, e.stack?.split('\n').slice(0, 4).join(' | ')));
+  buyer.on('console', (m) => { if (m.type() === 'error') console.log('[buyer console]', m.text()); });
   await buyer.goto(link);
   await expect(buyer.getByRole('heading', { level: 1 })).toContainText('1 voucher', { timeout: 60_000 });
   const w2 = new TestWallet();
   await pair(buyer, w2, /Connect wallet to take it/, buyer.getByRole('button', { name: /^Take/ }));
   await buyer.getByRole('button', { name: /^Take/ }).click();
   await expect(buyer.getByText('In your wallet')).toBeVisible({ timeout: 60_000 });
-  await buyer.getByRole('link', { name: /Now buy your first stamp/ }).click();
-  await pair(buyer, w2, /^Connect wallet$/, buyer.getByText('You hold a voucher.'));
+  await buyer.getByRole('link', { name: /Now buy your first stamp/ }).click();  await pair(buyer, w2, /^Connect wallet$/, buyer.getByText('You hold a voucher.'));
   const buy = buyer.locator('article.stall', { hasText: 'Es Dawet' }).getByRole('button', { name: /🎟/ });
   await expect(buy).toBeVisible({ timeout: 60_000 }); // the price on the button already has the voucher taken off
   await buy.click();
   await done(buyer, 'Stamped at Es Dawet');
+  await buyer.waitForTimeout(2500); // let the stamp land on camera
+  await buyerCtx.close(); // writes the video
   w2.close();
 });
 
 // the sponsor (the chipnet organizer key) sends one voucher token to the buyer, like an airdrop after a sign-up
 async function giveVoucher(wif: string, to: string) {
   const { sponsor } = JSON.parse(readFileSync(new URL('../../src/rally.chipnet.json', import.meta.url), 'utf8'));
+  if ((await provider.getUtxos(to)).some((u) => u.token?.category === sponsor.category)) return; // already holds one (an earlier run)
   const priv = (decodePrivateKeyWif(wif) as { privateKey: Uint8Array }).privateKey;
   const lock = encodeLockingBytecodeP2pkh(hash160(secp256k1.derivePublicKeyCompressed(priv) as Uint8Array));
   const from = (lockingBytecodeToCashAddress({ bytecode: lock, prefix: 'bchtest', tokenSupport: true }) as { address: string }).address;

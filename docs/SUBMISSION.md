@@ -6,6 +6,8 @@
 
 **Not a loyalty card, a rally.** A loyalty card is one shop paying back its own customers. Jelajah puts **many independent stalls behind one shared prize pool** that pays only for stamps from *different* stalls, and the pool can't be drained even if stalls collude: in a levy rally, colluding stalls end up paying the prize themselves.
 
+**In one line:** a loyalty card makes one shop pay back its own regulars; Jelajah makes many stalls share one prize pool that no stall, and not even all of them together, can drain.
+
 | | Per-shop loyalty card (stamp in the payment, redeemed from the shop's reserve) | **Jelajah rally** |
 |---|---|---|
 | Who pays the reward | The same shop that sold the stamps | **One shared pool**, filled by every stall's levy |
@@ -50,7 +52,7 @@ Every step is one wallet prompt, and each one is a real covenant transaction on 
 **How it scores on the four questions**
 - **Cool?** The stamp is printed by the payment itself. The prize sits in a covenant nobody can touch. The trophy is a membership card.
 - **Slick?** One button per step, works on a phone, Bahasa Indonesia / English, rupiah prices, stall posters with QR codes. No sign-up.
-- **Does it work?** The full lifecycle is on mainnet: stamps, claim and trophy (links below). There are 68 VM checks, about 40 of them attack cases, plus 41 Playwright UI tests that click like a person, and wallet end-to-end tests where a headless WizardConnect wallet signs real chipnet transactions (buy, claim, member price, gift, Jelajah ID). Every feature was also run with a real wallet (Selene) over WizardConnect.
+- **Does it work?** The full lifecycle is on mainnet: stamps, claim and trophy (links below). There are 68 VM checks, about 40 of them attack cases, plus 41 Playwright UI tests that click like a person, and wallet end-to-end tests where a headless WizardConnect wallet signs real chipnet transactions (buy and claim, member price, gift, Jelajah ID, a rally opened from the browser with proof of presence, sponsor voucher links). Every feature was also run with a real wallet (Selene) over WizardConnect.
 - **Does it make money?** Organisers (malls, festivals, tourism boards) pay per rally, and in a levy rally the organiser earns on every set: the levies exceed the reward (by ≥ 2,100 sats per set on the live mainnet rally), and that surplus comes back to them with `reclaim` after the end, enforced by the contracts. Sponsors fund subsidised stamps. Every stamp is a paid visit the stall can prove on the `#/stats` dashboard, and the stall's till (`#/till/<id>`) rings the moment one is paid.
 
 **What makes it a rally and not a loyalty card.** A loyalty card is one shop paying back its own customers. Jelajah is **many independent stalls behind one prize pool**, and the hard part is keeping that pool honest:

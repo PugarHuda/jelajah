@@ -133,6 +133,7 @@ export function Organize() {
             {err && <p className="error" role="alert">{err}</p>}
             {bcmrBody && <p className="small">🪪 <a href={URL.createObjectURL(new Blob([bcmrBody], { type: 'application/json' }))} download="bcmr.json">{tr('Download bcmr.json', 'Unduh bcmr.json')}</a> {tr(`and host it, unchanged, at ${f.bcmrUrl.trim()}: wallets then show your rally's names (its hash is locked in the genesis).`, `lalu host apa adanya di ${f.bcmrUrl.trim()}: wallet akan menampilkan nama rally-mu (hash-nya terkunci di genesis).`)}</p>}
             {reclaimWif && <p className="warn small">🔑 <b>{tr('Back up your reclaim key.', 'Simpan kunci reclaim-mu.')}</b> {tr('It is the only way to take the leftover pool back after the rally ends (link + #/reclaim). It is also saved in this browser.', 'Hanya dengan kunci ini sisa pool bisa diambil setelah rally berakhir (link + #/reclaim). Kunci ini juga tersimpan di browser ini.')}<br /><code className="wrap">{reclaimWif}</code></p>}
+            {reclaimWif && f.levy.trim() && <p className="small">🏪 {tr('More stalls want in after launch? Open the rally link + #/reclaim with this key and use “Open the stall”: the vault mints the new stall its minter on chain, so you can sell stall slots while the rally runs.', 'Ada warung lain yang mau ikut setelah rally jalan? Buka link rally + #/reclaim dengan kunci ini lalu pakai “Buka warung”: vault mencetak minter warung baru di chain, jadi kamu bisa menjual slot warung selama rally berjalan.')}</p>}
           </div>
         </div>
       ) : (<>
