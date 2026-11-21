@@ -37,6 +37,13 @@ const clips = {
     await page.goto(SITE + '?lang=en#/till/1', { waitUntil: 'networkidle' });
     await pause(page, 4500);
   },
+  // the till while a real stamp is bought (run scripts/buy-one.mjs during this): waits for the bell, up to 3 min
+  async tillLive(page) {
+    await page.goto(SITE + '?lang=en#/till/1', { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: /sale bell/i }).click().catch(() => {});
+    await page.getByText(/since this screen opened/).waitFor({ timeout: 180000 });
+    await pause(page, 4000);
+  },
   // stall dashboard and all seasons, recomputed from the chain
   async stats(page) {
     await page.goto(SITE + '?lang=en#/stats', { waitUntil: 'networkidle' });
