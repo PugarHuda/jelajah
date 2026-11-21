@@ -72,7 +72,7 @@ export async function buildStamp({ rally, provider, minters, merchantId, buyerLo
   const subsidy = pool ? (await pool.getUtxos()).find((u) => !u.token && u.satoshis === BigInt(rally.sponsor.value)) : null;
   if (voucher && !subsidy) throw new Error('The sponsor has no subsidy left');
   const off = subsidy ? subsidy.satoshis : 0n;
-  const { picked, sum } = pickCoins(coins, price + levy - off + DUST + STAMP_FEE + DUST);
+  const { picked, sum } = pickCoins(coins, price + levy - off + DUST + STAMP_FEE + 546n); // change must clear the 546-sat dust limit
   // levy rallies take the stall's presence signature (ignored by stalls without a presenceKey)
   const unlock = rally.minter === 3 ? minter.unlock.stamp(presence ?? new Uint8Array(64)) : minter.unlock.stamp();
   const tb = new TransactionBuilder({ provider, allowImplicitFungibleTokenBurn: !!subsidy }).addInput(minterUtxo, unlock);

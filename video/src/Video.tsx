@@ -24,7 +24,7 @@ const SCENES: Scene[] = [
   ...(hasPhone ? [{ s: 10, render: () => <Phone /> }] : []),
   clip('story.webm', 12.5, 'The rally', <>Stamps from 3 <em>different</em> stalls → a reward and a trophy that works as a member card.</>, 0.3, 1.25),
   { s: 7, render: () => <Levy /> },
-  clip('till.webm', 5, 'For the stall', <>The till rings the moment a stamp is paid.</>, 0.5, 1),
+  clip('tillLive.webm', 7, 'For the stall', <>A real mainnet sale: the till rings the moment a stamp is paid.</>, 17.5, 1),
   clip('stats.webm', 6, 'Nothing to fake', <>Every number is recomputed from the chain, across every season.</>, 8, 1),
   clip('organize.webm', 7, 'Anyone can run one', <>Open a rally from the browser. The contract rules are checked before your wallet signs.</>, 0.4, 1.2),
   { s: 8, render: () => <Proof /> },

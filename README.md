@@ -2,7 +2,7 @@
 
 ![The four Jelajah Jogja stamps and the trophy](public/stamps.png)
 
-**Live demo:** https://jelajah-bch.vercel.app (mirror: https://pugarhuda.github.io/jelajah/) · **Deck (Widget Factory template):** https://jelajah-bch.vercel.app/deck.pdf · **Video (73 s):** https://jelajah-bch.vercel.app/jelajah.mp4
+**Live demo:** https://jelajah-bch.vercel.app (mirror: https://pugarhuda.github.io/jelajah/) · **Deck (Widget Factory template):** https://jelajah-bch.vercel.app/deck.pdf · **Video (75 s):** https://jelajah-bch.vercel.app/jelajah.mp4 (vertical: https://jelajah-bch.vercel.app/jelajah-vertical.mp4) · **Media Track entry:** https://dorahacks.io/buidl/51515
 
 **For judges, in 60 seconds:** [the story in 6 panels](https://jelajah-bch.vercel.app/#/story) · [live levy rally genesis](https://blockchair.com/bitcoin-cash/transaction/e0ed3240f589bafe01996f2a8f54a4f32077ecb212df24a7cfcdb2ab6c19752e) · [a mainnet claim that paid the reward and minted a trophy](https://blockchair.com/bitcoin-cash/transaction/0e071a4648f8ac6ab48bf97f48e72ff473dfd5af3fa3bc6a131e5974ab528b33) · [the same claim through the XO engine](https://blockchair.com/bitcoin-cash/transaction/70efa57cbf453afedf32efd76bbc8ef513fb4d7105d473c79afd537de8b3ac0e) · [stats read from the chain](https://jelajah-bch.vercel.app/#/stats) · [a stall's printable poster](https://jelajah-bch.vercel.app/#/stall/1) · `npm run check` runs 84 VM checks of the contracts.
 
@@ -111,6 +111,7 @@ The live demo is a **levy rally**: `StampMinter3` + `RewardVault2`, the anti-col
 - Genesis: [`e0ed3240…`](https://blockchair.com/bitcoin-cash/transaction/e0ed3240f589bafe01996f2a8f54a4f32077ecb212df24a7cfcdb2ab6c19752e) · category `6dd1cc7da85cdb72d7cbe597a505b11197173ebb25c3e49e079c778ac1a5cbf3`
 - Reward vault: `bitcoincash:rwh78jaglz5vvz5w793d3zlsw6unl574tn8h5r0shrspwxmlztgmqdlj6sakf`
 - BCMR metadata, hash-committed in the genesis: [`bcmr-levy.json`](https://pugarhuda.github.io/jelajah/bcmr-levy.json)
+- First levy stamp (Kopi Joss, 1,500 sats to the stall + 2,500 levy to the pool), caught live by the till in the video: [`8718bc42…`](https://blockchair.com/bitcoin-cash/transaction/8718bc42c871cd9e5cb37c0a51c2aced4e488457a3678412161497692b5ea98e)
 
 ## Mainnet rally v2 (19 Nov 2026, retired)
 Rally v2 (`StampMinter2`, no levy) was the demo until 21 Nov; its record is `scripts/rally.mainnet-v2.json` and its stamps keep their BCMR in `bcmr.json`. Pool: 4 rewards × 5,000 sats + 1,000 sats dust.
