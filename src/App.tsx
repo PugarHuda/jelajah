@@ -7,8 +7,8 @@ import { generateSecretKey, getPublicKey, finalizeEvent, type NostrEvent } from 
 import { SimplePool } from 'nostr-tools/pool';
 import { nip19 } from 'nostr-tools';
 import { RELAYS, NIP39_KIND, rallyEvent, findRallies, buildProofTx, linkEvent, nip39Event, findVerified, loginChallenge, loginEvent, checkLogin } from './lib/identity.js';
-import { rally, provider, minters, vault, rallyLink, fromLink, passportFromLink, type Merchant, type Rally } from './chain';
-import { stallSales, isVoucher, buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane, buildReclaim, buildAddStall, buildPassportClaim, isTrophyOf } from './lib/tx.js';
+import { rally, provider, minters, vault, rallyLink, fromLink, passportFromLink, officialRallies, rallyFromPayload, type Merchant, type Rally } from './chain';
+import { genesisMatches, stallSales, isVoucher, buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane, buildReclaim, buildAddStall, buildPassportClaim, isTrophyOf } from './lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, receiveZeroCoin, type Coin } from './wallet';
 import { Stamp, Trophy } from './Stamp';
 import { SLIDES_URL, REPO_URL, VOTE_ADDRESS } from './links';
@@ -178,8 +178,8 @@ function Rally() {
         <section className="hero">
           <p className="eyebrow">{rally.name} · {tr('a stamp rally on Bitcoin Cash', 'stamp rally di Bitcoin Cash')}</p>
           {ID
-            ? <h1>Jajan di {rally.needed} warung.<br />Kumpulkan {rally.needed} stamp.<br /><em>Uangmu kembali.</em></h1>
-            : <h1>Eat at {rally.needed} stalls.<br />Collect {rally.needed} stamps.<br /><em>Get paid back.</em></h1>}
+            ? <h1>Jajan di {rally.needed} warung.<br />Kumpulkan {rally.needed} stamp.<br /><em>Dapat hadiah.</em></h1>
+            : <h1>Eat at {rally.needed} stalls.<br />Collect {rally.needed} stamps.<br /><em>Get rewarded.</em></h1>}
           {ID ? (<>
             <p className="lede">
               Bayar di warung dan stamp NFT-nya tercetak <b>di transaksi yang sama</b>. Bakar satu set lengkap, kontrak rally
@@ -353,9 +353,10 @@ function StallPoster({ m }: { m?: Merchant }) {
       <Stamp m={m} inked size={180} />
       <h1>{m.name}</h1>
       {m.place && <a className="place" href={mapUrl(m.place)} target="_blank" rel="noreferrer">📍 {m.place}</a>}
-      <p className="lede">{tr(`Pay here with Bitcoin Cash and get the ${m.name} stamp. Collect ${rally.needed} → get paid back.`, `Bayar di sini pakai Bitcoin Cash dan dapat stamp ${m.name}. Kumpulkan ${rally.needed} → uangmu kembali.`)}</p>
+      <p className="lede">{tr(`Pay here with Bitcoin Cash and get the ${m.name} stamp. Collect ${rally.needed} → get a reward.`, `Bayar di sini pakai Bitcoin Cash dan dapat stamp ${m.name}. Kumpulkan ${rally.needed} → dapat hadiah.`)}</p>
       <img className="qr" src={qr.createDataURL(8, 16)} alt={tr(`QR code to ${m.name}'s stall in the rally`, `Kode QR ke warung ${m.name} di rally`)} />
       <p className="muted small">{url}</p>
+      <p className="small">{tr('For the stall:', 'Untuk warung:')} <a href={`#/till/${m.id}`} onClick={() => setTimeout(() => location.reload())}>🔔 {tr('open the till (rings on every sale)', 'buka kasir (berbunyi tiap ada penjualan)')}</a></p>
       <a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a>
     </main>
   );
@@ -727,7 +728,7 @@ function IdentityPage() {
       const r = await findVerified(pool, q.includes(':') ? { address: q } : { nostrPubkey: q.startsWith('npub') ? (nip19.decode(q).data as string) : q }, provider);
       pool.close(RELAYS);
       if (r.ok) { // reputation that travels: this rally's stamps and trophies held by the verified address
-        const held = (await provider.getUtxos(r.address!)).filter((u) => isRallyNft(rally, u));
+        const held = (await provider.getUtxos(r.address!)).filter((u) => officialRallies.some((x) => isRallyNft(x, u)));
         setFound({ ...r, stamps: held.filter((u) => !u.token!.nft!.commitment.startsWith('00')).length, trophies: held.filter((u) => u.token!.nft!.commitment.startsWith('00')).length });
       } else setFound(r);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); }
@@ -769,7 +770,7 @@ function IdentityPage() {
         ? <div className="claim ready"><div>
           <h3>✅ {tr('Verified', 'Terverifikasi')}</h3>
           <p className="small">{nip19.npubEncode(found.nostrPubkey!)} ⇄ <code className="wrap">{found.address}</code></p>
-          <p className="muted small">{tr('BCH proof', 'Bukti BCH')} <a href={explorerTx(found.txid!)} target="_blank" rel="noreferrer">{found.txid!.slice(0, 16)}…</a> · {rally.name}: {found.stamps} stamp, {found.trophies} 🏆</p>
+          <p className="muted small">{tr('BCH proof', 'Bukti BCH')} <a href={explorerTx(found.txid!)} target="_blank" rel="noreferrer">{found.txid!.slice(0, 16)}…</a> · {tr(`Jelajah (${officialRallies.length} rallies)`, `Jelajah (${officialRallies.length} rally)`)}: {found.stamps} stamp, {found.trophies} 🏆</p>
           <p className="small"><a href={`${found.address}?message=${encodeURIComponent('via Jelajah ID')}`}>{tr('Pay this identity in your wallet →', 'Bayar identitas ini di wallet-mu →')}</a></p>
         </div></div>
         : <p className="error">✗ {found.reason}</p>)}
@@ -968,6 +969,7 @@ function Device() {
         {buyer && !parsed && <p className="error">{tr("That isn't a Jelajah buyer code.", 'Itu bukan kode pembeli Jelajah.')}</p>}
         {sig && <><img className="qr" src={qrImage(sig)} alt={tr('Signed code for the buyer', 'Kode bertanda tangan untuk pembeli')} /><code className="wrap small">{sig}</code></>}
       </>)}
+      {m && <p className="small"><a href={`#/till/${m.id}`} onClick={() => setTimeout(() => location.reload())}>🔔 {tr('Open this stall’s till', 'Buka kasir warung ini')}</a></p>}
       <p className="muted small">{tr('The code works once, for this buyer, at this stall, in this rally: a screenshot is useless to anyone else, and to them after they buy.', 'Kode ini berlaku sekali, untuk pembeli ini, di warung ini, di rally ini: screenshot tidak berguna bagi orang lain, dan bagi mereka setelah membeli.')}</p>
     </main>
   );
@@ -1048,7 +1050,7 @@ function ring(ctx: AudioContext | null) {
 
 // ---- #/u/<BCH address or npub>: a collector's page. What they hold in this rally, read from the chain, and their
 // verified Nostr identity (Jelajah ID) if they linked one. Shareable: nothing here is self-reported.
-type ProfileData = { address: string; npub?: string; stamps: Record<number, number>; bought: number; trophies: number; bonus: number };
+type ProfileData = { address: string; npub?: string; stamps: Record<number, number>; bought: number; trophies: number; bonus: number; record: { r: Rally; stamps: number; trophies: number }[] };
 function Profile() {
   const q = decodeURIComponent(location.hash.slice('#/u/'.length)).trim();
   const [p, setP] = useState<ProfileData | null>(null);
@@ -1072,11 +1074,17 @@ function Profile() {
         npub = nip19.npubEncode(pk);
       }
       const pkh = binToHex((cashAddressToLockingBytecode(address) as { bytecode: Uint8Array }).bytecode.slice(3, 23));
-      const held = (await provider.getUtxos(address)).filter((u) => isRallyNft(rally, u)).map((u) => u.token!.nft!.commitment);
+      const utxos = await provider.getUtxos(address);
+      // reputation that spans rallies: what this address holds in every official Jelajah rally on this network
+      const record = officialRallies.map((r) => {
+        const c = utxos.filter((u) => isRallyNft(r, u)).map((u) => u.token!.nft!.commitment);
+        return { r, stamps: c.filter((x) => !x.startsWith('00')).length, trophies: c.filter((x) => x.startsWith('00')).length };
+      }).filter((x) => x.stamps + x.trophies > 0);
+      const held = utxos.filter((u) => isRallyNft(rally, u)).map((u) => u.token!.nft!.commitment);
       const stamps: Record<number, number> = {};
       held.filter((c) => !c.startsWith('00')).forEach((c) => { const s = parseInt(c.slice(0, 2), 16); stamps[s] = (stamps[s] ?? 0) + 1; });
       const trophies = held.filter((c) => c.startsWith('00'));
-      setP({ address, npub, stamps, bought: held.filter((c) => !c.startsWith('00') && c.slice(2, 42) === pkh).length, trophies: trophies.length, bonus: trophies.filter((c) => c.length > 42).length });
+      setP({ address, npub, record, stamps, bought: held.filter((c) => !c.startsWith('00') && c.slice(2, 42) === pkh).length, trophies: trophies.length, bonus: trophies.filter((c) => c.length > 42).length });
     })().catch((e) => setErr(e instanceof Error ? e.message : String(e))).finally(() => pool.close(RELAYS));
   }, [q]);
   return (
@@ -1093,6 +1101,10 @@ function Profile() {
         <p>{tr(`${Object.keys(p.stamps).length}/${rally.merchants.length} stalls in hand · ${p.bought} stamps bought by this address · ${p.trophies} trophies`,
           `${Object.keys(p.stamps).length}/${rally.merchants.length} warung di tangan · ${p.bought} stamp dibeli alamat ini · ${p.trophies} trofi`)}{p.bonus > 0 && ` (${p.bonus} bonus)`}</p>
         {p.trophies > 0 && <div className="trophies">{Array.from({ length: Math.min(p.trophies, 6) }, (_, i) => <Trophy key={i} name={rally.name} bonus={i < p.bonus} size={96} />)}</div>}
+        {p.record.length > 0 && (<>
+          <h2>{tr('Across Jelajah rallies', 'Di semua rally Jelajah')}</h2>
+          <ul>{p.record.map(({ r, stamps: n, trophies: t }) => <li key={r.category}>{r.name} {r.category === officialRallies[0]?.category ? tr('(live)', '(aktif)') : tr('(earlier)', '(sebelumnya)')} · <a href={explorerTx(r.genesisTx)} target="_blank" rel="noreferrer">{r.genesisTx.slice(0, 8)}…</a>: {n} stamp, {t} 🏆</li>)}</ul>
+        </>)}
         <p className="muted small">{tr('Read from the chain just now. Stamps bought by this address are the ones it can claim a reward with; traded stamps are collectibles.', 'Dibaca dari chain barusan. Stamp yang dibeli alamat ini yang bisa diklaim hadiahnya; stamp hasil tukar hanya koleksi.')}</p>
         <p className="small">{tr('Share this page', 'Bagikan halaman ini')}: <code className="wrap">{location.href}</code></p>
       </>)}
@@ -1103,20 +1115,32 @@ function Profile() {
 
 // ---- #/rallies: community rallies listed on Nostr by their organizers (from #/organize). Discovery without a server.
 function Rallies() {
-  const [list, setList] = useState<{ name: string; r: string; pubkey: string; created_at: number }[] | null>(null);
+  const [list, setList] = useState<{ name: string; r: string; pubkey: string; created_at: number; onChain?: boolean }[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     const pool = new SimplePool();
-    findRallies(pool, rally.network).then(setList, (e) => setErr(String(e))).finally(() => pool.close(RELAYS));
+    findRallies(pool, rally.network).then(async (found: { name: string; r: string; pubkey: string; created_at: number }[]) => {
+      // a listing whose link doesn't parse is dropped; one whose genesis doesn't match the chain stays, unbadged
+      const checked = await Promise.all(found.map(async (x) => {
+        const r = await rallyFromPayload(x.r);
+        return r && r.network === rally.network ? { ...x, onChain: await genesisMatches({ rally: r, provider }) } : null;
+      }));
+      setList(checked.filter((x) => x !== null));
+    }, (e) => setErr(String(e))).finally(() => pool.close(RELAYS));
   }, []);
   return (
     <main className="organize">
       <p className="eyebrow">{rally.network === 'mainnet' ? 'BCH mainnet' : 'chipnet (test)'} · Nostr</p>
       <h1>{tr('Community rallies', 'Rally komunitas')}</h1>
       <p className="lede">{tr('Rallies their organizers listed on public Nostr relays. Anyone can list one: check who runs it before you buy. Each rally is checked again when you open it.', 'Rally yang didaftarkan penyelenggaranya di relay Nostr publik. Siapa pun bisa mendaftarkan: cek siapa penyelenggaranya sebelum membeli. Setiap rally dicek ulang saat dibuka.')}</p>
+      <h2>{tr('Official', 'Resmi')}</h2>
+      <ul>{officialRallies.map((r, i) => <li key={r.category}>{i === 0
+        ? <a href={location.pathname + (rally.network === 'chipnet' ? '?net=chipnet' : '')}>{r.name} · {tr('live', 'aktif')}</a>
+        : <>{r.name} · {tr('earlier', 'sebelumnya')}</>} <span className="muted small">· <a href={explorerTx(r.genesisTx)} target="_blank" rel="noreferrer">{r.genesisTx.slice(0, 8)}…</a></span></li>)}</ul>
+      <h2>{tr('Community', 'Komunitas')}</h2>
       {list === null && !err && <p className="muted">{tr('Asking the relays…', 'Bertanya ke relay…')}</p>}
       {list?.length === 0 && <p className="muted">{tr('None listed yet.', 'Belum ada.')} <a href="#/organize" onClick={() => setTimeout(() => location.reload())}>{tr('Open one →', 'Buka satu →')}</a></p>}
-      <ul>{list?.map((x) => <li key={x.pubkey + x.r.slice(0, 24)}><a href={`${location.pathname}?r=${x.r}`}>{x.name || tr('(untitled)', '(tanpa nama)')}</a> <span className="muted small">· {nip19.npubEncode(x.pubkey).slice(0, 14)}… · {new Date(x.created_at * 1000).toLocaleDateString(ID ? 'id-ID' : 'en-US')}</span></li>)}</ul>
+      <ul>{list?.map((x) => <li key={x.pubkey + x.r.slice(0, 24)}><a href={`${location.pathname}?r=${x.r}`}>{x.name || tr('(untitled)', '(tanpa nama)')}</a> {x.onChain ? <span className="small" title={tr('Its genesis on chain locks the prize vault this link describes', 'Genesis-nya di chain mengunci vault hadiah yang dijelaskan link ini')}>✓ {tr('on chain', 'di chain')}</span> : <span className="small error">✗ {tr('not found on chain', 'tidak ada di chain')}</span>} <span className="muted small">· {nip19.npubEncode(x.pubkey).slice(0, 14)}… · {new Date(x.created_at * 1000).toLocaleDateString(ID ? 'id-ID' : 'en-US')}</span></li>)}</ul>
       {err && <p className="error" role="alert">{err}</p>}
       {back}
     </main>

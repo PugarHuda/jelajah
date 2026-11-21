@@ -178,6 +178,20 @@ const ofRally = (rally, o) => o?.token && binToHex(o.token.category) === rally.c
 const spends = (rally, c) => ({ tx }) => ofRally(rally, tx.outputs[0]) && tx.outputs[0].token.nft?.capability === 'minting'
   && binToHex(tx.outputs[0].lockingBytecode) === binToHex(cashAddressToLockingBytecode(c.address).bytecode);
 
+/** Is this rally really on chain? Its genesis tx (hash-checked) must lock the vault's minting NFT of the rally's
+ *  category at the vault address the rally's own parameters give. Used to badge community rallies before opening. */
+export async function genesisMatches({ rally, provider }) {
+  try {
+    const raw = hexToBin(await provider.getRawTransaction(rally.genesisTx));
+    if (binToHex(sha256.hash(sha256.hash(raw)).reverse()) !== rally.genesisTx) return false;
+    const tx = decodeTransaction(raw);
+    if (typeof tx === 'string') return false;
+    const vaultLock = binToHex(cashAddressToLockingBytecode(rallyContracts(rally, provider).vault.address).bytecode);
+    return tx.outputs.some((o) => binToHex(o.lockingBytecode) === vaultLock && o.token?.nft?.capability === 'minting'
+      && binToHex(o.token.category) === rally.category);
+  } catch { return false; }
+}
+
 /** Every real sale at one stall: { ids: confirmed txids looked at, sales: [{ id, buyerPkh, paid, confirmed }] }. Pass
  *  the previous `ids` as `skip` to poll cheaply (the stall's till page); unconfirmed ones come back until they confirm. */
 export async function stallSales({ rally, provider, minter, merchantId, skip }) {

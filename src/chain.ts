@@ -28,7 +28,7 @@ export const rallyLink = async (r: Rally) =>
   `${location.origin}${location.pathname}?r=${toB64u(await pipe(new TextEncoder().encode(JSON.stringify(r)), new CompressionStream('deflate-raw')))}`;
 
 // The link is untrusted input: keep only well-formed rallies, and only values that are safe to render and style.
-function parseRally(json: string | null): Rally | undefined {
+export function parseRally(json: string | null): Rally | undefined {
   if (!json) return undefined;
   try {
     const r = JSON.parse(json) as Rally;
@@ -65,6 +65,13 @@ export const passportFromLink = ((json: string | null): Passport | undefined => 
   } catch { return undefined; }
 })(params.get('pp') ? await inflate(params.get('pp')!) : null);
 // a passport link runs on its own network (the wallet and provider follow `rally.network`)
+/** A rally from a ?r= payload (deflate-raw, base64url), shape- and rule-checked like a link. */
+export const rallyFromPayload = async (r: string) => parseRally(await inflate(r));
+// Every official rally on this network, the live one first, then retired ones kept in scripts/ (reputation spans all).
+const archived = Object.values(import.meta.glob<{ default: Partial<Rally> }>('../scripts/rally.*.json', { eager: true })).map((m) => m.default)
+  .filter((r): r is Rally => typeof r.category === 'string' && typeof r.network === 'string');
 export const rally: Rally = fromLink ?? (passportFromLink ? byNet(passportFromLink.network) : undefined) ?? (pick ? byNet(pick) : undefined) ?? byNet('mainnet') ?? byNet('chipnet')!;
 export const provider = new ElectrumNetworkProvider(rally.network);
 export const { minters, vault } = rallyContracts(rally, provider);
+const live = byNet(rally.network); // not `rally`: that may be a community rally opened from a link
+export const officialRallies: Rally[] = [...(live ? [live] : []), ...archived.filter((r) => r.network === rally.network && r.category !== live?.category)];

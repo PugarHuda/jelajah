@@ -1,0 +1,14 @@
+{
+  "name": "Jelajah · stamp rally on Bitcoin Cash",
+  "short_name": "Jelajah",
+  "description": "Pay a stall, get its stamp NFT in the same transaction; burn a full set for a reward and a trophy.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f5eedf",
+  "theme_color": "#f5eedf",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
