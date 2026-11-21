@@ -2,16 +2,69 @@
 
 BUIDL: https://dorahacks.io/buidl/51463. Attach `public/stamps.png` (or a screen recording of a purchase) to the X post.
 
-## X post (@BangDropID), single post (272/280 by X's count)
+## X posts (@BangDropID, Premium): 4 posts, each quoting the one before
+
+### Post 1 
+_attach `public/stamps.png`_
 
 Jelajah is live on Bitcoin Cash mainnet 🍜
 
-A stamp rally for Jogja street food: pay a warung, get its stamp NFT in the same tx. Collect 3: reward + a trophy that's your member card.
+It's a stamp rally for Jogja street food. Pay a warung and its stamp NFT is printed in that same transaction. Collect stamps from 3 different stalls, burn them, and the rally's contract pays you a reward and mints your trophy. The trophy then works as a member card: every stall gives you a lower price.
 
-No server. Stalls can't drain the pool.
+There's no sign-up and no server, and nobody holds the prize money. It sits in a covenant until someone completes a set.
 
-https://jelajah-bch.vercel.app
+Try it with Selene or Paytaca: https://jelajah-bch.vercel.app
+
 #BCHBLAZE2026 @bchblaze
+
+### Post 2 (quotes post 1)
+_attach `public/icon-512.png` or a photo of a warung_
+
+Why a stamp rally?
+
+Japan's train stations have eki stamps. Malls and food festivals in Indonesia run stamp promos on paper cards. People love collecting them. But a paper stamp is easy to fake, and the prize only arrives if the organizer keeps their word.
+
+Jelajah puts the card on Bitcoin Cash:
+• the stamp is printed by the payment itself, so every stamp is a real, paid visit
+• the prize sits in a covenant, not in anyone's pocket
+• your trophy becomes a member card: a lower price at every stall, and it comes straight back to you in the same tx
+
+For a warung in Jogja that means customers walking over from the stall next door. No app to install, no server, no sign-up.
+
+#BCHBLAZE2026 @bchblaze
+
+### Post 3 (quotes post 2)
+_attach a screenshot of the rally page_
+
+The question every BCH dev asked me: what if the stalls collude and refund the buyer?
+
+That's why the live mainnet rally is a levy rally. Each stamp pays 1,500 sats to the stall plus a 2,500 sat levy into the prize pool. A set's own levies pay its reward, so colluding stalls only end up paying themselves. Anyone can fold the levies into the vault without a signature, and the covenant only ever lets the pool grow.
+
+What's left over goes back to the organizer when the rally ends, so running a rally is a business too.
+
+Genesis: https://blockchair.com/bitcoin-cash/transaction/e0ed3240f589bafe01996f2a8f54a4f32077ecb212df24a7cfcdb2ab6c19752e
+Try it with Selene or Paytaca (about 12k sats in, 3k back): https://jelajah-bch.vercel.app
+
+#BCHBLAZE2026 @bchblaze
+
+### Post 4 (quotes post 3)
+_attach a screenshot of `#/till/1` or `#/stats`_
+
+Side quests from #BCHBLAZE2026, all of them run on mainnet:
+
+🧩 XO: the whole journey (buy → claim) as an XO template, byte for byte the live covenants
+https://blockchair.com/bitcoin-cash/transaction/70efa57cbf453afedf32efd76bbc8ef513fb4d7105d473c79afd537de8b3ac0e
+🌱 FoldingCash: Merkle pull-claims, with the root rotated behind a CSV timelock
+https://blockchair.com/bitcoin-cash/transaction/aebb5f332e1acf52f04f01cd9fad7005966465476e0c634ca022d1761ee5891a
+🧪 SolidCash: a stall's loyalty card, full lifecycle, plus an upstream PR
+🪪 Jelajah ID: your BCH address ↔ your npub, ✓ in an independent verifier
+🔔 a till for the stall that rings the moment a stamp is paid
+
+Built solo from Jogja in 8 days.
+Code: https://github.com/PugarHuda/jelajah
+BUIDL: https://dorahacks.io/buidl/51463
+
+@bchblaze
 
 ## Telegram (BCH BLAZE group)
 
