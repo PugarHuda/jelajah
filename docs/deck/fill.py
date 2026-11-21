@@ -91,7 +91,7 @@ set_lines(S[108], [
 # 5 — BCH usage
 set_lines(S[116], [
     'BCH Usage', '',
-    "A stall's covenant releases its stamp only if the stall got paid, and every stamp pays a levy into the pool. The vault loops over your stamps, pays you from those levies, mints a trophy.",
+    "A stall's covenant releases a stamp only if the stall got paid, and each stamp's levy funds your reward. Only on BCH: sub-cent fees, native NFTs, covenants with no EVM or bridge.",
 ])
 
 # 6 — vision
