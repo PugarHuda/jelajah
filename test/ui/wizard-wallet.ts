@@ -58,6 +58,21 @@ export class TestWallet {
     if (need > 0n) console.warn(`[test wallet] short by ${need} chipnet sats at ${this.address('change', 0)}; the app will say if it is not enough`);
   }
 
+  /** Pay an address from this wallet's plain coins (what a person does after scanning an address QR). */
+  async pay(to: string, amount: bigint) {
+    const b = new TransactionBuilder({ provider });
+    let total = 0n, n = 0n;
+    for (const [path, i] of [['receive', 0], ['change', 0]] as const) {
+      const k = this.key(path, i);
+      for (const u of (await provider.getUtxos(this.address(path, i))).filter((x) => !x.token)) { b.addInput(u, new SignatureTemplate(k).unlockP2PKH()); total += u.satoshis; n++; }
+    }
+    const change = total - amount - 300n - 150n * n;
+    if (change < 0n) throw new Error(`test wallet holds ${total} sats, cannot pay ${amount}`);
+    b.addOutput({ to, amount });
+    if (change >= 546n) b.addOutput({ to: this.address('change', 0), amount: change });
+    return (await b.send()).txid;
+  }
+
   /** Pair with the dapp from the URI under its QR, the way a phone does after scanning it. */
   connect(uri: string) {
     const walletKey = randomBytes(32);
