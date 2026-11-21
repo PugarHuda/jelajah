@@ -1,0 +1,19 @@
+{
+  "name": "jelajah-video",
+  "private": true,
+  "type": "module",
+  "description": "Jelajah demo video: Playwright screen captures of the live app, composed in Remotion",
+  "scripts": {
+    "capture": "node capture.mjs",
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts Jelajah out/jelajah.mp4",
+    "render:vertical": "remotion render src/index.ts JelajahVertical out/jelajah-vertical.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.545",
+    "@remotion/google-fonts": "^4.0.545",
+    "react": "19.2.1",
+    "react-dom": "19.2.1",
+    "remotion": "4.0.545"
+  }
+}
