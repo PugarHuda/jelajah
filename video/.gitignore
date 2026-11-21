@@ -2,4 +2,4 @@ node_modules/
 out/
 .capture-tmp/
 
-video/public/clips/
+# clips are kept in git so the video can be re-rendered
