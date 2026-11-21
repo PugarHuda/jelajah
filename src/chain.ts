@@ -4,7 +4,7 @@ import { rallyContracts, checkRallyConfig } from './lib/tx.js';
 export interface Merchant { id: number; name: string; tagline: string; taglineId?: string; emoji: string; color: string; price: number; memberPrice?: number; lock: string; presenceKey?: string; place?: string }
 export interface Rally {
   network: 'chipnet' | 'mainnet'; name: string; description: string; category: string; vmCategory: string;
-  needed: number; reward: number; endTime: number; organizerPub: string; merchants: Merchant[]; genesisTx: string; minter?: 2 | 3; lanes?: number; levy?: number; bonusNeeded?: number; bonusReward?: number;
+  needed: number; reward: number; endTime: number; organizerPub: string; merchants: Merchant[]; genesisTx: string; minter?: 2 | 3 | 4; lanes?: number; levy?: number; bonusNeeded?: number; bonusReward?: number; streakDays?: number; streakReward?: number;
   sponsor?: { name: string; category: string; vmCategory: string; value: number; sponsorPub: string; endTime: number; genesisTx?: string };
 }
 
@@ -37,10 +37,10 @@ export function parseRally(json: string | null): Rally | undefined {
       && hex(r.genesisTx, 64) && hex(r.organizerPub, 66) && Array.isArray(r.merchants) && r.merchants.length > 0
       // payouts must be standard P2PKH or P2SH32 scripts
       && r.merchants.every((m) => Number.isInteger(m.id) && /^(76a914[0-9a-f]{40}88ac|aa20[0-9a-f]{64}87)$/.test(m.lock) && Number.isInteger(m.price))
-      && [r.needed, r.reward, r.endTime].every(Number.isInteger) && [undefined, 2, 3].includes(r.minter)
+      && [r.needed, r.reward, r.endTime].every(Number.isInteger) && [undefined, 2, 3, 4].includes(r.minter)
       && (r.sponsor === undefined || (r.minter === 3 && hex(r.sponsor.category, 64) && hex(r.sponsor.vmCategory, 64) && hex(r.sponsor.sponsorPub, 66)
         && Number.isInteger(r.sponsor.value) && Number.isInteger(r.sponsor.endTime) && r.merchants.every((m) => r.sponsor!.value < (m.memberPrice ?? m.price))))
-      && (r.minter !== 3 || Number.isInteger(r.levy)) && (r.bonusNeeded === undefined || (Number.isInteger(r.bonusNeeded) && Number.isInteger(r.bonusReward))) && (r.lanes === undefined || (Number.isInteger(r.lanes) && r.lanes >= 1 && r.lanes <= 8));
+      && ((r.minter ?? 1) < 3 || Number.isInteger(r.levy)) && (r.minter !== 4 || (Number.isInteger(r.streakDays) && (r.streakDays ?? 0) >= 2 && Number.isInteger(r.streakReward))) && (r.bonusNeeded === undefined || (Number.isInteger(r.bonusNeeded) && Number.isInteger(r.bonusReward))) && (r.lanes === undefined || (Number.isInteger(r.lanes) && r.lanes >= 1 && r.lanes <= 8));
     if (!ok) return undefined;
     checkRallyConfig({ ...r, rewardsInPool: 1 }); // the same economic rules the CLI enforces (throws -> ignored below)
     if (r.sponsor) r.sponsor.name = String(r.sponsor.name ?? 'sponsor').slice(0, 40);

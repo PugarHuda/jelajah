@@ -7,8 +7,8 @@ import { ElectrumNetworkProvider, SignatureTemplate } from 'cashscript';
 import { secp256k1, hash160, encodeLockingBytecodeP2pkh, lockingBytecodeToCashAddress, decodePrivateKeyWif } from '@bitauth/libauth';
 import { rallyContracts, buildStamp } from '../src/lib/tx.js';
 
-const { values: { network, stall } } = parseArgs({ options: { network: { type: 'string', default: 'chipnet' }, stall: { type: 'string', default: '1' } } });
-const rally = JSON.parse(readFileSync(new URL(`../src/rally.${network}.json`, import.meta.url)));
+const { values: { network, stall, rally: rallyFile } } = parseArgs({ options: { network: { type: 'string', default: 'chipnet' }, stall: { type: 'string', default: '1' }, rally: { type: 'string' } } });
+const rally = JSON.parse(readFileSync(new URL(rallyFile ? `../${rallyFile}` : `../src/rally.${network}.json`, import.meta.url))); // --rally scripts/x.json for another rally
 const m = rally.merchants.find((x) => x.id === Number(stall));
 if (!m) throw new Error(`no stall ${stall}`);
 if (m.presenceKey) throw new Error('this stall needs its device to sign: use the app');

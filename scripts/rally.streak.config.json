@@ -1,0 +1,17 @@
+{
+  "name": "Jelajah Streak (chipnet demo)",
+  "description": "Dated stamps (StampMinter4): buy on 3 days in a row for the streak reward. Every stamp pays a levy, so a backdated streak pays for itself.",
+  "needed": 3,
+  "reward": 500,
+  "rewardsInPool": 1,
+  "durationDays": 30,
+  "merchants": [
+    { "id": 1, "name": "Kopi Joss", "tagline": "Charcoal coffee by the station", "emoji": "☕", "color": "#7a4a2b", "price": 1000, "memberPrice": 900 },
+    { "id": 2, "name": "Bakmi Jawa", "tagline": "Wood-fire noodles", "emoji": "🍜", "color": "#c2410c", "price": 1000, "memberPrice": 900 },
+    { "id": 3, "name": "Sate Klathak", "tagline": "Goat satay on bicycle spokes", "emoji": "🍢", "color": "#b91c1c", "price": 1000, "memberPrice": 900 }
+  ],
+  "lanes": 1,
+  "levy": 1500,
+  "streakDays": 3,
+  "streakReward": 500
+}

@@ -276,7 +276,7 @@ export async function stallSales({ rally, provider, minter, merchantId, skip }) 
   const txs = await txsOf(rally, provider, minter, skip);
   const sales = txs.filter(spends(rally, minter))
     .filter(({ tx }) => ofRally(rally, tx.outputs[2]) && tx.outputs[2].token.nft?.commitment[0] === merchantId)
-    .map(({ id, tx, confirmed }) => ({ id, buyerPkh: binToHex(tx.outputs[2].token.nft.commitment.slice(1)), paid: tx.outputs[1].valueSatoshis, confirmed }));
+    .map(({ id, tx, confirmed }) => ({ id, buyerPkh: binToHex(tx.outputs[2].token.nft.commitment.slice(1, 21)) /* dated stamps carry 2 day bytes */, paid: tx.outputs[1].valueSatoshis, confirmed }));
   return { ids: txs.filter((t) => t.confirmed).map((t) => t.id), sales };
 }
 

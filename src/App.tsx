@@ -3,7 +3,7 @@ import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
 import { hexToBin, secp256k1, sha256 } from '@bitauth/libauth';
 import { type Utxo } from 'cashscript';
 import { rally, provider, minters, vault, fromLink, passportFromLink, officialRallies, type Merchant, type Rally } from './chain';
-import { rallyContracts, isVoucher, buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, presenceMessage, presenceCode, pickLane } from './lib/tx.js';
+import { rallyContracts, isVoucher, buildStamp, buildClaim, buildStreak, isRallyNft, rallyStats, mergeLevies, presenceMessage, presenceCode, pickLane } from './lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, type Coin } from './wallet';
 import { Stamp, Trophy } from './Stamp';
 import { StallPoster } from './pages/StallPoster';
@@ -126,15 +126,26 @@ function Rally() {
 
   const claim = () => run(tr('🏆 Set claimed: reward + trophy', '🏆 Set diklaim: hadiah + trofi'), async () => {
     const fresh = await walletCoins(wc.manager!);
-    const hexPkh = hex(lock!.slice(3, 23));
     // unsigned, so no wallet prompt; if it fails (e.g. a racing merge) the claim still uses the current vault coin
     const vaultUtxo = (await mergeLevies({ rally, provider, vault }).catch(() => null)) ?? undefined;
     const { builder, inputs } = await buildClaim({
       rally, provider, vault, buyerLock: lock!, vaultUtxo,
-      stamps: fresh.filter((c) => isRallyNft(rally, c.utxo) && stallOf(c) > 0 && c.utxo.token!.nft!.commitment.slice(2) === hexPkh),
+      stamps: fresh.filter((c) => isRallyNft(rally, c.utxo) && stallOf(c) > 0 && mine(c)),
       coins: fresh.filter((c) => !c.utxo.token), bonus,
     });
     return signAndSend(wc.manager!, builder, inputs, tr(`Burn ${burn} stamps for ${sats(prize)} + a trophy`, `Bakar ${burn} stamp untuk ${sats(prize)} + trofi`));
+  });
+
+  // streak rallies (minter 4): dated stamps from `streakDays` days in a row -> the streak reward + a streak trophy
+  const streak = () => run(tr('🔥 Streak claimed', '🔥 Streak diklaim'), async () => {
+    const fresh = await walletCoins(wc.manager!);
+    const vaultUtxo = (await mergeLevies({ rally, provider, vault }).catch(() => null)) ?? undefined;
+    const { builder, inputs } = await buildStreak({
+      rally, provider, vault, buyerLock: lock!, vaultUtxo,
+      stamps: fresh.filter((c) => isRallyNft(rally, c.utxo) && stallOf(c) > 0 && mine(c)),
+      coins: fresh.filter((c) => !c.utxo.token),
+    });
+    return signAndSend(wc.manager!, builder, inputs, tr(`Burn ${rally.streakDays} stamps from ${rally.streakDays} days in a row for ${sats(rally.streakReward!)}`, `Bakar ${rally.streakDays} stamp dari ${rally.streakDays} hari berturut-turut untuk ${sats(rally.streakReward!)}`));
   });
 
   return (
@@ -241,6 +252,11 @@ function Rally() {
             <button className="primary big" disabled={!ready || !!busy} onClick={claim}>
               {busy?.startsWith('🏆') ? tr('Approve in wallet…', 'Setujui di wallet…') : tr(`Claim ${bonus ? 'bonus ' : ''}${sats(prize)} + trophy`, `Klaim ${bonus ? 'bonus ' : ''}${sats(prize)} + trofi`)}
             </button>
+            {rally.minter === 4 && (
+              <button className="big" disabled={!connected || !!busy} onClick={streak} title={tr('Stamps bought on consecutive days (UTC), any stalls', 'Stamp yang dibeli di hari berturut-turut (UTC), warung mana saja')}>
+                {busy?.startsWith('🔥') ? tr('Approve in wallet…', 'Setujui di wallet…') : tr(`🔥 ${rally.streakDays}-day streak: ${sats(rally.streakReward!)}`, `🔥 Streak ${rally.streakDays} hari: ${sats(rally.streakReward!)}`)}
+              </button>
+            )}
           </div>
           {!connected && <p className="hint">{tr("Connect a wallet (Selene, Paytaca, Cashonize) to start. Each stamp costs the stall's price plus a tiny network fee.", 'Hubungkan wallet (Selene, Paytaca, Cashonize) untuk mulai. Tiap stamp seharga warungnya ditambah biaya jaringan yang sangat kecil.')}</p>}
           {rally.sponsor && (

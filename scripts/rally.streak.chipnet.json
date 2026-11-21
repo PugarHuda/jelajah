@@ -1,0 +1,49 @@
+{
+  "network": "chipnet",
+  "name": "Jelajah Streak (chipnet demo)",
+  "description": "Dated stamps (StampMinter4): buy on 3 days in a row for the streak reward. Every stamp pays a levy, so a backdated streak pays for itself.",
+  "category": "2fdf1541b9bc119229857a7a58b9c867367b74ef196fe3a1a9696a0e001a533e",
+  "vmCategory": "3e531a000e6a69a9a1e36f19ef747b3667c8b9587a7a85299211bcb94115df2f",
+  "needed": 3,
+  "reward": 500,
+  "endTime": 1797869036,
+  "organizerPub": "033f41a2eaf9fa8a2d9a21ada58031094cdce2981627120f09ac80332a32b693cd",
+  "lanes": 1,
+  "minter": 4,
+  "levy": 1500,
+  "streakDays": 3,
+  "streakReward": 500,
+  "merchants": [
+    {
+      "id": 1,
+      "name": "Kopi Joss",
+      "tagline": "Charcoal coffee by the station",
+      "emoji": "☕",
+      "color": "#7a4a2b",
+      "price": 1000,
+      "memberPrice": 900,
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+    },
+    {
+      "id": 2,
+      "name": "Bakmi Jawa",
+      "tagline": "Wood-fire noodles",
+      "emoji": "🍜",
+      "color": "#c2410c",
+      "price": 1000,
+      "memberPrice": 900,
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+    },
+    {
+      "id": 3,
+      "name": "Sate Klathak",
+      "tagline": "Goat satay on bicycle spokes",
+      "emoji": "🍢",
+      "color": "#b91c1c",
+      "price": 1000,
+      "memberPrice": 900,
+      "lock": "76a9147d72774e699e049195bf07c909b021be91f10a6288ac"
+    }
+  ],
+  "genesisTx": "e5a957b8029f2ab761164eb0534a1c5de06b2174d109e64184854ef758c94903"
+}
