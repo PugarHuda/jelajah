@@ -296,7 +296,7 @@ function Rally() {
         {log.length > 0 && (
           <section className="log">
             <h2>{tr('Your transactions', 'Transaksimu')}</h2>
-            <ul>{log.map((l) => <li key={l.txid}>{l.label} · <a href={explorerTx(l.txid)} target="_blank" rel="noreferrer">{l.txid.slice(0, 12)}…</a></li>)}</ul>
+            <ul>{log.map((l) => <li key={l.txid}>{l.label} · <a href={explorerTx(l.txid)} target="_blank" rel="noreferrer">{l.txid.slice(0, 12)}…</a> · <a href={shareUrl(l.label, l.txid)} target="_blank" rel="noreferrer">{tr('Share', 'Bagikan')} ↗</a></li>)}</ul>
           </section>
         )}
 
@@ -369,6 +369,7 @@ function StallPoster({ m }: { m?: Merchant }) {
       <p className="muted small">{url}</p>
       <p className="row no-print"><button className="primary" onClick={() => print()}>🖨 {tr('Print this poster (A4)', 'Cetak poster ini (A4)')}</button></p>
       <p className="small no-print">{tr('For the stall:', 'Untuk warung:')} <a href={`#/till/${m.id}`} onClick={() => setTimeout(() => location.reload())}>🔔 {tr('open the till (rings on every sale)', 'buka kasir (berbunyi tiap ada penjualan)')}</a></p>
+      <p className="small no-print">📄 <a href={`${import.meta.env.BASE_URL}stall-guide.pdf`} target="_blank" rel="noreferrer">{tr('One-page guide for stall owners (PDF)', 'Panduan satu halaman untuk pemilik warung (PDF)')}</a></p>
       <details className="no-print"><summary className="small">{tr('Till QR for the stall’s phone (keep it off the printed poster)', 'QR kasir untuk HP warung (jangan ikut dicetak)')}</summary>
         <img className="qr" src={qrImage(url.replace(`#stall-${m.id}`, `#/till/${m.id}`))} alt={tr('QR code to this stall’s till', 'Kode QR ke kasir warung ini')} /></details>
       <img className="poster-logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="Jelajah" width={56} height={56} />
@@ -853,7 +854,7 @@ function Stats() {
   useEffect(() => { rallyStats({ rally, provider, minters, vault }).then(setS, (e) => setErr(String(e))); }, []);
   // all seasons: every official rally on this network is a season; trophies and stamps add up per collector (on demand:
   // it reads each rally's whole history)
-  const [seasons, setSeasons] = useState<{ pkh: string; trophies: number; stamps: number; seasons: number }[] | 'loading' | null>(null);
+  const [seasons, setSeasons] = useState<{ pkh: string; trophies: number; stamps: number; seasons: number; streak?: number }[] | 'loading' | null>(null);
   async function loadSeasons() {
     setSeasons('loading');
     try {
@@ -863,7 +864,9 @@ function Stats() {
         const x = by.get(c.pkh) ?? { pkh: c.pkh, trophies: 0, stamps: 0, seasons: 0 };
         by.set(c.pkh, { ...x, trophies: x.trophies + c.trophies, stamps: x.stamps + c.stamps, seasons: x.seasons + 1 });
       }));
-      setSeasons([...by.values()].sort((a, b) => b.trophies - a.trophies || b.seasons - a.seasons || b.stamps - a.stamps).slice(0, 10));
+      const top = [...by.values()].sort((a, b) => b.trophies - a.trophies || b.seasons - a.seasons || b.stamps - a.stamps).slice(0, 10);
+      const today = todayWib(); // 🔥 across seasons: a stamp in any official rally keeps the streak alive
+      setSeasons(await Promise.all(top.map(async (c) => ({ ...c, streak: streakOf(await stampDays({ rally, rallies: officialRallies, provider, address: addressOf(hexToBin(`76a914${c.pkh}88ac`)), pkh: c.pkh }).catch(() => []), today) }))));
     } catch (e) { setErr(String(e)); setSeasons(null); }
   }
   useEffect(() => {
@@ -913,8 +916,8 @@ function Stats() {
       {seasons === 'loading' && <p className="muted">{tr('Reading every season…', 'Membaca semua musim…')}</p>}
       {Array.isArray(seasons) && (seasons.length === 0 ? <p className="muted">{tr('No collectors yet.', 'Belum ada kolektor.')}</p> : (
         <table>
-          <thead><tr><th>{tr('Collector', 'Kolektor')}</th><th>{tr('Seasons', 'Musim')}</th><th>Stamp{ID ? '' : 's'}</th><th>{tr('Trophies', 'Trofi')}</th></tr></thead>
-          <tbody>{seasons.map((c) => <tr key={c.pkh}><td><a href={`#/u/${addressOf(hexToBin(`76a914${c.pkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}><code>{shortAddr(c.pkh)}</code></a></td><td>{c.seasons}</td><td>{c.stamps}</td><td>{c.trophies}</td></tr>)}</tbody>
+          <thead><tr><th>{tr('Collector', 'Kolektor')}</th><th>{tr('Seasons', 'Musim')}</th><th>Stamp{ID ? '' : 's'}</th><th>{tr('Trophies', 'Trofi')}</th><th title={tr('Consecutive days with a stamp in any season', 'Hari berturut-turut dengan stamp di musim mana pun')}>🔥</th></tr></thead>
+          <tbody>{seasons.map((c) => <tr key={c.pkh}><td><a href={`#/u/${addressOf(hexToBin(`76a914${c.pkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}><code>{shortAddr(c.pkh)}</code></a></td><td>{c.seasons}</td><td>{c.stamps}</td><td>{c.trophies}</td><td>{c.streak || ''}</td></tr>)}</tbody>
         </table>
       ))}
       <a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a>
@@ -930,6 +933,8 @@ const mapUrl = (place: string) => {
   return ll ? `https://www.openstreetmap.org/?mlat=${ll[1]}&mlon=${ll[2]}#map=18/${ll[1]}/${ll[2]}` : `https://www.openstreetmap.org/search?query=${encodeURIComponent(place)}`;
 };
 
+// a receipt anyone can check: the post carries the tx link, so the claim proves itself (no server, no image to fake)
+const shareUrl = (label: string, txid: string) => `https://x.com/intent/post?text=${encodeURIComponent(`${label} on ${rally.name}, a stamp rally on Bitcoin Cash. On chain: ${explorerTx(txid)}\n\n${location.origin}${location.pathname} #BCHBLAZE2026`)}`;
 const qrImage = (text: string) => { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createDataURL(6, 8); };
 
 /** Scan one QR with the camera. Only where the browser has BarcodeDetector; everyone can still paste the code. */

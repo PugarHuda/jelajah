@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Jelajah: guide for stalls</title>
+<!-- One A4 page for a stall owner. Rendered to public/stall-guide.pdf by docs/stall-guide.cjs -->
+<style>
+  @page { size: A4; margin: 0; }
+  html { background: #f5eedf; }
+  body { font: 13.5px/1.5 system-ui, sans-serif; color: #2a1d14; background: #f5eedf; margin: 0; padding: 16mm; }
+  h1 { font: 800 34px/1.1 Georgia, serif; margin: 0 0 4px; }
+  .sub { color: #6f5e50; margin: 0 0 18px; font-size: 15px; }
+  ol { padding: 0; margin: 0; list-style: none; counter-reset: s; display: grid; gap: 12px; }
+  li { counter-increment: s; background: #fffaf0; border: 2px solid #e4d7c3; border-radius: 14px; padding: 12px 16px 12px 58px; position: relative; }
+  li::before { content: counter(s); position: absolute; left: 14px; top: 12px; width: 30px; height: 30px; border-radius: 99px; background: #b3261e; color: #fff; font-weight: 800; display: grid; place-items: center; }
+  b.t { display: block; font-size: 15.5px; margin-bottom: 2px; }
+  code { background: #efe4d1; padding: 1px 5px; border-radius: 5px; }
+  .box { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .box div { border: 2px dashed #b3261e; border-radius: 14px; padding: 10px 14px; }
+  .foot { margin-top: 14px; color: #6f5e50; font-size: 12px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+</style></head><body>
+<div class="brand"><img src="../public/favicon.svg" width="52" height="52" alt=""><div><h1>Jelajah for stalls</h1><p class="sub">Get paid in Bitcoin Cash and bring in new customers. One page, five steps.</p></div></div>
+<ol>
+  <li><b class="t">Print your poster</b>Open <code>jelajah-bch.vercel.app/#/stall/&lt;your number&gt;</code> and press <i>Print this poster (A4)</i>. Tape it next to where people pay. Its QR code takes customers straight to your stall in the rally.</li>
+  <li><b class="t">Open the till on your phone</b>On the same page, open <i>Till QR for the stall's phone</i> and scan it. Press <i>Turn on the sale bell</i> and keep the screen open. It rings the moment a stamp payment reaches the network.</li>
+  <li><b class="t">A customer pays</b>They scan the poster and press <i>Buy</i> in Selene or Paytaca. One wallet prompt: your price goes straight to your own wallet, and their stamp NFT is printed in the same transaction. The contract checks the price, so a short payment can't get a stamp.</li>
+  <li><b class="t">Check and serve</b>The till shows the amount and the buyer. <code>⏳ unconfirmed</code> turns final in about 10 minutes; for a small order you can serve right away, for a big one wait for it.</li>
+  <li><b class="t">Keep your records</b>Press <i>Download sales (CSV)</i> on the till any time. Every number comes from the chain, so it matches what anyone else can count on <code>#/stats</code>.</li>
+</ol>
+<div class="box">
+  <div><b>Why customers come back</b><br>Stamps from 3 different stalls pay them a reward from the prize pool and mint a trophy. The trophy is a member card: a lower price at every stall, checked by the contract.</div>
+  <div><b>Why the prize is safe</b><br>Each stamp pays a small levy into the pool, and each set's own levies pay its reward. Stalls that fake purchases between themselves only pay themselves. No one holds the pool: a contract does.</div>
+</div>
+<p class="foot">Jelajah · a stamp rally on Bitcoin Cash · jelajah-bch.vercel.app · code: github.com/PugarHuda/jelajah · no sign-up, no server</p>
+</body></html>

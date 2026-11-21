@@ -184,7 +184,7 @@ const wibDay = (unix) => new Date((unix + 7 * 3600) * 1000).toISOString().slice(
 
 /** Days (WIB) on which this address bought a stamp of the rally for itself, from confirmed txs, each hash-checked.
  *  ponytail: reads the last 40 txs of the address; enough for a profile badge, page through history if it matters. */
-export async function stampDays({ rally, provider, address, pkh }) {
+export async function stampDays({ rally, rallies = [rally], provider, address, pkh }) { // rallies: count stamps of any of them (all seasons)
   const hist = (await provider.performRequest('blockchain.address.get_history', address)).filter((h) => h.height > 0).slice(-40);
   const days = await Promise.all(hist.map(async ({ tx_hash: id, height }) => {
     const raw = hexToBin(await provider.getRawTransaction(id));
@@ -192,9 +192,10 @@ export async function stampDays({ rally, provider, address, pkh }) {
     const tx = decodeTransaction(raw);
     if (typeof tx === 'string') throw new Error(tx);
     // a stamp mint: the rally's minter at out[0] and a stamp (not a trophy) for this pkh among the outputs
-    if (!(ofRally(rally, tx.outputs[0]) && tx.outputs[0].token.nft?.capability === 'minting')) return null;
+    const r = rallies.find((x) => ofRally(x, tx.outputs[0]) && tx.outputs[0].token.nft?.capability === 'minting');
+    if (!r) return null;
     const mine = (o) => { const c = o.token.nft.commitment && binToHex(o.token.nft.commitment); return !c.startsWith('00') && c.slice(2, 42) === pkh; };
-    if (!tx.outputs.some((o) => ofRally(rally, o) && o.token.nft?.capability === 'none' && mine(o))) return null;
+    if (!tx.outputs.some((o) => ofRally(r, o) && o.token.nft?.capability === 'none' && mine(o))) return null;
     const header = await provider.performRequest('blockchain.block.header', height);
     const t = hexToBin(header).slice(68, 72);
     return wibDay(t[0] | t[1] << 8 | t[2] << 16 | t[3] * 2 ** 24);

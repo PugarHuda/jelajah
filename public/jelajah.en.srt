@@ -1,0 +1,39 @@
+1
+00:00:00,300 --> 00:00:03,604
+Jelajah. A stamp rally on Bitcoin Cash.
+
+2
+00:00:04,800 --> 00:00:09,016
+Paper stamp cards are easy to fake, and the prize is only a promise.
+
+3
+00:00:10,300 --> 00:00:18,548
+With Jelajah, you pay a street food stall in Jogja, and its stamp NFT is printed in the very same transaction. Live on mainnet.
+
+4
+00:00:21,300 --> 00:00:30,004
+Collect stamps from three different stalls. Burn the set, and the rally's contract pays you back, and mints a trophy that works as your member card.
+
+5
+00:00:33,600 --> 00:00:40,096
+What if stalls collude? Every stamp pays a levy into the pool, so each set's own levies pay its reward.
+
+6
+00:00:40,800 --> 00:00:45,856
+For the stall, the till rings the moment a stamp is paid. This one is a real sale.
+
+7
+00:00:47,800 --> 00:00:51,968
+Every number is recomputed from the chain. Nothing to fake.
+
+8
+00:00:53,800 --> 00:00:57,536
+And anyone can open their own rally, right from the browser.
+
+9
+00:01:00,800 --> 00:01:06,216
+All of it runs on Bitcoin Cash mainnet. Built solo, from Jogja, in eight days.
+
+10
+00:01:08,800 --> 00:01:12,080
+Jelajah. Eat, collect, get rewarded.
