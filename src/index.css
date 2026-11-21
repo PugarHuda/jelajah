@@ -151,3 +151,20 @@ video.scan { width: 100%; max-width: 360px; border-radius: 12px; display: block;
 code.wrap { word-break: break-all; }
 .device input.code { max-width: 420px; }
 .place { display: inline-block; margin: .1rem 0 .5rem; color: var(--muted); text-decoration: none; } .place:hover { text-decoration: underline; }
+
+/* #/story: six comic-style panels */
+.story { padding-top: 2.5rem; max-width: 980px; }
+.panels { list-style: none; padding: 0; margin: 1.5rem 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.1rem; }
+.panel { position: relative; background: var(--card); border: 2px solid var(--ink); border-radius: 14px; padding: 1rem 1.1rem 1.2rem; box-shadow: 5px 5px 0 var(--line); }
+.panel:nth-child(even) { transform: rotate(.6deg); }
+.panel:nth-child(odd) { transform: rotate(-.5deg); }
+.panel-tag { position: absolute; top: -.8rem; left: 1rem; background: var(--accent); color: var(--accent-ink); font-weight: 650; font-size: .8rem; padding: .15rem .6rem; border-radius: 99px; }
+.panel-art { display: flex; justify-content: center; align-items: center; min-height: 170px; }
+.panel p { margin: .6rem 0 0; line-height: 1.55; }
+.scene { display: flex; align-items: center; justify-content: center; gap: .6rem; font-size: 4rem; }
+.scene.stack > * { margin-left: -1.6rem; }
+.scene.stack > :first-child { margin-left: 0; }
+.scene .ring { font-size: 2.6rem; animation: ring 1.2s ease-in-out infinite; }
+@keyframes ring { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(-18deg); } 40% { transform: rotate(14deg); } 60% { transform: rotate(-8deg); } }
+@media (prefers-reduced-motion: reduce) { .scene .ring { animation: none; } .panel { transform: none !important; } }
+a.primary.big { display: inline-block; text-decoration: none; }
