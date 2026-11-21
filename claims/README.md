@@ -74,6 +74,16 @@ node claims/cli.mjs activate --network chipnet     # after `delay` blocks
 
 `claim` can be sent by anyone on a folder's behalf, because the tokens can only go to the folder. That makes the **auto-claim relayer** stretch goal a non-custodial script with no special rights.
 
+## Mainnet run (21 Nov 2026)
+
+The same lifecycle on **BCH mainnet** (test FLDCH token, real October + November FoldingCash folders in the tree):
+- Proposal authority genesis [`7b0afe05…`](https://blockchair.com/bitcoin-cash/transaction/7b0afe05c207cd3b8027efc2b3316b227f131287aabeea08474d5ca3b2414071) · test FLDCH genesis [`ef77d43e…`](https://blockchair.com/bitcoin-cash/transaction/ef77d43ec8ab7be7fe34d68b95ec6fc216412ebf0b1cb358ba26c6ba9841ba1d) · keeper NFT genesis [`35165a92…`](https://blockchair.com/bitcoin-cash/transaction/35165a9273fb23b06ab27111ec655fc6a0d536dea05487ceee5797393f80a526)
+- Pool funded with 300 leaves: [`c4d2eb5c…`](https://blockchair.com/bitcoin-cash/transaction/c4d2eb5c38ebd0f66516c135658bdb68512e1e8dd473124b320be4c5cfb7574e)
+- Claim against the October root (2,361 bytes, depth-16 proofs): [`cb2e5a51…`](https://blockchair.com/bitcoin-cash/transaction/cb2e5a51488c88e4f78d1afc9229efd10ba6d044da8c2ea1347439fcb1bf6df8)
+- Epoch 1 (November data) proposed [`5eeb0e23…`](https://blockchair.com/bitcoin-cash/transaction/5eeb0e239738692b3e7186b0dc42ad1ae06b667b62cbd9727a61e77e2afeb71d), activated after the 2-block CSV delay [`c7b58ccf…`](https://blockchair.com/bitcoin-cash/transaction/c7b58ccf310ed3659760d657590f5e5e56191dde18b41c8b1e43420fedd47b8f) (an earlier attempt was refused by mainnet nodes: `non-BIP68-final`)
+- Claim against the new root: [`aebb5f33…`](https://blockchair.com/bitcoin-cash/transaction/aebb5f332e1acf52f04f01cd9fad7005966465476e0c634ca022d1761ee5891a). A claimer with nothing new in the November tree is refused locally (`nothing to claim`), and the covenant would refuse it too.
+- `sync` replayed both claims from mainnet, and the rebuilt claimed root **matches** the keeper. State: [`state.mainnet.json`](state.mainnet.json).
+
 ## Chipnet run (17 Nov 2026)
 
 - Proposal authority genesis: [`49bd559d…`](https://chipnet.imaginary.cash/tx/49bd559d26986318683d56e974ddbf03cf1847ac02eeefc3cdb9ee6a13ddd7ae)
