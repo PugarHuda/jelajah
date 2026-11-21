@@ -1,10 +1,10 @@
-// Check xo/built.json against the BCH 2026 VM using the real source outputs from chipnet.
+// Check xo/built.json against the BCH 2026 VM using the real source outputs from chipnet (or NET=mainnet).
 import { readFileSync } from 'node:fs';
 import { ElectrumNetworkProvider } from 'cashscript';
 import { createVirtualMachineBch2026, decodeTransaction, hexToBin, binToHex } from '@bitauth/libauth';
 const built = JSON.parse(readFileSync(new URL('./built.json', import.meta.url)));
 const tx = decodeTransaction(hexToBin(built.serializedTransaction));
-const provider = new ElectrumNetworkProvider('chipnet');
+const provider = new ElectrumNetworkProvider(process.env.NET === 'mainnet' ? 'mainnet' : 'chipnet');
 const sourceOutputs = [];
 for (const i of tx.inputs) {
   const prev = decodeTransaction(hexToBin(await provider.getRawTransaction(binToHex(i.outpointTransactionHash))));

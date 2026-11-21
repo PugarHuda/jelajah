@@ -1,4 +1,4 @@
-// Claim a Jelajah set through the XO engine on chipnet: burn stamps from `needed` different stalls (bought with
+// Claim a Jelajah set through the XO engine (chipnet, or NET=mainnet): burn stamps from `needed` different stalls (bought with
 // buy-stamp.mjs, all to the account's fixed buyer address) at the live RewardVault for the reward + a trophy.
 //   node xo/buy-stamp.mjs 1 && node xo/buy-stamp.mjs 2 && node xo/buy-stamp.mjs 3 && node xo/claim-set.mjs
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -10,15 +10,20 @@ import { jelajahStampTemplate } from './jelajah-template.mjs';
 import { rallyContracts } from '../src/lib/tx.js';
 
 const here = (p) => new URL(p, import.meta.url);
-const rally = JSON.parse(readFileSync(here('./rally.chipnet-v1.json')));
-const { mnemonic, buyer } = JSON.parse(readFileSync(here('.wallet.chipnet.json')));
+// NET=mainnet runs against the retired-but-live mainnet rally v1 (same original StampMinter + RewardVault); default chipnet
+const net = process.env.NET === 'mainnet' ? 'mainnet' : 'chipnet';
+const prefix = net === 'mainnet' ? 'bitcoincash' : 'bchtest';
+const explorer = net === 'mainnet' ? 'https://blockchair.com/bitcoin-cash/transaction/' : 'https://chipnet.imaginary.cash/tx/';
+const rallyFile = net === 'mainnet' ? '../scripts/rally.mainnet-v1.json' : './rally.chipnet-v1.json';
+const rally = JSON.parse(readFileSync(here(rallyFile)));
+const { mnemonic, buyer } = JSON.parse(readFileSync(here(`.wallet.${net}.json`)));
 if (!buyer) throw new Error('buy stamps with xo/buy-stamp.mjs first');
 const pkh = buyer.slice(6, 46);
-const provider = new ElectrumNetworkProvider('chipnet');
+const provider = new ElectrumNetworkProvider(net);
 const { vault } = rallyContracts(rally, provider);
 
 // the stamps: one per stall, bought by `buyer` (commitment = stall id ‖ pkh), lowest stall ids first
-const held = (await provider.getUtxos(lockingBytecodeToCashAddress({ bytecode: hexToBin(buyer), prefix: 'bchtest' }).address))
+const held = (await provider.getUtxos(lockingBytecodeToCashAddress({ bytecode: hexToBin(buyer), prefix }).address))
   .filter((u) => u.token?.category === rally.category && u.token.nft?.commitment.slice(2) === pkh);
 const byStall = new Map();
 for (const u of held) byStall.set(u.token.nft.commitment.slice(0, 2), u);
@@ -26,7 +31,7 @@ const stamps = [...byStall.entries()].sort(([a], [b]) => parseInt(a, 16) - parse
 if (stamps.length < rally.needed) throw new Error(`need stamps from ${rally.needed} stalls, have ${stamps.length}`);
 const [vaultCoin] = (await vault.getUtxos()).filter((u) => u.token?.nft?.capability === 'minting');
 
-const engine = await Engine.create(mnemonic, { network: XO_SUPPORTED_NETWORKS.chipnet });
+const engine = await Engine.create(mnemonic, { network: XO_SUPPORTED_NETWORKS[net] });
 try {
   const p2pkh = await engine.importTemplate(p2pkhTemplate);
   await engine.setDefaultPolicies({
@@ -95,7 +100,7 @@ try {
   // saved before executing: this engine build can throw while releasing reservations after a successful broadcast
   mkdirSync(here('invitations'), { recursive: true });
   const stored = await engine.getInvitation(id);
-  writeFileSync(here('invitations/claim-set-chipnet.json'), JSON.stringify(stored.invitation ?? stored, (_, val) => (typeof val === 'bigint' ? `<bigint: ${val}n>` : val instanceof Uint8Array ? `<Uint8Array: 0x${binToHex(val)}>` : val), 2));
+  writeFileSync(here(`invitations/claim-set-${net}.json`), JSON.stringify(stored.invitation ?? stored, (_, val) => (typeof val === 'bigint' ? `<bigint: ${val}n>` : val instanceof Uint8Array ? `<Uint8Array: 0x${binToHex(val)}>` : val), 2));
   let txid;
   try {
     txid = (await engine.executeAction(id, { broadcastTransaction: true })).builtTransaction.transactionHash;
@@ -105,7 +110,7 @@ try {
     console.log(`(engine after broadcast: ${e.name})`);
     txid = now.txid;
   }
-  console.log('set claimed via XO', `https://chipnet.imaginary.cash/tx/${txid}`);
+  console.log('set claimed via XO', `${explorer}${txid}`);
 } finally {
   await engine.stop();
 }

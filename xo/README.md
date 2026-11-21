@@ -63,5 +63,15 @@ The bounty asks for personally written feedback, so these are only the facts obs
 8. **Engine start-up syncs block headers** from its checkpoint (`The requested header is ahead of the current checkpoint`), and until it catches up, `listSpendableUnspentOutputs` can be empty for an account that has coins. The scripts now wait for the account's known coins before funding it again.
 9. With engine `0.1.1-next.18230317763`, `executeAction` broadcast successfully but then threw `UnspentOutputNotFoundInStoreError` (buy) or `DatabaseClosedError` (claim) while releasing reservations. `claim-set.mjs` saves the invitation before executing and confirms the claim by checking that the vault coin moved.
 
-## Not yet
-- Mainnet run (the XO bounty itself is judged on chipnet).
+10. **The engine's unspent-output records carry no token data.** When `buy-stamp.mjs` started passing every spendable coin (one coin was too small), the engine also spent the account's earlier stamps as plain BCH and the covenant tx burned them (mainnet [`1769075f…`](https://blockchair.com/bitcoin-cash/transaction/1769075f3cd0de73e6d31d5bb0873d44037943158d14ac066c1af178e995e569)). The script now asks Electrum which of the account's outpoints hold tokens and leaves those out. A token-aware `listSpendableUnspentOutputs` (or a "BCH only" filter) would prevent this for every XO wallet.
+
+## Mainnet (21 Nov 2026)
+`NET=mainnet` runs the same two actions against mainnet rally v1 (still live until 18 Jan 2027; original `StampMinter` + `RewardVault`, so the template's scripts match byte for byte). One XO buyer key:
+- stamps: stall 3 [`1769075f…`](https://blockchair.com/bitcoin-cash/transaction/1769075f3cd0de73e6d31d5bb0873d44037943158d14ac066c1af178e995e569), stall 1 [`5b99656b…`](https://blockchair.com/bitcoin-cash/transaction/5b99656b292f26ed3c78fc0dd24e2a519be2bb15f7af910bf5ee5dd41e887712), stall 2 [`c9ada3ec…`](https://blockchair.com/bitcoin-cash/transaction/c9ada3ec62ef46041ef34a58625edfd5455d55e911147593054e40ef9b8d5471) (stalls 1 and 2 were bought twice because of note 10)
+- **claim [`70efa57c…`](https://blockchair.com/bitcoin-cash/transaction/70efa57cbf453afedf32efd76bbc8ef513fb4d7105d473c79afd537de8b3ac0e)**: vault 25,000 → 20,000 sats, 5,000 to the buyer, trophy `00d69c6b…`. The dry run was VALID under the BCH 2026 VM before broadcasting (`NET=mainnet node xo/verify.mjs`).
+
+```bash
+NET=mainnet FUND=10000 node xo/buy-stamp.mjs 1     # funds a throwaway mainnet XO account once (never twice)
+NET=mainnet node xo/topup-buyer.mjs 3500           # if the account runs short
+NET=mainnet DRY=1 node xo/claim-set.mjs && NET=mainnet node xo/verify.mjs && NET=mainnet node xo/claim-set.mjs
+```
