@@ -27,6 +27,7 @@ const here = (p) => new URL(p, import.meta.url);
 const stateFile = here(`state.${network}.json`);
 const provider = new ElectrumNetworkProvider(network);
 const DEPTH = 16, DELAY = 2, LEAVES = 300;
+const CLAIMER_FUNDS = 5_000n; // each demo claimer pays its own claim fee (~3,000 sats)
 
 const wallet = (priv) => {
   const pub = secp256k1.derivePublicKeyCompressed(priv);
@@ -58,7 +59,7 @@ if (cmd === 'setup') {
 
   // a genesis spends a vout-0 outpoint; each genesis leaves its change at vout 0 for the next one
   let [c] = await bchCoins();
-  if (!c || c.utxo.satoshis < 30_000n) throw new Error(`fund ${operator.address} with 30000+ sats`);
+  if (!c || c.utxo.satoshis < 20_000n) throw new Error(`fund ${operator.address} with 20000+ sats`);
   if (c.utxo.vout !== 0) {
     const txid = await send('prepare vout-0', new TransactionBuilder({ provider }).addInput(c.utxo, c.unlocker).addOutput({ to: operator.lock, amount: c.utxo.satoshis - 1000n }));
     c = { utxo: { txid, vout: 0, satoshis: c.utxo.satoshis - 1000n, lockingBytecode: binToHex(operator.lock) }, unlocker: operator.sig.unlockP2PKH() };
@@ -86,8 +87,8 @@ if (cmd === 'setup') {
   const ft = (await operator.coins()).find((x) => x.utxo.token?.category === rewardCategory);
   const tb = new TransactionBuilder({ provider }).addInput(ft.utxo, ft.unlocker).addInput(c.utxo, c.unlocker)
     .addOutput({ to: pool.tokenAddress, amount: DUST, token: ft.utxo.token });
-  for (const d of Object.values(demo)) tb.addOutput({ to: d.lock, amount: 10_000n });
-  tb.addOutput({ to: operator.lock, amount: c.utxo.satoshis + ft.utxo.satoshis - DUST - 20_000n - 1500n });
+  for (const d of Object.values(demo)) tb.addOutput({ to: d.lock, amount: CLAIMER_FUNDS });
+  tb.addOutput({ to: operator.lock, amount: c.utxo.satoshis + ft.utxo.satoshis - DUST - CLAIMER_FUNDS * BigInt(Object.keys(demo).length) - 1500n });
   await send('fund pool + claimers', tb);
   const tokenCategory = rewardCategory;
   save({ network, cfg, tokenCategory, dist, claimed: {}, pool: pool.tokenAddress, keeper: keeper.tokenAddress });

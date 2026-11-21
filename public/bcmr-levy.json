@@ -1,0 +1,75 @@
+{
+  "$schema": "https://cashtokens.org/bcmr-v2.schema.json",
+  "version": {
+    "major": 1,
+    "minor": 0,
+    "patch": 0
+  },
+  "latestRevision": "2026-11-21T02:23:32.698Z",
+  "registryIdentity": {
+    "name": "Jelajah",
+    "description": "Stamp rallies on Bitcoin Cash",
+    "uris": {
+      "icon": "https://pugarhuda.github.io/jelajah/art/00.png",
+      "web": "https://pugarhuda.github.io/jelajah/"
+    }
+  },
+  "identities": {
+    "6dd1cc7da85cdb72d7cbe597a505b11197173ebb25c3e49e079c778ac1a5cbf3": {
+      "2026-11-21T02:23:32.698Z": {
+        "name": "Jelajah Jogja stamps",
+        "description": "Stamp rally across Yogyakarta street-food stalls. Every stamp pays a levy into the pool, so each set funds its own reward.",
+        "token": {
+          "category": "6dd1cc7da85cdb72d7cbe597a505b11197173ebb25c3e49e079c778ac1a5cbf3",
+          "symbol": "JELAJAH",
+          "nfts": {
+            "parse": {
+              "bytecode": "00d2517f75",
+              "types": {
+                "00": {
+                  "name": "Jelajah Jogja Trophy",
+                  "description": "Completed Jelajah Jogja",
+                  "uris": {
+                    "icon": "https://pugarhuda.github.io/jelajah/art/00.png"
+                  }
+                },
+                "01": {
+                  "name": "☕ Kopi Joss stamp",
+                  "description": "Charcoal coffee by the station",
+                  "uris": {
+                    "icon": "https://pugarhuda.github.io/jelajah/art/01.png"
+                  }
+                },
+                "02": {
+                  "name": "🍜 Bakmi Jawa stamp",
+                  "description": "Wood-fire noodles",
+                  "uris": {
+                    "icon": "https://pugarhuda.github.io/jelajah/art/02.png"
+                  }
+                },
+                "03": {
+                  "name": "🍢 Sate Klathak stamp",
+                  "description": "Goat satay on bicycle spokes",
+                  "uris": {
+                    "icon": "https://pugarhuda.github.io/jelajah/art/03.png"
+                  }
+                },
+                "04": {
+                  "name": "🥥 Es Dawet stamp",
+                  "description": "Iced coconut and palm sugar",
+                  "uris": {
+                    "icon": "https://pugarhuda.github.io/jelajah/art/04.png"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "uris": {
+          "icon": "https://pugarhuda.github.io/jelajah/art/00.png",
+          "web": "https://pugarhuda.github.io/jelajah/"
+        }
+      }
+    }
+  }
+}

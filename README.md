@@ -8,10 +8,10 @@
 
 **Not a loyalty card, a rally.** A loyalty card is one shop paying back its own customers. Jelajah puts **many independent stalls behind one shared prize pool** that pays only for stamps from *different* stalls, and the pool can't be drained even if stalls collude: in a levy rally, colluding stalls end up paying the prize themselves.
 
-**▶ Try it on mainnet in 2 minutes (net cost ≈ 3,000 sats).** Open https://jelajah-bch.vercel.app, press **Connect wallet** and scan with Selene or Paytaca (WizardConnect). Then:
-1. Buy at 3 stalls: 2,000 sats each, plus about 500 in fees.
-2. Press **Claim**: 5,000 sats come back, along with a Trophy NFT.
-3. Optional: buy once more and the button shows **★ member price**. Your trophy is your membership card.
+**▶ Try it on mainnet in 2 minutes (about 12,000 sats in, 3,000 back: a few US cents).** Open https://jelajah-bch.vercel.app, press **Connect wallet** and scan with Selene or Paytaca (WizardConnect). Then:
+1. Buy at 3 stalls: 4,000 sats each (1,500 to the stall + a 2,500 levy into the prize pool), plus about 500 in fees.
+2. Press **Claim**: 3,000 sats come back, along with a Trophy NFT. Your set's own levies paid that reward, which is why colluding stalls can't drain the pool.
+3. Optional: buy at the 4th stall too and the claim becomes the **bonus tier** (4,500 sats). Or buy again after claiming and the button shows **★ member price**: your trophy is your membership card.
 
 Every step is one wallet prompt, and each one is a real covenant transaction on BCH mainnet.
 
@@ -100,8 +100,14 @@ All four are tested against the VM first (`npm run check`, 68 checks, about 40 o
 - **Bonus trophies.** A bonus-tier claim mints `00 ‖ pkh ‖ 02`, drawn in violet with a star, and it works as a membership card too (`StampMinter3` checks the 21-byte prefix). Member stamp with a bonus trophy: [`e4fcbb7c…`](https://chipnet.imaginary.cash/tx/e4fcbb7c23a2a1cb764f4f1520bd17d3792e9088c40a047cb710bd70df83c9d1).
 - **UI tests:** `npm run test:ui` runs 8 Playwright tests against the production build: organizer rule checks, tampered links, the device signature, posters and the language switch.
 
-## Mainnet rally v2 (19 Nov 2026, live demo)
-The live demo runs **Jelajah Jogja on BCH mainnet** with `StampMinter2` (member price 1,800 sats for trophy holders) and **2 lanes per stall**. Add `?net=chipnet` for the test rally. Pool: 4 rewards × 5,000 sats + 1,000 sats dust. Open for 60 days.
+## Mainnet levy rally (21 Nov 2026, live demo)
+The live demo is a **levy rally**: `StampMinter3` + `RewardVault2`, the anti-collusion design, with a bonus tier, member prices and 2 lanes per stall. Add `?net=chipnet` for the test rally. Each stamp: 1,500 sats to the stall (1,200 for trophy holders) + 2,500 levy to the pool. Set of 3 different stalls → 3,000; all 4 → 4,500. Pool seeded with 4 rewards, and every set's levies refill it. Open for 60 days.
+- Genesis: [`e0ed3240…`](https://blockchair.com/bitcoin-cash/transaction/e0ed3240f589bafe01996f2a8f54a4f32077ecb212df24a7cfcdb2ab6c19752e) · category `6dd1cc7da85cdb72d7cbe597a505b11197173ebb25c3e49e079c778ac1a5cbf3`
+- Reward vault: `bitcoincash:rwh78jaglz5vvz5w793d3zlsw6unl574tn8h5r0shrspwxmlztgmqdlj6sakf`
+- BCMR metadata, hash-committed in the genesis: [`bcmr-levy.json`](https://pugarhuda.github.io/jelajah/bcmr-levy.json)
+
+## Mainnet rally v2 (19 Nov 2026, retired)
+Rally v2 (`StampMinter2`, no levy) was the demo until 21 Nov; its record is `scripts/rally.mainnet-v2.json` and its stamps keep their BCMR in `bcmr.json`. Pool: 4 rewards × 5,000 sats + 1,000 sats dust.
 - Genesis: [`4c96cba2…`](https://blockchair.com/bitcoin-cash/transaction/4c96cba232afc690f841ffa7b4e10680de7b3123df4836da50700fa208a2601d) (8 minter coins + vault) · category `082ad61858ea6ad7c75c7f2b1d2cbf8293a61e91fa46464b2e66c0dadcec24ad`
 - Reward vault: `bitcoincash:rv603w2k07qrq9dcasfl3u2es204lfzjk42njsnayqgk0gxz2p4xcmuvyrzjf`
 - BCMR metadata with stamp and trophy icons, hash-committed in the genesis: [`bcmr.json`](https://pugarhuda.github.io/jelajah/bcmr.json)

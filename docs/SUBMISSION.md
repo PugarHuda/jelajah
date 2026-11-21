@@ -30,10 +30,10 @@ Food festivals and malls in Jogja run stamp cards: eat at five stalls and win a 
 
 There is no sign-up, no server and no database. The prize is locked in a covenant, so the organiser can't take it back before the rally ends.
 
-**▶ Try it on mainnet in 2 minutes (net cost ≈ 3,000 sats).** Open https://jelajah-bch.vercel.app, press **Connect wallet** and scan with Selene or Paytaca (WizardConnect). Then:
-1. Buy at 3 stalls: 2,000 sats each, plus about 500 in fees.
-2. Press **Claim**: 5,000 sats come back, along with a Trophy NFT.
-3. Optional: buy once more and the button shows **★ member price**. Your trophy is your membership card.
+**▶ Try it on mainnet in 2 minutes (about 12,000 sats in, 3,000 back: a few US cents).** Open https://jelajah-bch.vercel.app, press **Connect wallet** and scan with Selene or Paytaca (WizardConnect). Then:
+1. Buy at 3 stalls: 4,000 sats each (1,500 to the stall + a 2,500 levy into the prize pool), plus about 500 in fees.
+2. Press **Claim**: 3,000 sats come back, along with a Trophy NFT. Your set's own levies paid that reward, which is why colluding stalls can't drain the pool.
+3. Optional: buy at the 4th stall too and the claim becomes the **bonus tier** (4,500 sats). Or buy again after claiming and the button shows **★ member price**: your trophy is your membership card.
 
 Every step is one wallet prompt, and each one is a real covenant transaction on BCH mainnet.
 
@@ -51,7 +51,7 @@ Every step is one wallet prompt, and each one is a real covenant transaction on 
 
 **Why it's a business:** organisers, malls and brands pay per rally, and every stamp is a paid visit they can prove. The anti-farming rule (reward < cheapest full set) means a stall can never profit from buying its own stamps.
 
-**Tech:** CashScript 0.14 (StampMinter 94 B, RewardVault 170 B), CashTokens, WizardConnect, React/Vite. The test suite runs every transaction against the BCH VM, including the attack cases. Tested end to end with Selene on chipnet. Run end to end on mainnet with the first rally: 3 stamps, then claim + trophy [`0e071a46…`](https://blockchair.com/bitcoin-cash/transaction/0e071a4648f8ac6ab48bf97f48e72ff473dfd5af3fa3bc6a131e5974ab528b33). The live demo is rally v2 on mainnet (genesis [`4c96cba2…`](https://blockchair.com/bitcoin-cash/transaction/4c96cba232afc690f841ffa7b4e10680de7b3123df4836da50700fa208a2601d), first v2 stamp [`8b3d8dec…`](https://blockchair.com/bitcoin-cash/transaction/8b3d8deccc37c42ec9e8850dc6483591ee524e5d4c672d89e04eb579ee5bd596)). The organizer page and proof of presence were also tested with Selene over WizardConnect on chipnet.
+**Tech:** CashScript 0.14 (StampMinter 94 B, RewardVault 170 B), CashTokens, WizardConnect, React/Vite. The test suite runs every transaction against the BCH VM, including the attack cases. Tested end to end with Selene on chipnet. Run end to end on mainnet with the first rally: 3 stamps, then claim + trophy [`0e071a46…`](https://blockchair.com/bitcoin-cash/transaction/0e071a4648f8ac6ab48bf97f48e72ff473dfd5af3fa3bc6a131e5974ab528b33). The live demo is now the **levy rally on mainnet** (anti-collusion + bonus tier, genesis [`e0ed3240…`](https://blockchair.com/bitcoin-cash/transaction/e0ed3240f589bafe01996f2a8f54a4f32077ecb212df24a7cfcdb2ab6c19752e)); before it, rally v2 ran there (genesis [`4c96cba2…`](https://blockchair.com/bitcoin-cash/transaction/4c96cba232afc690f841ffa7b4e10680de7b3123df4836da50700fa208a2601d), stamp [`8b3d8dec…`](https://blockchair.com/bitcoin-cash/transaction/8b3d8deccc37c42ec9e8850dc6483591ee524e5d4c672d89e04eb579ee5bd596)). The organizer page and proof of presence were also tested with Selene over WizardConnect on chipnet.
 
 **New in v2: your trophy is a membership card.** `StampMinter2` charges a member price when you show your own trophy, and the covenant forces the trophy straight back to you in the same transaction. Each stall also gets 2 minter "lanes", so buyers at a busy stall don't collide. Both are tested against the VM, including attacks, and on chipnet: member stamp [`14875f6d…`](https://chipnet.imaginary.cash/tx/14875f6d30c42372342efc84372e133c9061986be0074cc5197723f7276dac28).
 

@@ -1,15 +1,18 @@
 {
   "network": "mainnet",
   "name": "Jelajah Jogja",
-  "description": "Stamp rally across Yogyakarta street-food stalls. Buy at any 3 stalls, burn the stamps, get paid back and keep a trophy.",
-  "category": "082ad61858ea6ad7c75c7f2b1d2cbf8293a61e91fa46464b2e66c0dadcec24ad",
-  "vmCategory": "ad24ecdcdac0662e4b4646fa911ea69382bf2c1d2b7f5cc7d76aea5818d62a08",
+  "description": "Stamp rally across Yogyakarta street-food stalls. Every stamp pays a levy into the pool, so each set funds its own reward.",
+  "category": "6dd1cc7da85cdb72d7cbe597a505b11197173ebb25c3e49e079c778ac1a5cbf3",
+  "vmCategory": "f3cba5c18a779c079ee4c325bb3e179711b105a597e5cbd772db5ca87dccd16d",
   "needed": 3,
-  "reward": 5000,
-  "endTime": 1800237549,
+  "reward": 3000,
+  "endTime": 1800411812,
   "organizerPub": "027128dba06986defcfda3297557c35e2ff71b77c06d8d0da638553b5ef8290943",
-  "minter": 2,
   "lanes": 2,
+  "minter": 3,
+  "levy": 2500,
+  "bonusNeeded": 4,
+  "bonusReward": 4500,
   "merchants": [
     {
       "id": 1,
@@ -17,11 +20,11 @@
       "tagline": "Charcoal coffee by the station",
       "emoji": "☕",
       "color": "#7a4a2b",
-      "price": 2000,
+      "price": 1500,
       "taglineId": "Kopi arang dekat stasiun",
-      "memberPrice": 1800,
-      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac",
-      "place": "Jl. Wongsodirjan, Yogyakarta"
+      "memberPrice": 1200,
+      "place": "Jl. Wongsodirjan, Yogyakarta",
+      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac"
     },
     {
       "id": 2,
@@ -29,11 +32,11 @@
       "tagline": "Wood-fire noodles",
       "emoji": "🍜",
       "color": "#c2410c",
-      "price": 2000,
+      "price": 1500,
       "taglineId": "Mi godhog masak tungku",
-      "memberPrice": 1800,
-      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac",
-      "place": "Kotagede, Yogyakarta"
+      "memberPrice": 1200,
+      "place": "Kotagede, Yogyakarta",
+      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac"
     },
     {
       "id": 3,
@@ -41,11 +44,11 @@
       "tagline": "Goat satay on bicycle spokes",
       "emoji": "🍢",
       "color": "#b91c1c",
-      "price": 2000,
+      "price": 1500,
       "taglineId": "Sate kambing tusuk jeruji sepeda",
-      "memberPrice": 1800,
-      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac",
-      "place": "Jl. Imogiri Timur, Bantul"
+      "memberPrice": 1200,
+      "place": "Jl. Imogiri Timur, Bantul",
+      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac"
     },
     {
       "id": 4,
@@ -53,12 +56,12 @@
       "tagline": "Iced coconut and palm sugar",
       "emoji": "🥥",
       "color": "#15803d",
-      "price": 2000,
+      "price": 1500,
       "taglineId": "Es kelapa dan gula aren",
-      "memberPrice": 1800,
-      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac",
-      "place": "Pasar Beringharjo, Yogyakarta"
+      "memberPrice": 1200,
+      "place": "Pasar Beringharjo, Yogyakarta",
+      "lock": "76a9141aa5dc13a28843c8f44b6de3a9094b67029019ff88ac"
     }
   ],
-  "genesisTx": "4c96cba232afc690f841ffa7b4e10680de7b3123df4836da50700fa208a2601d"
+  "genesisTx": "e0ed3240f589bafe01996f2a8f54a4f32077ecb212df24a7cfcdb2ab6c19752e"
 }
