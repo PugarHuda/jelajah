@@ -56,7 +56,7 @@ export function Gift() {
     <main className="organize">
       <p className="eyebrow">{rally.network === 'mainnet' ? 'BCH mainnet' : 'chipnet (test)'} · {tr('gift link', 'link hadiah')}</p>
       <h1>🎁 {balance ? sats(balance) : tr('A Jelajah gift', 'Hadiah Jelajah')}</h1>
-      {done ? <p className="hint">✅ {tr('In your wallet', 'Sudah di wallet-mu')}: <a href={explorerTx(done)} target="_blank" rel="noreferrer">{done.slice(0, 16)}…</a>. <a href={location.pathname + location.search} onClick={() => setTimeout(() => location.reload())}>{tr('Now buy your first stamp →', 'Sekarang beli stamp pertamamu →')}</a></p>
+      {done ? <p className="hint">✅ {tr('In your wallet', 'Sudah di wallet-mu')}: <a href={explorerTx(done)} target="_blank" rel="noreferrer">{done.slice(0, 16)}…</a>. <a href={location.pathname + location.search}>{tr('Now buy your first stamp →', 'Sekarang beli stamp pertamamu →')}</a></p>
         : balance ? (lock
           ? <button className="primary big" onClick={take}>{tr(`Take ${sats(balance)} into my wallet`, `Ambil ${sats(balance)} ke wallet-ku`)}</button>
           : <button className="primary big" onClick={wc.connect} disabled={wc.state === 'connecting' || wc.state === 'connected'}>{wc.state === 'connected' ? tr('Loading wallet…', 'Memuat wallet…') : tr('Connect wallet to take it', 'Hubungkan wallet untuk mengambilnya')}</button>)

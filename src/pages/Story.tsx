@@ -68,7 +68,7 @@ export function Story() {
             <h2>{tr('Your turn', 'Giliranmu')}</h2>
             <p className="muted small">{tr('Real stalls, real covenants, real sats. Connect Selene or Paytaca and buy your first stamp.', 'Warung nyata, covenant nyata, sats nyata. Hubungkan Selene atau Paytaca dan beli stamp pertamamu.')}</p>
           </div>
-          <a className="primary big" href={location.pathname + location.search} onClick={() => setTimeout(() => location.reload())}>{tr('Start the rally →', 'Mulai rally →')}</a>
+          <a className="primary big" href="#">{tr('Start the rally →', 'Mulai rally →')}</a>
         </div>
         <p className="muted small">{tr('Rani and Pak Darto are made up; the stalls are real Jogja favourites and the rally is live.', 'Rani dan Pak Darto tokoh rekaan; warungnya favorit Jogja yang nyata dan rally-nya live.')} <button className="ghost lang" onClick={switchLang}>{ID ? 'EN' : 'ID'}</button></p>
       </main>

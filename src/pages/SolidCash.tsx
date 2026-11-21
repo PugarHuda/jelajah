@@ -19,7 +19,7 @@ export function SolidCashPage() {
           <ol>{Object.entries(r.txs).map(([step, id]) => <li key={step}>{step}: <a href={link(r.network, id)} target="_blank" rel="noreferrer">{id.slice(0, 16)}…</a></li>)}</ol>
         </section>
       ))}
-      <p><a href={location.pathname + location.search} onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
+      <p><a href={location.pathname + location.search}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
     </main>
   );
 }

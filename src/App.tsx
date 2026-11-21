@@ -190,7 +190,7 @@ function Rally() {
             </p>
             <p className="muted small">Not one shop's loyalty card: many stalls, one shared prize pool, and only stamps from <b>different</b> stalls count.</p>
           </>)}
-          {proof && proof.stamps > 0 && <p className="proof"><a href="#/stats" onClick={() => setTimeout(() => location.reload())}>{tr(`${proof.stamps} paid stamps · ${proof.sets} sets claimed on ${rally.network}, read from the chain`, `${proof.stamps} stamp terbayar · ${proof.sets} set diklaim di ${rally.network}, dibaca dari chain`)}</a></p>}
+          {proof && proof.stamps > 0 && <p className="proof"><a href="#/stats">{tr(`${proof.stamps} paid stamps · ${proof.sets} sets claimed on ${rally.network}, read from the chain`, `${proof.stamps} stamp terbayar · ${proof.sets} set diklaim di ${rally.network}, dibaca dari chain`)}</a></p>}
         </section>
 
         {LOADED_AT > rally.endTime && (
@@ -316,19 +316,19 @@ function Rally() {
             <dt>{tr('Token category', 'Kategori token')}</dt><dd><code>{rally.category}</code></dd>
             <dt>{tr('Reward vault', 'Vault hadiah')}</dt><dd><code>{vault.tokenAddress}</code></dd>
             <dt>Genesis</dt><dd><a href={explorerTx(rally.genesisTx)} target="_blank" rel="noreferrer">{rally.genesisTx.slice(0, 16)}…</a></dd>
-            <dt>{tr('Stall dashboard', 'Dasbor warung')}</dt><dd><a href="#/stats" onClick={() => setTimeout(() => location.reload())}>{tr('Sales per stall, from the chain', 'Penjualan tiap warung, langsung dari chain')}</a></dd>
-            <dt>SolidCash</dt><dd><a href="#/solidcash" onClick={() => setTimeout(() => location.reload())}>{tr('The stall card in SolidCash →', 'Kartu warung di SolidCash →')}</a></dd>
-            <dt>Jelajah ID</dt><dd><a href="#/identity" onClick={() => setTimeout(() => location.reload())}>{tr('Link your BCH address with Nostr →', 'Tautkan alamat BCH-mu dengan Nostr →')}</a></dd>
-            <dt>{tr('Organizers', 'Penyelenggara')}</dt><dd><a href="#/organize" onClick={() => setTimeout(() => location.reload())}>{tr('Open your own rally →', 'Buka rally-mu sendiri →')}</a> · <a href="#/reclaim" onClick={() => setTimeout(() => location.reload())}>{tr('reclaim after the end', 'ambil sisa pool')}</a></dd>
-            <dt>{tr('Stall tills', 'Kasir warung')}</dt><dd>{rally.merchants.map((m) => <a key={m.id} href={`#/till/${m.id}`} onClick={() => setTimeout(() => location.reload())}>🔔 {m.name}</a>)}</dd>
-            <dt>{tr('Story', 'Cerita')}</dt><dd><a href="#/story" onClick={() => setTimeout(() => location.reload())}>{tr('A day of roaming Jogja, in 6 panels →', 'Sehari menjelajah Jogja, dalam 6 panel →')}</a></dd>
-            <dt>{tr('More rallies', 'Rally lain')}</dt><dd><a href="#/rallies" onClick={() => setTimeout(() => location.reload())}>{tr('Community rallies on Nostr →', 'Rally komunitas di Nostr →')}</a></dd>
-            <dt>{tr('Gift', 'Hadiah')}</dt><dd><a href="#/gift" onClick={() => setTimeout(() => location.reload())}>{tr('Give a friend sats for their first stamp →', 'Beri teman sats untuk stamp pertamanya →')}</a></dd>
+            <dt>{tr('Stall dashboard', 'Dasbor warung')}</dt><dd><a href="#/stats">{tr('Sales per stall, from the chain', 'Penjualan tiap warung, langsung dari chain')}</a></dd>
+            <dt>SolidCash</dt><dd><a href="#/solidcash">{tr('The stall card in SolidCash →', 'Kartu warung di SolidCash →')}</a></dd>
+            <dt>Jelajah ID</dt><dd><a href="#/identity">{tr('Link your BCH address with Nostr →', 'Tautkan alamat BCH-mu dengan Nostr →')}</a></dd>
+            <dt>{tr('Organizers', 'Penyelenggara')}</dt><dd><a href="#/organize">{tr('Open your own rally →', 'Buka rally-mu sendiri →')}</a> · <a href="#/reclaim">{tr('reclaim after the end', 'ambil sisa pool')}</a></dd>
+            <dt>{tr('Stall tills', 'Kasir warung')}</dt><dd>{rally.merchants.map((m) => <a key={m.id} href={`#/till/${m.id}`}>🔔 {m.name}</a>)}</dd>
+            <dt>{tr('Story', 'Cerita')}</dt><dd><a href="#/story">{tr('A day of roaming Jogja, in 6 panels →', 'Sehari menjelajah Jogja, dalam 6 panel →')}</a></dd>
+            <dt>{tr('More rallies', 'Rally lain')}</dt><dd><a href="#/rallies">{tr('Community rallies on Nostr →', 'Rally komunitas di Nostr →')}</a></dd>
+            <dt>{tr('Gift', 'Hadiah')}</dt><dd><a href="#/gift">{tr('Give a friend sats for their first stamp →', 'Beri teman sats untuk stamp pertamanya →')}</a></dd>
             <dt>{tr('Stall posters', 'Poster warung')}</dt><dd>{rally.merchants.map((m) => <a key={m.id} href={`#/stall/${m.id}`}>{m.emoji} {m.name}</a>)}</dd>
           </dl>
         </section>
       </main>
-      <footer>Jelajah · {tr('stamp rallies on Bitcoin Cash · built for BCH BLAZE 2026', 'stamp rally di Bitcoin Cash · dibuat untuk BCH BLAZE 2026')} {lock && <span className="muted">· {tr('your stamp address', 'alamat stamp-mu')} {addressOf(lock, true)} · <a href={`#/u/${addressOf(lock)}`} onClick={() => setTimeout(() => location.reload())}>{tr('your collector page', 'halaman kolektormu')}</a></span>}</footer>
+      <footer>Jelajah · {tr('stamp rallies on Bitcoin Cash · built for BCH BLAZE 2026', 'stamp rally di Bitcoin Cash · dibuat untuk BCH BLAZE 2026')} {lock && <span className="muted">· {tr('your stamp address', 'alamat stamp-mu')} {addressOf(lock, true)} · <a href={`#/u/${addressOf(lock)}`}>{tr('your collector page', 'halaman kolektormu')}</a></span>}</footer>
     </>
   );
 }

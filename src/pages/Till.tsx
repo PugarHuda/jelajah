@@ -54,7 +54,7 @@ export function Till() {
         : tr(`${sales.length} stamps sold · ${sats(total)} paid to this stall`, `${sales.length} stamp terjual · ${sats(total)} dibayar ke warung ini`)}</p>
       {fresh.length > 0 && <p className="hint"><b>🔔 +{fresh.length} {tr('since this screen opened', 'sejak layar ini dibuka')} · {sats(fresh.reduce((s, x) => s + x.paid, 0n))}</b></p>}
       <ul>{(sales ?? []).slice(0, 20).map((x) => (
-        <li key={x.id}>{x.fresh ? '🔔 ' : ''}{sats(x.paid)}{x.confirmed ? '' : ` · ⏳ ${tr('unconfirmed', 'belum terkonfirmasi')}`} · <a href={`#/u/${addressOf(hexToBin(`76a914${x.buyerPkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}>{shortAddr(x.buyerPkh)}</a> · <a href={explorerTx(x.id)} target="_blank" rel="noreferrer">{x.id.slice(0, 10)}…</a></li>
+        <li key={x.id}>{x.fresh ? '🔔 ' : ''}{sats(x.paid)}{x.confirmed ? '' : ` · ⏳ ${tr('unconfirmed', 'belum terkonfirmasi')}`} · <a href={`#/u/${addressOf(hexToBin(`76a914${x.buyerPkh}88ac`))}`}>{shortAddr(x.buyerPkh)}</a> · <a href={explorerTx(x.id)} target="_blank" rel="noreferrer">{x.id.slice(0, 10)}…</a></li>
       ))}</ul>
       {err && <p className="error" role="alert">{err}</p>}
       {!!sales?.length && <p className="row"><button onClick={() => downloadCsv(`${m.name}-sales.csv`, sales)}>⬇ {tr('Download sales (CSV)', 'Unduh penjualan (CSV)')}</button></p>}

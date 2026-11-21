@@ -109,7 +109,7 @@ export function IdentityPage() {
       {login && <p className="hint">{login.address ? `✅ ${tr('Logged in as', 'Masuk sebagai')} ${login.address}` : login.note}</p>}
       {err && <p className="error" role="alert">{err}</p>}
       {wc.uri && wc.qrUri && <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri} title="WizardConnect" subtitle={tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca')} />}
-      <p><a href={location.pathname + location.search} onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
+      <p><a href={location.pathname + location.search}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
     </main>
   );
 }

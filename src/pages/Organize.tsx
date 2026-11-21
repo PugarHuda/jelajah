@@ -129,7 +129,7 @@ export function Organize() {
             <p className="muted small">{tr('The rally lives in this link: save it. Stall posters: open the link and add #/stall/1, #/stall/2, …', 'Rally ada di dalam link ini, simpan baik-baik. Poster warung: buka link lalu tambahkan #/stall/1, #/stall/2, …')}</p>
             {listed === null
               ? <button className="ghost" onClick={list}>{tr('List it on Nostr (shows on #/rallies)', 'Daftarkan di Nostr (muncul di #/rallies)')}</button>
-              : <p className="small">✅ {tr(`Listed on ${listed} relays`, `Terdaftar di ${listed} relay`)} · <a href="#/rallies" onClick={() => setTimeout(() => location.reload())}>#/rallies</a></p>}
+              : <p className="small">✅ {tr(`Listed on ${listed} relays`, `Terdaftar di ${listed} relay`)} · <a href="#/rallies">#/rallies</a></p>}
             {err && <p className="error" role="alert">{err}</p>}
             {bcmrBody && <p className="small">🪪 <a href={URL.createObjectURL(new Blob([bcmrBody], { type: 'application/json' }))} download="bcmr.json">{tr('Download bcmr.json', 'Unduh bcmr.json')}</a> {tr(`and host it, unchanged, at ${f.bcmrUrl.trim()}: wallets then show your rally's names (its hash is locked in the genesis).`, `lalu host apa adanya di ${f.bcmrUrl.trim()}: wallet akan menampilkan nama rally-mu (hash-nya terkunci di genesis).`)}</p>}
             {reclaimWif && <p className="warn small">🔑 <b>{tr('Back up your reclaim key.', 'Simpan kunci reclaim-mu.')}</b> {tr('It is the only way to take the leftover pool back after the rally ends (link + #/reclaim). It is also saved in this browser.', 'Hanya dengan kunci ini sisa pool bisa diambil setelah rally berakhir (link + #/reclaim). Kunci ini juga tersimpan di browser ini.')}<br /><code className="wrap">{reclaimWif}</code></p>}
@@ -180,7 +180,7 @@ export function Organize() {
         <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri}
           title={tr('Connect with WizardConnect', 'Hubungkan lewat WizardConnect')} subtitle={tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca')} />
       )}
-      <p><a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
+      <p><a href="#">{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
     </main>
   );
 }

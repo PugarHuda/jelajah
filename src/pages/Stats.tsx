@@ -74,7 +74,7 @@ export function Stats() {
         <h2>{tr('Top collectors', 'Kolektor teratas')}</h2>
         <table>
           <thead><tr><th>{tr('Collector', 'Kolektor')}</th><th>{tr('Stalls visited', 'Warung dikunjungi')}</th><th>Stamp{ID ? '' : 's'}</th><th>{tr('Trophies', 'Trofi')}</th><th title={tr('Consecutive days with a stamp, from block times (Jogja time)', 'Hari berturut-turut dengan stamp, dari waktu blok (waktu Jogja)')}>🔥</th></tr></thead>
-          <tbody>{s.collectors.map((c) => <tr key={c.pkh}><td><a href={`#/u/${addressOf(hexToBin(`76a914${c.pkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}><code>{shortAddr(c.pkh)}</code></a>{ids[c.pkh] && <> <a className="small" href={`https://njump.me/${nip19.npubEncode(ids[c.pkh])}`} target="_blank" rel="noreferrer" title={tr('Verified Jelajah ID: this address and this Nostr key prove each other', 'Jelajah ID terverifikasi: alamat ini dan kunci Nostr ini saling membuktikan')}>✓ Nostr</a></>}</td><td>{c.stalls}/{rally.merchants.length}</td><td>{c.stamps}</td><td>{'🏆'.repeat(Math.min(c.trophies, 5))}{c.trophies > 5 ? ` ×${c.trophies}` : ''}</td><td>{streaks[c.pkh] ? `${streaks[c.pkh]}` : ''}</td></tr>)}</tbody>
+          <tbody>{s.collectors.map((c) => <tr key={c.pkh}><td><a href={`#/u/${addressOf(hexToBin(`76a914${c.pkh}88ac`))}`}><code>{shortAddr(c.pkh)}</code></a>{ids[c.pkh] && <> <a className="small" href={`https://njump.me/${nip19.npubEncode(ids[c.pkh])}`} target="_blank" rel="noreferrer" title={tr('Verified Jelajah ID: this address and this Nostr key prove each other', 'Jelajah ID terverifikasi: alamat ini dan kunci Nostr ini saling membuktikan')}>✓ Nostr</a></>}</td><td>{c.stalls}/{rally.merchants.length}</td><td>{c.stamps}</td><td>{'🏆'.repeat(Math.min(c.trophies, 5))}{c.trophies > 5 ? ` ×${c.trophies}` : ''}</td><td>{streaks[c.pkh] ? `${streaks[c.pkh]}` : ''}</td></tr>)}</tbody>
         </table>
       </>)}
       <h2>{tr('All seasons', 'Semua musim')}</h2>
@@ -85,10 +85,10 @@ export function Stats() {
       {Array.isArray(seasons) && (seasons.length === 0 ? <p className="muted">{tr('No collectors yet.', 'Belum ada kolektor.')}</p> : (
         <table>
           <thead><tr><th>{tr('Collector', 'Kolektor')}</th><th>{tr('Seasons', 'Musim')}</th><th>Stamp{ID ? '' : 's'}</th><th>{tr('Trophies', 'Trofi')}</th><th title={tr('Consecutive days with a stamp in any season', 'Hari berturut-turut dengan stamp di musim mana pun')}>🔥</th></tr></thead>
-          <tbody>{seasons.map((c) => <tr key={c.pkh}><td><a href={`#/u/${addressOf(hexToBin(`76a914${c.pkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}><code>{shortAddr(c.pkh)}</code></a></td><td>{c.seasons}</td><td>{c.stamps}</td><td>{c.trophies}</td><td>{c.streak || ''}</td></tr>)}</tbody>
+          <tbody>{seasons.map((c) => <tr key={c.pkh}><td><a href={`#/u/${addressOf(hexToBin(`76a914${c.pkh}88ac`))}`}><code>{shortAddr(c.pkh)}</code></a></td><td>{c.seasons}</td><td>{c.stamps}</td><td>{c.trophies}</td><td>{c.streak || ''}</td></tr>)}</tbody>
         </table>
       ))}
-      <a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a>
+      <a href="#">{tr('← Back to the rally', '← Kembali ke rally')}</a>
     </main>
   );
 }

@@ -37,8 +37,7 @@ export function switchLang() {
   try { localStorage.setItem('lang', ID ? 'en' : 'id'); } catch { /* private mode */ }
   const u = new URL(location.href);
   u.searchParams.set('lang', ID ? 'en' : 'id');
-  location.href = u.href;
-  if (u.hash) setTimeout(() => location.reload());
+  location.href = u.href; // a new query string always loads the page again, hash or not
 }
 // what the buyer pays for one stamp: the stall's (member) price plus the levy that goes to the pool
 export const cost = (m: Merchant, member: boolean, voucher = false) => (member ? m.memberPrice! : m.price) + (rally.levy ?? 0) - (voucher ? rally.sponsor!.value : 0);
@@ -63,7 +62,7 @@ export const shareTx = (label: string, txid: string) => (e: { preventDefault: ()
 };
 export const qrImage = (text: string) => { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createDataURL(6, 8); };
 
-export const back = <p><a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>;
+export const back = <p><a href="#">{tr('← Back to the rally', '← Kembali ke rally')}</a></p>;
 
 export const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
 export const reclaimStoreKey = (r: Rally) => `jelajah-reclaim-${r.category}`;

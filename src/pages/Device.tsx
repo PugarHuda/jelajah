@@ -72,7 +72,7 @@ export function Device() {
         {buyer && !parsed && <p className="error">{tr("That isn't a Jelajah buyer code.", 'Itu bukan kode pembeli Jelajah.')}</p>}
         {sig && <><img className="qr" src={qrImage(sig)} alt={tr('Signed code for the buyer', 'Kode bertanda tangan untuk pembeli')} /><code className="wrap small">{sig}</code></>}
       </>)}
-      {m && <p className="small"><a href={`#/till/${m.id}`} onClick={() => setTimeout(() => location.reload())}>🔔 {tr('Open this stall’s till', 'Buka kasir warung ini')}</a></p>}
+      {m && <p className="small"><a href={`#/till/${m.id}`}>🔔 {tr('Open this stall’s till', 'Buka kasir warung ini')}</a></p>}
       <p className="muted small">{tr('The code works once, for this buyer, at this stall, in this rally: a screenshot is useless to anyone else, and to them after they buy.', 'Kode ini berlaku sekali, untuk pembeli ini, di warung ini, di rally ini: screenshot tidak berguna bagi orang lain, dan bagi mereka setelah membeli.')}</p>
     </main>
   );

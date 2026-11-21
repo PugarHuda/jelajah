@@ -33,7 +33,7 @@ export function Rallies() {
         : <>{r.name} · {tr('earlier', 'sebelumnya')}</>} <span className="muted small">· <a href={explorerTx(r.genesisTx)} target="_blank" rel="noreferrer">{r.genesisTx.slice(0, 8)}…</a></span></li>)}</ul>
       <h2>{tr('Community', 'Komunitas')}</h2>
       {list === null && !err && <p className="muted">{tr('Asking the relays…', 'Bertanya ke relay…')}</p>}
-      {list?.length === 0 && <p className="muted">{tr('None listed yet.', 'Belum ada.')} <a href="#/organize" onClick={() => setTimeout(() => location.reload())}>{tr('Open one →', 'Buka satu →')}</a></p>}
+      {list?.length === 0 && <p className="muted">{tr('None listed yet.', 'Belum ada.')} <a href="#/organize">{tr('Open one →', 'Buka satu →')}</a></p>}
       <ul>{list?.map((x) => <li key={x.pubkey + x.r.slice(0, 24)}><a href={`${location.pathname}?r=${x.r}`}>{x.name || tr('(untitled)', '(tanpa nama)')}</a> {x.onChain ? <span className="small" title={tr('Its genesis on chain locks the prize vault this link describes', 'Genesis-nya di chain mengunci vault hadiah yang dijelaskan link ini')}>✓ {tr('on chain', 'di chain')}</span> : <span className="small error">✗ {tr('not found on chain', 'tidak ada di chain')}</span>} <span className="muted small">· {nip19.npubEncode(x.pubkey).slice(0, 14)}… · {new Date(x.created_at * 1000).toLocaleDateString(ID ? 'id-ID' : 'en-US')}</span></li>)}</ul>
       {err && <p className="error" role="alert">{err}</p>}
       {back}

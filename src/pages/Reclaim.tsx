@@ -48,7 +48,7 @@ export function Reclaim() {
         {err && <p className="error" role="alert">{err}</p>}
       </>)}
       {keyOk && rally.minter === 3 && <AddStall keyBytes={key!} />}
-      <p><a href={location.pathname + location.search} onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
+      <p><a href={location.pathname + location.search}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
     </main>
   );
 }
