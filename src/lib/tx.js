@@ -178,17 +178,21 @@ const ofRally = (rally, o) => o?.token && binToHex(o.token.category) === rally.c
 const spends = (rally, c) => ({ tx }) => ofRally(rally, tx.outputs[0]) && tx.outputs[0].token.nft?.capability === 'minting'
   && binToHex(tx.outputs[0].lockingBytecode) === binToHex(cashAddressToLockingBytecode(c.address).bytecode);
 
-/** Is this rally really on chain? Its genesis tx (hash-checked) must lock the vault's minting NFT of the rally's
- *  category at the vault address the rally's own parameters give. Used to badge community rallies before opening. */
+/** Is this rally really on chain, exactly as the link describes it? Its genesis tx (hash-checked) must put a minting NFT
+ *  of the rally's category at the vault AND at every stall's minter, each address derived from the link's own
+ *  parameters (prices, payout scripts, levy…). A link that reuses a real genesis but changes where stalls get paid
+ *  derives other minter addresses and fails. Used to badge community rallies before opening. */
 export async function genesisMatches({ rally, provider }) {
   try {
     const raw = hexToBin(await provider.getRawTransaction(rally.genesisTx));
     if (binToHex(sha256.hash(sha256.hash(raw)).reverse()) !== rally.genesisTx) return false;
     const tx = decodeTransaction(raw);
     if (typeof tx === 'string') return false;
-    const vaultLock = binToHex(cashAddressToLockingBytecode(rallyContracts(rally, provider).vault.address).bytecode);
-    return tx.outputs.some((o) => binToHex(o.lockingBytecode) === vaultLock && o.token?.nft?.capability === 'minting'
+    const { vault, minters } = rallyContracts(rally, provider);
+    const lockOf = (c) => binToHex(cashAddressToLockingBytecode(c.address).bytecode);
+    const minted = (lock) => tx.outputs.some((o) => binToHex(o.lockingBytecode) === lock && o.token?.nft?.capability === 'minting'
       && binToHex(o.token.category) === rally.category);
+    return [vault, ...Object.values(minters)].every((c) => minted(lockOf(c)));
   } catch { return false; }
 }
 
