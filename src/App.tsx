@@ -19,7 +19,7 @@ import { Till } from './pages/Till';
 import { Profile } from './pages/Profile';
 import { Rallies } from './pages/Rallies';
 import { Gift } from './pages/Gift';
-import { LOADED_AT, sats, idrPerBch, idrRate, rupiah, ID, tr, switchLang, cost, stallOf, mapUrl, shareUrl, qrImage, hex } from './shared';
+import { LOADED_AT, sats, idrPerBch, idrRate, rupiah, ID, tr, switchLang, cost, stallOf, mapUrl, shareUrl, shareTx, qrImage, hex } from './shared';
 
 export default function App() {
   const stallFromHash = window.location.hash.match(/^#\/stall\/(\d+)/)?.[1];
@@ -289,7 +289,7 @@ function Rally() {
         {log.length > 0 && (
           <section className="log">
             <h2>{tr('Your transactions', 'Transaksimu')}</h2>
-            <ul>{log.map((l) => <li key={l.txid}>{l.label} · <a href={explorerTx(l.txid)} target="_blank" rel="noreferrer">{l.txid.slice(0, 12)}…</a> · <a href={shareUrl(l.label, l.txid)} target="_blank" rel="noreferrer">{tr('Share', 'Bagikan')} ↗</a></li>)}</ul>
+            <ul>{log.map((l) => <li key={l.txid}>{l.label} · <a href={explorerTx(l.txid)} target="_blank" rel="noreferrer">{l.txid.slice(0, 12)}…</a> · <a href={shareUrl(l.label, l.txid)} onClick={shareTx(l.label, l.txid)} target="_blank" rel="noreferrer">{tr('Share', 'Bagikan')} ↗</a></li>)}</ul>
           </section>
         )}
 

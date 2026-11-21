@@ -53,7 +53,14 @@ export const mapUrl = (place: string) => {
 };
 
 // a receipt anyone can check: the post carries the tx link, so the claim proves itself (no server, no image to fake)
-export const shareUrl = (label: string, txid: string) => `https://x.com/intent/post?text=${encodeURIComponent(`${label} on ${rally.name}, a stamp rally on Bitcoin Cash. On chain: ${explorerTx(txid)}\n\n${location.origin}${location.pathname} #BCHBLAZE2026`)}`;
+const shareText = (label: string, txid: string) => `${label} on ${rally.name}, a stamp rally on Bitcoin Cash. On chain: ${explorerTx(txid)}\n\n${location.origin}${location.pathname} #BCHBLAZE2026`;
+export const shareUrl = (label: string, txid: string) => `https://x.com/intent/post?text=${encodeURIComponent(shareText(label, txid))}`;
+/** On phones: the OS share sheet (WhatsApp, Telegram…) via the Web Share API; elsewhere the link opens the X composer. */
+export const shareTx = (label: string, txid: string) => (e: { preventDefault: () => void }) => {
+  if (!navigator.share) return; // no Web Share: let the link open X
+  e.preventDefault();
+  navigator.share({ title: rally.name, text: shareText(label, txid) }).catch(() => { /* the user closed the sheet */ });
+};
 export const qrImage = (text: string) => { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createDataURL(6, 8); };
 
 export const back = <p><a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>;
