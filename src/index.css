@@ -60,7 +60,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 
 .top { display: flex; align-items: center; gap: .75rem; max-width: 1040px; margin: 0 auto; padding: 1rem; }
 .brand { font: 800 1.5rem var(--font-display); color: var(--ink); text-decoration: none; letter-spacing: -.01em; }
-.brand-mark { color: var(--accent); }
+.brand-mark { vertical-align: -7px; }
 .pill { font-size: .75rem; padding: .15rem .6rem; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
 .pill.mainnet { border-color: var(--ok); color: var(--ok); }
 

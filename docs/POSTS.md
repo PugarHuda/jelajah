@@ -1,47 +1,17 @@
 # Launch posts (draft, post on 21 Nov 2026 = H-1)
 
-Fill in `https://dorahacks.io/buidl/51463` after submitting. Attach `public/stamps.png` (or a screen recording of a purchase) to the first X post.
+BUIDL: https://dorahacks.io/buidl/51463. Attach `public/stamps.png` (or a screen recording of a purchase) to the X post.
 
-## X thread (@BangDropID)
+## X post (@BangDropID), single post (272/280 by X's count)
 
-**1/**
-Jelajah is live on Bitcoin Cash mainnet 🍜☕🍢
+Jelajah is live on Bitcoin Cash mainnet 🍜
 
-A stamp rally for Jogja street food: pay a warung, and its stamp NFT is printed in the same transaction. Collect 3, burn them, get a reward + a trophy.
+A stamp rally for Jogja street food: pay a warung, get its stamp NFT in the same tx. Collect 3: reward + a trophy that's your member card.
 
-No sign-up. No server. No one holds the prize money.
+No server. Stalls can't drain the pool.
+
 https://jelajah-bch.vercel.app
-#BCHBLAZE2026
-
-**2/**
-How the stall's covenant works: the stamp only leaves if the stall got paid at least its price, in that same tx. Every stamp is proof of a real, paid visit.
-
-The reward vault loops over your stamps (2026 VM loops) and checks 3 different stalls, all bought by you. Then it pays you and mints your trophy.
-
-**3/**
-New: your trophy is a membership card 🏆
-
-Show it to any stall and the covenant charges you the member price, then hands the trophy straight back in the same tx. A traded trophy doesn't work, and neither does keeping the discount while sending the trophy away. All enforced on chain.
-
-**4/**
-"What if the stalls collude and refund the buyer?"
-
-The live mainnet rally is a levy rally: every stamp pays a levy into the pool, and one set's levies cover its own reward. Colluders just pay themselves. Anyone can merge levies into the vault, unsigned, and it can only grow.
-
-**5/**
-New: Jelajah ID 🪪 links your BCH address to your Nostr key. Each key vouches for the other: a NIP-39 claim plus an on-chain proof. No server.
-
-TwinKey's independent verifier already shows our mainnet link as ✓ Verified. Your stamps and trophies travel with your npub, and you can log in with Nostr.
-
-**6/**
-Also in:
-🔔 a stall till that rings on every paid stamp
-🧩 buy → claim as an XO template
-🌱 FoldingCash Merkle claims on mainnet
-🇮🇩 Bahasa Indonesia / English
-
-Code + attack tests: https://github.com/PugarHuda/jelajah
-Vote / BUIDL: https://dorahacks.io/buidl/51463
+#BCHBLAZE2026 @bchblaze
 
 ## Telegram (BCH BLAZE group)
 

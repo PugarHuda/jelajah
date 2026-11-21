@@ -155,7 +155,7 @@ function Rally() {
     <>
       <Banner />
       <header className="top">
-        <a className="brand" href="#"><span className="brand-mark">◉</span> Jelajah</a>
+        <a className="brand" href="#"><img className="brand-mark" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={30} height={30} /> Jelajah</a>
         <span className={`pill ${rally.network}`}>{rally.network === 'mainnet' ? 'BCH mainnet' : 'chipnet (test)'}</span>
         <div className="grow" />
         <button className="ghost lang" onClick={switchLang} title={tr('Bahasa Indonesia', 'English')}>{ID ? 'EN' : 'ID'}</button>
