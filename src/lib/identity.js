@@ -234,7 +234,8 @@ export async function findRallies(pool, network) {
   const latest = new Map(); // one per (author, d): replaceable
   for (const e of events) {
     const tag = (k) => e.tags.find((t) => t[0] === k)?.[1];
-    if (!tag('d')?.startsWith(`${RALLY_TAG}:`) || tag('network') !== network || !R_PAYLOAD.test(tag('r') ?? '') || !verifyFresh(e)) continue;
+    if (!tag('d')?.startsWith(`${RALLY_TAG}:`) || tag('network') !== network || !R_PAYLOAD.test(tag('r') ?? '')
+      || e.created_at > Date.now() / 1000 + 600 || !verifyFresh(e)) continue; // future-dated events can't pin the top
     const key = `${e.pubkey}:${tag('d')}`;
     if ((latest.get(key)?.created_at ?? -1) < e.created_at) latest.set(key, { name: String(e.content).slice(0, 60), r: tag('r'), pubkey: e.pubkey, created_at: e.created_at });
   }

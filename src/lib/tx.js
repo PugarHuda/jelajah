@@ -159,14 +159,17 @@ export function pickSet(rally, stamps, n = rally.needed) {
 
 /** Per-stall sales and claims, read from the chain: every spend of a minter is one paid stamp.
  *  ponytail: one Electrum round trip per tx, fine for hundreds of stamps; index by height if a rally gets big. */
-// Transactions at a covenant's address (unconfirmed ones too), minus the genesis and any txids in `skip`.
+// Transactions at a covenant's address (unconfirmed ones too, confirmed = false), minus the genesis and any txids in
+// `skip`. Each raw tx must hash to its txid, so the Electrum server can't hand back a made-up transaction.
 async function txsOf(rally, provider, contract, skip) {
   const hist = await provider.performRequest('blockchain.address.get_history', contract.address);
-  const ids = hist.map((h) => h.tx_hash).filter((id) => id !== rally.genesisTx && !skip?.has(id));
-  return Promise.all(ids.map(async (id) => {
-    const tx = decodeTransaction(hexToBin(await provider.getRawTransaction(id)));
+  const rows = hist.filter((h) => h.tx_hash !== rally.genesisTx && !skip?.has(h.tx_hash));
+  return Promise.all(rows.map(async ({ tx_hash: id, height }) => {
+    const raw = hexToBin(await provider.getRawTransaction(id));
+    if (binToHex(sha256.hash(sha256.hash(raw)).reverse()) !== id) throw new Error(`the server returned a different transaction for ${id}`);
+    const tx = decodeTransaction(raw);
     if (typeof tx === 'string') throw new Error(tx);
-    return { id, tx };
+    return { id, tx, confirmed: height > 0 };
   }));
 }
 const ofRally = (rally, o) => o?.token && binToHex(o.token.category) === rally.category;
@@ -175,14 +178,14 @@ const ofRally = (rally, o) => o?.token && binToHex(o.token.category) === rally.c
 const spends = (rally, c) => ({ tx }) => ofRally(rally, tx.outputs[0]) && tx.outputs[0].token.nft?.capability === 'minting'
   && binToHex(tx.outputs[0].lockingBytecode) === binToHex(cashAddressToLockingBytecode(c.address).bytecode);
 
-/** Every real sale at one stall: { ids: all txids looked at, sales: [{ id, buyerPkh, paid }] }. Pass the previous
- *  `ids` as `skip` to poll cheaply (the stall's till page). */
+/** Every real sale at one stall: { ids: confirmed txids looked at, sales: [{ id, buyerPkh, paid, confirmed }] }. Pass
+ *  the previous `ids` as `skip` to poll cheaply (the stall's till page); unconfirmed ones come back until they confirm. */
 export async function stallSales({ rally, provider, minter, merchantId, skip }) {
   const txs = await txsOf(rally, provider, minter, skip);
   const sales = txs.filter(spends(rally, minter))
     .filter(({ tx }) => ofRally(rally, tx.outputs[2]) && tx.outputs[2].token.nft?.commitment[0] === merchantId)
-    .map(({ id, tx }) => ({ id, buyerPkh: binToHex(tx.outputs[2].token.nft.commitment.slice(1)), paid: tx.outputs[1].valueSatoshis }));
-  return { ids: txs.map((t) => t.id), sales };
+    .map(({ id, tx, confirmed }) => ({ id, buyerPkh: binToHex(tx.outputs[2].token.nft.commitment.slice(1)), paid: tx.outputs[1].valueSatoshis, confirmed }));
+  return { ids: txs.filter((t) => t.confirmed).map((t) => t.id), sales };
 }
 
 export async function rallyStats({ rally, provider, minters, vault }) {

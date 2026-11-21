@@ -977,7 +977,7 @@ const back = <p><a href="#" onClick={() => setTimeout(() => location.reload())}>
 
 // ---- #/till/<stall id>: the stall's cashier screen. Rings on every paid stamp as soon as it hits the mempool,
 // and keeps the totals, all read from the stall covenant's own history (no server, nothing to fake).
-type Sale = { id: string; buyerPkh: string; paid: bigint; fresh: boolean };
+type Sale = { id: string; buyerPkh: string; paid: bigint; confirmed: boolean; fresh: boolean };
 function Till() {
   const id = Number(location.hash.match(/^#\/till\/(\d+)/)?.[1] ?? 0);
   const m = rally.merchants.find((x) => x.id === id);
@@ -988,15 +988,22 @@ function Till() {
   useEffect(() => { bellRef.current = bell; }, [bell]);
   useEffect(() => {
     if (!m) return;
-    const seen = new Set<string>();
+    const seen = new Set<string>(), known = new Set<string>();
     let first = true, stop = false, timer = 0;
     const poll = async () => {
       try {
         const { ids, sales: got } = await stallSales({ rally, provider, minter: minters[m.id], merchantId: m.id, skip: seen });
         ids.forEach((x: string) => seen.add(x));
         const fresh = !first;
-        setSales((s) => [...got.map((x: Omit<Sale, 'fresh'>) => ({ ...x, fresh })).reverse(), ...(s ?? [])]);
-        if (fresh && got.length) ring(bellRef.current);
+        const newcomers = got.filter((x: { id: string }) => !known.has(x.id)); // a pending sale comes back until it confirms
+        newcomers.forEach((x: { id: string }) => known.add(x.id));
+        setSales((s) => {
+          const old = new Map((s ?? []).map((x) => [x.id, x]));
+          const next: Sale[] = got.map((x: Omit<Sale, 'fresh'>) => ({ ...x, fresh: old.get(x.id)?.fresh ?? fresh }));
+          const ids = new Set(next.map((x) => x.id));
+          return [...next.reverse(), ...(s ?? []).filter((x) => !ids.has(x.id))];
+        });
+        if (fresh && newcomers.length) ring(bellRef.current);
         first = false;
         setErr(null);
       } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
@@ -1017,10 +1024,10 @@ function Till() {
         : tr(`${sales.length} stamps sold · ${sats(total)} paid to this stall`, `${sales.length} stamp terjual · ${sats(total)} dibayar ke warung ini`)}</p>
       {fresh.length > 0 && <p className="hint"><b>🔔 +{fresh.length} {tr('since this screen opened', 'sejak layar ini dibuka')} · {sats(fresh.reduce((s, x) => s + x.paid, 0n))}</b></p>}
       <ul>{(sales ?? []).slice(0, 20).map((x) => (
-        <li key={x.id}>{x.fresh ? '🔔 ' : ''}{sats(x.paid)} · <a href={`#/u/${addressOf(hexToBin(`76a914${x.buyerPkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}>{shortAddr(x.buyerPkh)}</a> · <a href={explorerTx(x.id)} target="_blank" rel="noreferrer">{x.id.slice(0, 10)}…</a></li>
+        <li key={x.id}>{x.fresh ? '🔔 ' : ''}{sats(x.paid)}{x.confirmed ? '' : ` · ⏳ ${tr('unconfirmed', 'belum terkonfirmasi')}`} · <a href={`#/u/${addressOf(hexToBin(`76a914${x.buyerPkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}>{shortAddr(x.buyerPkh)}</a> · <a href={explorerTx(x.id)} target="_blank" rel="noreferrer">{x.id.slice(0, 10)}…</a></li>
       ))}</ul>
       {err && <p className="error" role="alert">{err}</p>}
-      <p className="muted small">{tr('Keep this open on the stall’s phone or tablet. Every stamp here is a payment the covenant already checked, so a ring means the money is in.', 'Biarkan terbuka di ponsel atau tablet warung. Setiap stamp di sini adalah pembayaran yang sudah dicek covenant, jadi kalau bel berbunyi, uangnya sudah masuk.')}</p>
+      <p className="muted small">{tr('Keep this open on the stall’s phone or tablet. It rings when a stamp payment reaches the network: the covenant already checked the price. It is final once confirmed (⏳ goes away, about 10 minutes); for a big order, wait for that.', 'Biarkan terbuka di ponsel atau tablet warung. Bel berbunyi saat pembayaran stamp masuk ke jaringan, dan harganya sudah dicek covenant. Pembayaran final setelah terkonfirmasi (tanda ⏳ hilang, sekitar 10 menit); untuk pesanan besar, tunggu itu.')}</p>
       {back}
     </main>
   );

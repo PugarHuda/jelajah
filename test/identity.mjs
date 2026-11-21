@@ -141,7 +141,8 @@ console.log('PASS login: the right challenge passes; a wrong challenge, another 
   const tampered = { ...ev({ created_at: 3000 }), content: 'Hijacked' };
   const otherNet = ev({ tags: rallyEvent({ name: 'x', network: 'mainnet', category: 'cd'.repeat(32), r }).tags });
   const badPayload = ev({ tags: rallyEvent({ name: 'x', network: 'chipnet', category: 'ef'.repeat(32), r: 'javascript:alert(1)' }).tags });
-  const list = await findRallies({ querySync: async () => [old, newer, tampered, otherNet, badPayload] }, 'chipnet');
+  const future = ev({ created_at: Math.floor(Date.now() / 1000) + 86400, content: 'Pinned on top' });
+  const list = await findRallies({ querySync: async () => [old, newer, tampered, otherNet, badPayload, future] }, 'chipnet');
   assert.deepEqual(list.map((x) => x.name), ['Renamed']);
   console.log('PASS rally discovery keeps only the newest signed, well-formed listing for this network');
 }
