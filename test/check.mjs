@@ -422,3 +422,12 @@ await fails('replaying a used presence code (the minter coin it named is gone)',
     .send();
   console.log('PASS carol bought a stamp at the stall added mid-rally');
 }
+
+{ // streak badge: consecutive days ending today or yesterday
+  const { streakOf } = await import('../src/lib/tx.js');
+  assert.equal(streakOf(['2026-11-19', '2026-11-20', '2026-11-21'], '2026-11-21'), 3);
+  assert.equal(streakOf(['2026-11-19', '2026-11-20'], '2026-11-21'), 2); // today not bought yet: still alive
+  assert.equal(streakOf(['2026-11-18', '2026-11-20'], '2026-11-22'), 0); // broken
+  assert.equal(streakOf(['2026-10-31', '2026-11-01'], '2026-11-01'), 2); // across a month
+  console.log('PASS streak counts consecutive days');
+}

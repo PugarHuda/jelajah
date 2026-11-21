@@ -172,6 +172,37 @@ async function txsOf(rally, provider, contract, skip) {
     return { id, tx, confirmed: height > 0 };
   }));
 }
+/** Consecutive days with at least one stamp, ending today or yesterday. days: 'YYYY-MM-DD' strings, today: same format. */
+export function streakOf(days, today) {
+  const set = new Set(days);
+  const prev = (d) => new Date(Date.parse(d + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10);
+  let d = set.has(today) ? today : prev(today), n = 0;
+  while (set.has(d)) { n++; d = prev(d); }
+  return n;
+}
+const wibDay = (unix) => new Date((unix + 7 * 3600) * 1000).toISOString().slice(0, 10); // Jogja time, UTC+7
+
+/** Days (WIB) on which this address bought a stamp of the rally for itself, from confirmed txs, each hash-checked.
+ *  ponytail: reads the last 40 txs of the address; enough for a profile badge, page through history if it matters. */
+export async function stampDays({ rally, provider, address, pkh }) {
+  const hist = (await provider.performRequest('blockchain.address.get_history', address)).filter((h) => h.height > 0).slice(-40);
+  const days = await Promise.all(hist.map(async ({ tx_hash: id, height }) => {
+    const raw = hexToBin(await provider.getRawTransaction(id));
+    if (binToHex(sha256.hash(sha256.hash(raw)).reverse()) !== id) throw new Error(`the server returned a different transaction for ${id}`);
+    const tx = decodeTransaction(raw);
+    if (typeof tx === 'string') throw new Error(tx);
+    // a stamp mint: the rally's minter at out[0] and a stamp (not a trophy) for this pkh among the outputs
+    if (!(ofRally(rally, tx.outputs[0]) && tx.outputs[0].token.nft?.capability === 'minting')) return null;
+    const mine = (o) => { const c = o.token.nft.commitment && binToHex(o.token.nft.commitment); return !c.startsWith('00') && c.slice(2, 42) === pkh; };
+    if (!tx.outputs.some((o) => ofRally(rally, o) && o.token.nft?.capability === 'none' && mine(o))) return null;
+    const header = await provider.performRequest('blockchain.block.header', height);
+    const t = hexToBin(header).slice(68, 72);
+    return wibDay(t[0] | t[1] << 8 | t[2] << 16 | t[3] * 2 ** 24);
+  }));
+  return [...new Set(days.filter((d) => d !== null))];
+}
+export const todayWib = () => wibDay(Math.floor(Date.now() / 1000));
+
 const ofRally = (rally, o) => o?.token && binToHex(o.token.category) === rally.category;
 // A real spend of a covenant hands the rally's minting NFT back to that covenant at out[0]. Only the
 // covenant holds that NFT, so junk sent to its address (or a fake NFT of another category) never counts.

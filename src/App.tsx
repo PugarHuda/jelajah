@@ -8,7 +8,7 @@ import { SimplePool } from 'nostr-tools/pool';
 import { nip19 } from 'nostr-tools';
 import { RELAYS, NIP39_KIND, rallyEvent, findRallies, buildProofTx, linkEvent, nip39Event, findVerified, loginChallenge, loginEvent, checkLogin } from './lib/identity.js';
 import { rally, provider, minters, vault, rallyLink, fromLink, passportFromLink, officialRallies, rallyFromPayload, type Merchant, type Rally } from './chain';
-import { bcmrRegistry, rallyContracts, genesisMatches, stallSales, isVoucher, buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane, buildReclaim, buildAddStall, buildPassportClaim, isTrophyOf } from './lib/tx.js';
+import { bcmrRegistry, rallyContracts, genesisMatches, stallSales, isVoucher, buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane, buildReclaim, buildAddStall, buildPassportClaim, isTrophyOf, stampDays, streakOf, todayWib } from './lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, receiveZeroCoin, type Coin } from './wallet';
 import { Stamp, Trophy } from './Stamp';
 import { SLIDES_URL, REPO_URL, VOTE_ADDRESS } from './links';
@@ -1185,7 +1185,7 @@ function ring(ctx: AudioContext | null) {
 
 // ---- #/u/<BCH address or npub>: a collector's page. What they hold in this rally, read from the chain, and their
 // verified Nostr identity (Jelajah ID) if they linked one. Shareable: nothing here is self-reported.
-type ProfileData = { address: string; npub?: string; stamps: Record<number, number>; bought: number; trophies: number; bonus: number; record: { r: Rally; stamps: number; trophies: number }[] };
+type ProfileData = { address: string; npub?: string; stamps: Record<number, number>; bought: number; trophies: number; bonus: number; record: { r: Rally; stamps: number; trophies: number }[]; streak: number | null; days: number };
 function Profile() {
   const q = decodeURIComponent(location.hash.slice('#/u/'.length)).trim();
   const [p, setP] = useState<ProfileData | null>(null);
@@ -1209,7 +1209,7 @@ function Profile() {
         npub = nip19.npubEncode(pk);
       }
       const pkh = binToHex((cashAddressToLockingBytecode(address) as { bytecode: Uint8Array }).bytecode.slice(3, 23));
-      const utxos = await provider.getUtxos(address);
+      const [utxos, stampedDays] = await Promise.all([provider.getUtxos(address), stampDays({ rally, provider, address, pkh }).catch(() => null)]);
       // reputation that spans rallies: what this address holds in every official Jelajah rally on this network
       const record = officialRallies.map((r) => {
         const c = utxos.filter((u) => isRallyNft(r, u)).map((u) => u.token!.nft!.commitment);
@@ -1219,7 +1219,7 @@ function Profile() {
       const stamps: Record<number, number> = {};
       held.filter((c) => !c.startsWith('00')).forEach((c) => { const s = parseInt(c.slice(0, 2), 16); stamps[s] = (stamps[s] ?? 0) + 1; });
       const trophies = held.filter((c) => c.startsWith('00'));
-      setP({ address, npub, record, stamps, bought: held.filter((c) => !c.startsWith('00') && c.slice(2, 42) === pkh).length, trophies: trophies.length, bonus: trophies.filter((c) => c.length > 42).length });
+      setP({ address, npub, record, stamps, bought: held.filter((c) => !c.startsWith('00') && c.slice(2, 42) === pkh).length, trophies: trophies.length, bonus: trophies.filter((c) => c.length > 42).length, streak: stampedDays && streakOf(stampedDays, todayWib()), days: stampedDays?.length ?? 0 });
     })().catch((e) => setErr(e instanceof Error ? e.message : String(e))).finally(() => pool.close(RELAYS));
   }, [q]);
   return (
@@ -1235,6 +1235,7 @@ function Profile() {
         </div>
         <p>{tr(`${Object.keys(p.stamps).length}/${rally.merchants.length} stalls in hand · ${p.bought} stamps bought by this address · ${p.trophies} trophies`,
           `${Object.keys(p.stamps).length}/${rally.merchants.length} warung di tangan · ${p.bought} stamp dibeli alamat ini · ${p.trophies} trofi`)}{p.bonus > 0 && ` (${p.bonus} bonus)`}</p>
+        {!!p.streak && <p><b>🔥 {tr(`${p.streak}-day streak`, `Streak ${p.streak} hari`)}</b> · {tr(`stamps bought on ${p.days} different days (Jogja time, from block times)`, `beli stamp di ${p.days} hari berbeda (waktu Jogja, dari waktu blok)`)}</p>}
         {p.trophies > 0 && <div className="trophies">{Array.from({ length: Math.min(p.trophies, 6) }, (_, i) => <Trophy key={i} name={rally.name} bonus={i < p.bonus} size={96} />)}</div>}
         {p.record.length > 0 && (<>
           <h2>{tr('Across Jelajah rallies', 'Di semua rally Jelajah')}</h2>

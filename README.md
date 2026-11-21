@@ -81,7 +81,7 @@ node scripts/rally.mjs bcmr    --network chipnet --registry https://<host>/bcmr.
 
 **Stall till:** `#/till/<stall id>` is the cashier screen. It rings (and vibrates) on every paid stamp as soon as it reaches the mempool, and shows the stall's sales and buyers. Everything comes from the stall covenant's own history (`stallSales` in `src/lib/tx.js`, shared with `#/stats`), so a ring means the covenant already checked the payment.
 
-**Collector pages:** `#/u/<BCH address or npub>` shows what a collector holds in the rally (stamps per stall, how many they bought themselves, trophies) and their verified Jelajah ID, all read live from the chain and public relays. `#/stats` links every top collector to theirs.
+**Collector pages:** `#/u/<BCH address or npub>` shows what a collector holds in the rally (stamps per stall, how many they bought themselves, trophies) and their verified Jelajah ID, plus a 🔥 streak of consecutive days with a stamp (from block times, Jogja time), all read live from the chain and public relays. `#/stats` links every top collector to theirs.
 
 **Community rallies on Nostr:** after opening a rally on `#/organize`, the organizer can list it on public relays (a signed kind-30078 event carrying the share link's `?r=` payload). `#/rallies` lists them for the current network. Listings are signature-checked, and each rally is checked again by the same link rules when it opens, with the community-rally warning. Still no server.
 
