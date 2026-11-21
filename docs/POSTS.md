@@ -51,7 +51,7 @@ Halo semua! Update dari **Jelajah** (stamp rally di Bitcoin Cash, dari Jogja) �
 🛡️ **Levy rally**: setiap set membiayai hadiahnya sendiri, jadi warung yang berkolusi tidak bisa menguras pool
 📊 Dasbor penjualan per warung langsung dari chain · UI Bahasa Indonesia / English
 🪪 **Jelajah ID**: alamat BCH ↔ kunci Nostr (NIP-39 + bukti on-chain), terverifikasi juga oleh verifier TwinKey; stamp & trofi ikut ke npub-mu
-🧪 Kontrak StampCard di **SolidCash** (+ PR upstream ke solidcash)
+🧪 Kontrak StampCard di **SolidCash**, siklus penuh di mainnet (deploy → 3 kunjungan → redeem) + PR upstream ke solidcash
 
 Demo: https://jelajah-bch.vercel.app
 Code: https://github.com/PugarHuda/jelajah
@@ -66,5 +66,5 @@ Hi all! Update from **Jelajah**, a stamp rally on Bitcoin Cash from Jogja 🍜
 🛡️ Levy rallies: each set funds its own reward, so colluding stalls can't drain the pool
 📊 Live per-stall sales from the chain · ID/EN UI
 🪪 Jelajah ID: BCH address ↔ Nostr key (NIP-39 + on-chain proof), also ✓ in TwinKey's independent verifier
-🧪 A StampCard contract in SolidCash (+ an upstream PR)
+🧪 A StampCard contract in SolidCash, full lifecycle on mainnet (deploy → 3 visits → redeem) + an upstream PR
 Demo / code / BUIDL links above.
