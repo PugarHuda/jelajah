@@ -849,6 +849,7 @@ function Stats() {
   const [err, setErr] = useState<string | null>(null);
   // Jelajah ID: which collectors have a verified Nostr identity (looked up from public relays, verified on chain)
   const [ids, setIds] = useState<Record<string, string>>({});
+  const [streaks, setStreaks] = useState<Record<string, number>>({}); // 🔥 consecutive days with a stamp, per collector
   useEffect(() => { rallyStats({ rally, provider, minters, vault }).then(setS, (e) => setErr(String(e))); }, []);
   // all seasons: every official rally on this network is a season; trophies and stamps add up per collector (on demand:
   // it reads each rally's whole history)
@@ -872,6 +873,9 @@ function Stats() {
       const r = await findVerified(pool, { address: addressOf(hexToBin(`76a914${c.pkh}88ac`)) }, provider).catch(() => null);
       return r?.ok ? [c.pkh, r.nostrPubkey!] as const : null;
     })).then((rows) => { pool.close(RELAYS); setIds(Object.fromEntries(rows.filter((r) => r !== null))); });
+    const today = todayWib();
+    Promise.all(s.collectors.map(async (c) => [c.pkh, streakOf(await stampDays({ rally, provider, address: addressOf(hexToBin(`76a914${c.pkh}88ac`)), pkh: c.pkh }).catch(() => []), today)] as const))
+      .then((rows) => setStreaks(Object.fromEntries(rows)));
   }, [s]);
   const total = s?.stalls.reduce((a, x) => ({ stamps: a.stamps + x.stamps, revenue: a.revenue + x.revenue }), { stamps: 0, revenue: 0n });
   return (
@@ -898,8 +902,8 @@ function Stats() {
       {s && s.collectors.length > 0 && (<>
         <h2>{tr('Top collectors', 'Kolektor teratas')}</h2>
         <table>
-          <thead><tr><th>{tr('Collector', 'Kolektor')}</th><th>{tr('Stalls visited', 'Warung dikunjungi')}</th><th>Stamp{ID ? '' : 's'}</th><th>{tr('Trophies', 'Trofi')}</th></tr></thead>
-          <tbody>{s.collectors.map((c) => <tr key={c.pkh}><td><a href={`#/u/${addressOf(hexToBin(`76a914${c.pkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}><code>{shortAddr(c.pkh)}</code></a>{ids[c.pkh] && <> <a className="small" href={`https://njump.me/${nip19.npubEncode(ids[c.pkh])}`} target="_blank" rel="noreferrer" title={tr('Verified Jelajah ID: this address and this Nostr key prove each other', 'Jelajah ID terverifikasi: alamat ini dan kunci Nostr ini saling membuktikan')}>✓ Nostr</a></>}</td><td>{c.stalls}/{rally.merchants.length}</td><td>{c.stamps}</td><td>{'🏆'.repeat(Math.min(c.trophies, 5))}{c.trophies > 5 ? ` ×${c.trophies}` : ''}</td></tr>)}</tbody>
+          <thead><tr><th>{tr('Collector', 'Kolektor')}</th><th>{tr('Stalls visited', 'Warung dikunjungi')}</th><th>Stamp{ID ? '' : 's'}</th><th>{tr('Trophies', 'Trofi')}</th><th title={tr('Consecutive days with a stamp, from block times (Jogja time)', 'Hari berturut-turut dengan stamp, dari waktu blok (waktu Jogja)')}>🔥</th></tr></thead>
+          <tbody>{s.collectors.map((c) => <tr key={c.pkh}><td><a href={`#/u/${addressOf(hexToBin(`76a914${c.pkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}><code>{shortAddr(c.pkh)}</code></a>{ids[c.pkh] && <> <a className="small" href={`https://njump.me/${nip19.npubEncode(ids[c.pkh])}`} target="_blank" rel="noreferrer" title={tr('Verified Jelajah ID: this address and this Nostr key prove each other', 'Jelajah ID terverifikasi: alamat ini dan kunci Nostr ini saling membuktikan')}>✓ Nostr</a></>}</td><td>{c.stalls}/{rally.merchants.length}</td><td>{c.stamps}</td><td>{'🏆'.repeat(Math.min(c.trophies, 5))}{c.trophies > 5 ? ` ×${c.trophies}` : ''}</td><td>{streaks[c.pkh] ? `${streaks[c.pkh]}` : ''}</td></tr>)}</tbody>
         </table>
       </>)}
       <h2>{tr('All seasons', 'Semua musim')}</h2>
