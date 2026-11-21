@@ -180,3 +180,21 @@ const Outro = () => {
     </AbsoluteFill>
   );
 };
+
+// 9:16 for phones (X, Reels): the 16:9 cut in the middle, the name on top, the link below
+export const JelajahVertical = () => (
+  <AbsoluteFill style={{ background: C.paper, fontFamily: body, color: C.ink }}>
+    <div style={{ position: 'absolute', top: 210, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
+      <Img src={staticFile('logo.svg')} style={{ width: 150 }} />
+      <H size={110}>Jelajah</H>
+      <div style={{ fontSize: 40, color: C.muted }}>A stamp rally on <b style={{ color: C.accent }}>Bitcoin Cash</b></div>
+    </div>
+    <div style={{ position: 'absolute', top: 700, left: 0, width: 1920, height: 1080, transform: 'scale(0.5625)', transformOrigin: 'top left', borderTop: `4px solid ${C.ink}`, borderBottom: `4px solid ${C.ink}` }}>
+      <Jelajah />
+    </div>
+    <div style={{ position: 'absolute', bottom: 260, width: '100%', textAlign: 'center' }}>
+      <div style={{ fontSize: 48, fontWeight: 700, color: C.accent }}>jelajah-bch.vercel.app</div>
+      <div style={{ fontSize: 34, color: C.muted, marginTop: 14 }}>Live on BCH mainnet · #BCHBLAZE2026</div>
+    </div>
+  </AbsoluteFill>
+);

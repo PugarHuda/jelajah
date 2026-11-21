@@ -2,7 +2,7 @@
 
 ![The four Jelajah Jogja stamps and the trophy](public/stamps.png)
 
-**Live demo:** https://jelajah-bch.vercel.app (mirror: https://pugarhuda.github.io/jelajah/) · **Deck (Widget Factory template):** https://jelajah-bch.vercel.app/deck.pdf
+**Live demo:** https://jelajah-bch.vercel.app (mirror: https://pugarhuda.github.io/jelajah/) · **Deck (Widget Factory template):** https://jelajah-bch.vercel.app/deck.pdf · **Video (73 s):** https://jelajah-bch.vercel.app/jelajah.mp4
 
 **A stamp rally on Bitcoin Cash.** Pay a stall and its stamp NFT is printed in the same transaction. Collect stamps from 3 different stalls, burn them, and the rally's contract pays you back and mints your trophy.
 
