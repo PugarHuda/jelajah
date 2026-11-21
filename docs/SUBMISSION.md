@@ -10,7 +10,7 @@
 - Live demo: https://jelajah-bch.vercel.app
 - Code: https://github.com/PugarHuda/jelajah
 - Deck (Widget Factory template): https://jelajah-bch.vercel.app/deck.pdf
-- Video (75 s, screen captures of the live app, made with Playwright + Remotion): https://jelajah-bch.vercel.app/jelajah.mp4
+- Video (75 s, narrated, screen captures of the live app, made with Playwright + Remotion; synthetic voice via edge-tts): https://jelajah-bch.vercel.app/jelajah.mp4
 - CashTokens address (EMBER2026 votes / prizes): bitcoincash:zrd56cv5ap5v2kc2dgc8hvt4e9g84pmrjcydclcrgj
 
 **Tracks:** Mainnet Track

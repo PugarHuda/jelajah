@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Img, OffthreadVideo, Sequence, getStaticFiles, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Audio, Img, OffthreadVideo, Sequence, getStaticFiles, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import { loadFont as loadDisplay } from '@remotion/google-fonts/Fraunces';
 import { loadFont as loadBody } from '@remotion/google-fonts/Inter';
 import type { ReactNode } from 'react';
@@ -10,7 +10,7 @@ const body = loadBody('normal', { weights: ['500', '700'] }).fontFamily;
 const C = { paper: '#f5eedf', card: '#fffaf0', ink: '#2a1d14', muted: '#6f5e50', accent: '#b3261e', gold: '#b7791f', line: '#e4d7c3', ok: '#15803d' };
 
 // a scene: either a title card or a screen capture of the live app with a caption
-type Scene = { s: number; render: () => ReactNode };
+type Scene = { s: number; render: () => ReactNode; vo?: string }; // vo: narration line in public/vo/<vo>.mp3 (vo.py)
 const clip = (name: string, s: number, kicker: string, caption: ReactNode, from = 0, rate = 1.15): Scene =>
   ({ s, render: () => <Capture src={`clips/${name}`} from={from} rate={rate} kicker={kicker} caption={caption} /> });
 
@@ -18,17 +18,17 @@ const clip = (name: string, s: number, kicker: string, caption: ReactNode, from 
 const hasPhone = getStaticFiles().some((f) => f.name === 'clips/phone.mp4');
 
 const SCENES: Scene[] = [
-  { s: 4.5, render: () => <Intro /> },
-  { s: 5.5, render: () => <Problem /> },
-  clip('home.webm', 11, 'Live on BCH mainnet', <>Pay a warung. Its stamp NFT is printed <em>in the same transaction</em>.</>, 0.5),
+  { s: 4.5, render: () => <Intro />, vo: 'intro' },
+  { s: 5.5, render: () => <Problem />, vo: 'problem' },
+  { vo: 'home', ...clip('home.webm', 11, 'Live on BCH mainnet', <>Pay a warung. Its stamp NFT is printed <em>in the same transaction</em>.</>, 0.5) },
   ...(hasPhone ? [{ s: 10, render: () => <Phone /> }] : []),
-  clip('story.webm', 12.5, 'The rally', <>Stamps from 3 <em>different</em> stalls → a reward and a trophy that works as a member card.</>, 0.3, 1.25),
-  { s: 7, render: () => <Levy /> },
-  clip('tillLive.webm', 7, 'For the stall', <>A real mainnet sale: the till rings the moment a stamp is paid.</>, 17.5, 1),
-  clip('stats.webm', 6, 'Nothing to fake', <>Every number is recomputed from the chain, across every season.</>, 8, 1),
-  clip('organize.webm', 7, 'Anyone can run one', <>Open a rally from the browser. The contract rules are checked before your wallet signs.</>, 0.4, 1.2),
-  { s: 8, render: () => <Proof /> },
-  { s: 6.5, render: () => <Outro /> },
+  { vo: 'story', ...clip('story.webm', 12.5, 'The rally', <>Stamps from 3 <em>different</em> stalls → a reward and a trophy that works as a member card.</>, 0.3, 1.25) },
+  { s: 7, render: () => <Levy />, vo: 'levy' },
+  { vo: 'till', ...clip('tillLive.webm', 7, 'For the stall', <>A real mainnet sale: the till rings the moment a stamp is paid.</>, 17.5, 1) },
+  { vo: 'stats', ...clip('stats.webm', 6, 'Nothing to fake', <>Every number is recomputed from the chain, across every season.</>, 8, 1) },
+  { vo: 'organize', ...clip('organize.webm', 7, 'Anyone can run one', <>Open a rally from the browser. The contract rules are checked before your wallet signs.</>, 0.4, 1.2) },
+  { s: 8, render: () => <Proof />, vo: 'proof' },
+  { s: 6.5, render: () => <Outro />, vo: 'outro' },
 ];
 const frames = (s: number) => Math.round(s * FPS);
 export const totalFrames = () => SCENES.reduce((n, x) => n + frames(x.s), 0);
@@ -40,7 +40,7 @@ export const Jelajah = () => {
       {SCENES.map((x, i) => {
         const from = at;
         at += frames(x.s);
-        return <Sequence key={i} from={from} durationInFrames={frames(x.s)}><Fade>{x.render()}</Fade></Sequence>;
+        return <Sequence key={i} from={from} durationInFrames={frames(x.s)}><Fade>{x.render()}</Fade>{x.vo && <Sequence from={x.vo === 'levy' ? 3 : 9}><Audio src={staticFile(`vo/${x.vo}.mp3`)} /></Sequence>}</Sequence>;
       })}
     </AbsoluteFill>
   );
