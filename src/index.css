@@ -84,6 +84,9 @@ section { margin-top: 2.5rem; }
   transition: border-color .3s, transform .2s;
 }
 .stall.have { border-style: solid; border-color: var(--c); }
+.stall.have > svg:first-child { animation: stamp-press .45s cubic-bezier(.2, 1.6, .4, 1); } /* the stamp lands like a rubber stamp */
+@keyframes stamp-press { 0% { scale: 1.5; rotate: -12deg; opacity: 0; } 60% { opacity: 1; } 100% { scale: 1; rotate: 0deg; } } /* scale/rotate, so the inline tilt transform stays */
+@media (prefers-reduced-motion: reduce) { .stall.have > svg:first-child { animation: none; } }
 .stall:target { box-shadow: 0 0 0 3px var(--c); }
 .stall h3 { font-size: 1.25rem; margin-top: .4rem; }
 .stall p { margin: 0 0 .6rem; min-height: 2.6em; }
@@ -180,3 +183,11 @@ a.primary.big { display: inline-block; text-decoration: none; }
   .poster { padding-top: 0; }
   .poster .qr { width: 95mm; height: 95mm; }
 }
+
+/* home: the levy cycle proof and the next-stop hint */
+details.cycle { margin-top: .8rem; }
+details.cycle summary { cursor: pointer; font-weight: 600; }
+details.cycle ol { margin: .5rem 0; padding-left: 1.2rem; }
+details.cycle a, .next a { margin-right: .4rem; white-space: nowrap; }
+.vouchers { display: flex; flex-wrap: wrap; gap: .6rem; }
+.vouchers figure { margin: 0; text-align: center; }
