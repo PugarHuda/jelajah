@@ -97,10 +97,10 @@ set_lines(S[116], [
 # 6 — vision
 set_lines(S[126], ['', 'The Vision for Jelajah'])
 set_lines(S[127], [
-    'Now: levy rally live on BCH mainnet',
-    'XO, FoldingCash, SolidCash, ID: on mainnet',
+    'Live: full levy cycle on BCH mainnet',
+    'Streak reward on chain (chipnet)',
+    'XO, FoldingCash, SolidCash, ID: mainnet',
     'Next: festivals, malls, BLISS 2027',
-    'Organisers earn the levy surplus',
 ], flat=True)
 
 A = sys.argv[3]

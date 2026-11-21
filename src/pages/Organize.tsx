@@ -23,7 +23,7 @@ export function Organize() {
     const t = setInterval(() => tick((n) => n + 1), 500);
     return () => clearInterval(t);
   }, [wc.state, lock]);
-  const [f, setF] = useState({ name: '', needed: '3', reward: '4000', rewardsInPool: '2', durationDays: '30', levy: '', bonusNeeded: '', bonusReward: '', bcmrUrl: '' });
+  const [f, setF] = useState({ name: '', needed: '3', reward: '4000', rewardsInPool: '2', durationDays: '30', levy: '', bonusNeeded: '', bonusReward: '', streakDays: '', streakReward: '', bcmrUrl: '' });
   const [bcmrBody, setBcmrBody] = useState<string | null>(null);
   const [stalls, setStalls] = useState<StallRow[]>([
     { name: '', emoji: '🍜', price: '5000', memberPrice: '4500', address: '' },
@@ -59,6 +59,8 @@ export function Organize() {
     rewardsInPool: Number(f.rewardsInPool), durationDays: Number(f.durationDays), lanes: 2,
     ...(f.levy.trim() ? { levy: Number(f.levy) } : {}),
     ...(f.bonusNeeded.trim() ? { bonusNeeded: Number(f.bonusNeeded), bonusReward: Number(f.bonusReward) } : {}),
+    // streak (StampMinter4 + RewardVault3): dated stamps, a reward for N days in a row; checkRallyConfig prices in backdating
+    ...(f.streakDays.trim() ? { streakDays: Number(f.streakDays), streakReward: Number(f.streakReward) } : {}),
     merchants: stalls.map((s, i) => ({
       id: i + 1, name: s.name.trim() || `Stall ${i + 1}`, emoji: s.emoji || '⭐', tagline: '', color: PALETTE[i % PALETTE.length],
       price: Number(s.price), memberPrice: Number(s.memberPrice || s.price), lock: payout(s.address),
@@ -143,6 +145,8 @@ export function Organize() {
           <label>{tr('Levy per stamp (sats, optional)', 'Levy per stamp (sats, opsional)')}<input type="number" min={0} value={f.levy} onChange={set('levy')} placeholder={tr('none', 'tanpa')} /></label>
           <label>{tr('Bonus tier: stalls (optional, needs a levy)', 'Tingkat bonus: jumlah warung (opsional, perlu levy)')}<input type="number" min={2} value={f.bonusNeeded} onChange={set('bonusNeeded')} placeholder={tr('none', 'tanpa')} /></label>
           <label>{tr('Bonus reward (sats)', 'Hadiah bonus (sats)')}<input type="number" min={1} value={f.bonusReward} onChange={set('bonusReward')} disabled={!f.bonusNeeded.trim()} /></label>
+          <label>{tr('🔥 Streak: days in a row (optional, needs a levy)', '🔥 Streak: hari berturut-turut (opsional, perlu levy)')}<input type="number" min={2} max={30} value={f.streakDays} onChange={set('streakDays')} placeholder={tr('none', 'tanpa')} /></label>
+          <label>{tr('Streak reward (sats)', 'Hadiah streak (sats)')}<input type="number" min={1} value={f.streakReward} onChange={set('streakReward')} disabled={!f.streakDays.trim()} /></label>
           <label className="wide">{tr('Wallet metadata URL (optional: where you will host bcmr.json, e.g. GitHub Pages)', 'URL metadata wallet (opsional: tempat kamu akan meng-host bcmr.json, mis. GitHub Pages)')}<input value={f.bcmrUrl} onChange={set('bcmrUrl')} placeholder="https://you.github.io/rally/bcmr.json" /></label>
         </div>
         <h2>{tr('Stalls', 'Warung')}</h2>

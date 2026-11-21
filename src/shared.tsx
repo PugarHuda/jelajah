@@ -9,9 +9,18 @@ export const LOADED_AT = Date.now() / 1000;
 export const sats = (n: number | bigint) => `${Number(n).toLocaleString('en-US')} sats`;
 
 // Rupiah hint next to sat prices. One public price lookup, nothing about the user is sent; no rate -> no hint.
-export let idrPerBch: number | null = null;
-export const idrRate = fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash&vs_currencies=idr')
-  .then((r) => r.json()).then((j) => { idrPerBch = j['bitcoin-cash']?.idr ?? null; }).catch(() => {});
+// the rupiah hint: cached for 30 minutes per browser, and a stale rate beats none when CoinGecko rate-limits (its 429 has no CORS)
+const RATE_KEY = 'jelajah.idr';
+const cachedRate = (() => { try { return JSON.parse(localStorage.getItem(RATE_KEY) ?? 'null') as { idr: number; at: number } | null; } catch { return null; } })();
+export let idrPerBch: number | null = cachedRate?.idr ?? null;
+export const idrRate: Promise<void> = cachedRate && Date.now() - cachedRate.at < 30 * 60_000 ? Promise.resolve()
+  : fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash&vs_currencies=idr')
+    .then((r) => r.json()).then((j) => {
+      const idr = j['bitcoin-cash']?.idr;
+      if (typeof idr !== 'number' || !(idr > 0)) return;
+      idrPerBch = idr;
+      try { localStorage.setItem(RATE_KEY, JSON.stringify({ idr, at: Date.now() })); } catch { /* private mode: no cache */ }
+    }).catch(() => {});
 export const rupiah = (n: number | bigint) => idrPerBch === null ? ''
   : ` ≈ Rp${Math.round(Number(n) / 1e8 * idrPerBch).toLocaleString('id-ID')}`;
 
