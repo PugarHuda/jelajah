@@ -12,6 +12,7 @@
     "check": "npm run contracts && node test/check.mjs && node test/identity.mjs && npm run claims:check",
     "claims:contracts": "cashc claims/contracts/ClaimPool.cash -o claims/artifacts/ClaimPool.json && cashc claims/contracts/RootKeeper.cash -o claims/artifacts/RootKeeper.json && cashc claims/contracts/RootProposal.cash -o claims/artifacts/RootProposal.json",
     "test:ui": "playwright test",
+    "test:wallet": "playwright test wallet.spec",
     "claims:check": "npm run claims:contracts && node claims/test/check.mjs"
   },
   "dependencies": {
