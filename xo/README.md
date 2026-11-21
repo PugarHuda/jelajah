@@ -75,3 +75,7 @@ NET=mainnet FUND=10000 node xo/buy-stamp.mjs 1     # funds a throwaway mainnet X
 NET=mainnet node xo/topup-buyer.mjs 3500           # if the account runs short
 NET=mainnet DRY=1 node xo/claim-set.mjs && NET=mainnet node xo/verify.mjs && NET=mainnet node xo/claim-set.mjs
 ```
+
+## Scope
+
+The template mirrors the original `StampMinter` + `RewardVault` (mainnet rally v1, `scripts/rally.mainnet-v1.json`). The live levy rally runs on `StampMinter3` + `RewardVault2` (levy, unsigned merge, bonus tier, member price, presence keys), which this template does not cover yet. Porting it is the next migration step.
