@@ -4,6 +4,8 @@
 
 **Live demo:** https://jelajah-bch.vercel.app (mirror: https://pugarhuda.github.io/jelajah/) · **Deck (Widget Factory template):** https://jelajah-bch.vercel.app/deck.pdf · **Video (73 s):** https://jelajah-bch.vercel.app/jelajah.mp4
 
+**For judges, in 60 seconds:** [the story in 6 panels](https://jelajah-bch.vercel.app/#/story) · [live levy rally genesis](https://blockchair.com/bitcoin-cash/transaction/e0ed3240f589bafe01996f2a8f54a4f32077ecb212df24a7cfcdb2ab6c19752e) · [a mainnet claim that paid the reward and minted a trophy](https://blockchair.com/bitcoin-cash/transaction/0e071a4648f8ac6ab48bf97f48e72ff473dfd5af3fa3bc6a131e5974ab528b33) · [the same claim through the XO engine](https://blockchair.com/bitcoin-cash/transaction/70efa57cbf453afedf32efd76bbc8ef513fb4d7105d473c79afd537de8b3ac0e) · [stats read from the chain](https://jelajah-bch.vercel.app/#/stats) · [a stall's printable poster](https://jelajah-bch.vercel.app/#/stall/1) · `npm run check` runs 84 VM checks of the contracts.
+
 **A stamp rally on Bitcoin Cash.** Pay a stall and its stamp NFT is printed in the same transaction. Collect stamps from 3 different stalls, burn them, and the rally's contract pays you back and mints your trophy.
 
 **Not a loyalty card, a rally.** A loyalty card is one shop paying back its own customers. Jelajah puts **many independent stalls behind one shared prize pool** that pays only for stamps from *different* stalls, and the pool can't be drained even if stalls collude: in a levy rally, colluding stalls end up paying the prize themselves.

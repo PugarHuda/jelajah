@@ -369,6 +369,8 @@ function StallPoster({ m }: { m?: Merchant }) {
       <p className="muted small">{url}</p>
       <p className="row no-print"><button className="primary" onClick={() => print()}>🖨 {tr('Print this poster (A4)', 'Cetak poster ini (A4)')}</button></p>
       <p className="small no-print">{tr('For the stall:', 'Untuk warung:')} <a href={`#/till/${m.id}`} onClick={() => setTimeout(() => location.reload())}>🔔 {tr('open the till (rings on every sale)', 'buka kasir (berbunyi tiap ada penjualan)')}</a></p>
+      <details className="no-print"><summary className="small">{tr('Till QR for the stall’s phone (keep it off the printed poster)', 'QR kasir untuk HP warung (jangan ikut dicetak)')}</summary>
+        <img className="qr" src={qrImage(url.replace(`#stall-${m.id}`, `#/till/${m.id}`))} alt={tr('QR code to this stall’s till', 'Kode QR ke kasir warung ini')} /></details>
       <img className="poster-logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="Jelajah" width={56} height={56} />
       <a className="no-print" href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a>
     </main>
@@ -1153,10 +1155,19 @@ function Till() {
         <li key={x.id}>{x.fresh ? '🔔 ' : ''}{sats(x.paid)}{x.confirmed ? '' : ` · ⏳ ${tr('unconfirmed', 'belum terkonfirmasi')}`} · <a href={`#/u/${addressOf(hexToBin(`76a914${x.buyerPkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}>{shortAddr(x.buyerPkh)}</a> · <a href={explorerTx(x.id)} target="_blank" rel="noreferrer">{x.id.slice(0, 10)}…</a></li>
       ))}</ul>
       {err && <p className="error" role="alert">{err}</p>}
+      {!!sales?.length && <p className="row"><button onClick={() => downloadCsv(`${m.name}-sales.csv`, sales)}>⬇ {tr('Download sales (CSV)', 'Unduh penjualan (CSV)')}</button></p>}
       <p className="muted small">{tr('Keep this open on the stall’s phone or tablet. It rings when a stamp payment reaches the network: the covenant already checked the price. It is final once confirmed (⏳ goes away, about 10 minutes); for a big order, wait for that.', 'Biarkan terbuka di ponsel atau tablet warung. Bel berbunyi saat pembayaran stamp masuk ke jaringan, dan harganya sudah dicek covenant. Pembayaran final setelah terkonfirmasi (tanda ⏳ hilang, sekitar 10 menit); untuk pesanan besar, tunggu itu.')}</p>
       {back}
     </main>
   );
+}
+function downloadCsv(name: string, sales: Sale[]) {
+  const rows = [['txid', 'buyer', 'paid_sats', 'confirmed'], ...sales.map((x) => [x.id, addressOf(hexToBin(`76a914${x.buyerPkh}88ac`)), String(x.paid), String(x.confirmed)])];
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([rows.map((r) => r.join(',')).join('\n')], { type: 'text/csv' }));
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 function ring(ctx: AudioContext | null) {
   navigator.vibrate?.(200);
