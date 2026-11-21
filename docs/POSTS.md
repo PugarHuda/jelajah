@@ -98,3 +98,8 @@ Hi all! Update from **Jelajah**, a stamp rally on Bitcoin Cash from Jogja 🍜
 🪪 Jelajah ID: BCH address ↔ Nostr key (NIP-39 + on-chain proof), also ✓ in TwinKey's independent verifier
 🧪 A StampCard contract in SolidCash, full lifecycle on mainnet (deploy → 3 visits → redeem) + an upstream PR
 Demo / code / BUIDL links above.
+
+## Community Choice (EMBER2026), TG + X, after the admins answer the track question
+If you hold EMBER2026 and liked Jelajah, a vote is a send to our CashTokens address: bitcoincash:zrd56cv5ap5v2kc2dgc8hvt4e9g84pmrjcydclcrgj 🙏 Try a set first: https://jelajah-bch.vercel.app (Selene / Paytaca, a few cents).
+
+Indonesian: Kalau kamu pegang EMBER2026 dan suka Jelajah, vote cukup dengan mengirimnya ke alamat CashTokens kami: bitcoincash:zrd56cv5ap5v2kc2dgc8hvt4e9g84pmrjcydclcrgj 🙏 Coba satu set dulu: https://jelajah-bch.vercel.app
