@@ -111,6 +111,14 @@ function Rally() {
   const bonus = !!rally.bonusNeeded && collected.size >= rally.bonusNeeded;
   const prize = BigInt(bonus ? rally.bonusReward! : rally.reward);
   const burn = bonus ? rally.bonusNeeded! : rally.needed;
+  // social proof, from the chain: stamps paid and sets claimed across every official rally on this network
+  const [proof, setProof] = useState<{ stamps: number; sets: number } | null>(null);
+  useEffect(() => {
+    if (fromLink) return; // a community rally shows its own numbers on #/stats
+    Promise.all(officialRallies.map((r) => rallyStats({ rally: r, provider, ...rallyContracts(r, provider) })))
+      .then((all) => setProof({ stamps: all.reduce((n, x) => n + x.stalls.reduce((m: number, y: { stamps: number }) => m + y.stamps, 0), 0), sets: all.reduce((n, x) => n + x.claims, 0) }))
+      .catch(() => {});
+  }, []);
   const rewardsLeft = pool === null ? null : Number((pool - 1000n) / BigInt(rally.reward)); // vault keeps 1000 sats dust
 
   async function run(label: string, fn: () => Promise<string>) {
@@ -194,6 +202,7 @@ function Rally() {
             </p>
             <p className="muted small">Not one shop's loyalty card: many stalls, one shared prize pool, and only stamps from <b>different</b> stalls count.</p>
           </>)}
+          {proof && proof.stamps > 0 && <p className="proof"><a href="#/stats" onClick={() => setTimeout(() => location.reload())}>{tr(`${proof.stamps} paid stamps · ${proof.sets} sets claimed on ${rally.network}, read from the chain`, `${proof.stamps} stamp terbayar · ${proof.sets} set diklaim di ${rally.network}, dibaca dari chain`)}</a></p>}
         </section>
 
         {LOADED_AT > rally.endTime && (
@@ -358,8 +367,10 @@ function StallPoster({ m }: { m?: Merchant }) {
       <p className="lede">{tr(`Pay here with Bitcoin Cash and get the ${m.name} stamp. Collect ${rally.needed} → get a reward.`, `Bayar di sini pakai Bitcoin Cash dan dapat stamp ${m.name}. Kumpulkan ${rally.needed} → dapat hadiah.`)}</p>
       <img className="qr" src={qr.createDataURL(8, 16)} alt={tr(`QR code to ${m.name}'s stall in the rally`, `Kode QR ke warung ${m.name} di rally`)} />
       <p className="muted small">{url}</p>
-      <p className="small">{tr('For the stall:', 'Untuk warung:')} <a href={`#/till/${m.id}`} onClick={() => setTimeout(() => location.reload())}>🔔 {tr('open the till (rings on every sale)', 'buka kasir (berbunyi tiap ada penjualan)')}</a></p>
-      <a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a>
+      <p className="row no-print"><button className="primary" onClick={() => print()}>🖨 {tr('Print this poster (A4)', 'Cetak poster ini (A4)')}</button></p>
+      <p className="small no-print">{tr('For the stall:', 'Untuk warung:')} <a href={`#/till/${m.id}`} onClick={() => setTimeout(() => location.reload())}>🔔 {tr('open the till (rings on every sale)', 'buka kasir (berbunyi tiap ada penjualan)')}</a></p>
+      <img className="poster-logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="Jelajah" width={56} height={56} />
+      <a className="no-print" href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a>
     </main>
   );
 }
@@ -1077,7 +1088,7 @@ function Story() {
         </ol>
         <div className="claim ready">
           <div>
-            <h3>{tr('Your turn', 'Giliranmu')}</h3>
+            <h2>{tr('Your turn', 'Giliranmu')}</h2>
             <p className="muted small">{tr('Real stalls, real covenants, real sats. Connect Selene or Paytaca and buy your first stamp.', 'Warung nyata, covenant nyata, sats nyata. Hubungkan Selene atau Paytaca dan beli stamp pertamamu.')}</p>
           </div>
           <a className="primary big" href={location.pathname + location.search} onClick={() => setTimeout(() => location.reload())}>{tr('Start the rally →', 'Mulai rally →')}</a>

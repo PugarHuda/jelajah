@@ -89,7 +89,7 @@ node scripts/rally.mjs bcmr    --network chipnet --registry https://<host>/bcmr.
 
 **Gift links:** `#/gift` makes a key in the browser and puts it in the link's `#fragment`, which browsers never send to a server. Fund its address, send the link, and the receiver connects a wallet and sweeps it, so someone with an empty wallet can buy their first stamp. The link is the money: whoever opens it first can take it, and the giver can take it back the same way.
 
-**Quality:** Lighthouse (mobile) scores 100 for accessibility, best practices and SEO. `oxlint` reports no warnings.
+**Quality:** Lighthouse (mobile, 21 Nov): accessibility 100 and SEO 100 on the rally, story, till, collector and gift pages; best practices 100 on most, 96 where the stamps' ring lettering is drawn under 12px. `oxlint` reports no warnings.
 
 **Stall dashboard:** open `#/stats` in the app. Stamps sold, unique buyers, sats paid to each stall and sets claimed, all recomputed in the browser from each covenant's history, plus a **top-collectors** board (stalls visited, stamps, trophies per address). Prices also show a rupiah estimate (a CoinGecko rate, nothing about the user is sent). A transaction only counts if it really spent the covenant (the rally's minting NFT goes back to it at out[0]), so nobody can inflate the numbers by sending junk to a minter address.
 `scripts/rally.config.json` sets the stalls, prices, reward and duration. `--merchant-address` pays real stall wallets.

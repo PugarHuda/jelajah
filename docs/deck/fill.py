@@ -64,7 +64,7 @@ set_lines(S[70], ['Solo builder: Pugar (Bangdrop), Yogyakarta'])
 # 2 — one-liner + repo
 set_lines(S[78], [
     'Jelajah!', '',
-    'A stamp rally on Bitcoin Cash: pay a stall, get its stamp NFT in the same transaction, burn a set to get paid back', '',
+    'A stamp rally on Bitcoin Cash: pay a stall, get its stamp NFT in the same tx', '',
     'https://github.com/PugarHuda/jelajah',
 ])
 
@@ -82,30 +82,30 @@ set_lines(S[93], [
 set_lines(S[107], ['', 'Benefits of Jelajah'])
 set_lines(S[108], [
     'One scan: pay + stamp NFT, same tx',
-    'Prize locked in a covenant',
+    'Colluding stalls can\'t drain the pool',
     'Trophy = membership card, on chain',
-    'Live sales per stall, from the chain',
+    'A till that rings on every paid stamp',
     'No sign-up, no server, ID/EN',
 ], flat=True)
 
 # 5 — BCH usage
 set_lines(S[116], [
     'BCH Usage', '',
-    "A stall's covenant releases its stamp only if the stall got paid (less if you show your trophy). The vault loops over your stamps, pays you, mints a trophy.",
+    "A stall's covenant releases its stamp only if the stall got paid, and every stamp pays a levy into the pool. The vault loops over your stamps, pays you from those levies, mints a trophy.",
 ])
 
 # 6 — vision
 set_lines(S[126], ['', 'The Vision for Jelajah'])
 set_lines(S[127], [
-    'Now: live on BCH mainnet, Jogja street food',
+    'Now: levy rally live on BCH mainnet',
+    'XO, FoldingCash, SolidCash, ID: on mainnet',
     'Next: festivals, malls, BLISS 2027',
-    'Self-funding levy rallies, prices in PUSD',
-    'Brands pay per rally: provable visits',
+    'Organisers earn the levy surplus',
 ], flat=True)
 
 A = sys.argv[3]
 swap_picture(0, 71, A + '/art.png')
-swap_picture(2, 98, A + '/board-v2.png')
+swap_picture(2, 98, A + '/board-levy.png')  # the live levy rally, 21 Nov
 swap_picture(4, 117, A + '/selene-sign.png')
 p.save(out)
 print('saved', out)

@@ -168,3 +168,15 @@ code.wrap { word-break: break-all; }
 @keyframes ring { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(-18deg); } 40% { transform: rotate(14deg); } 60% { transform: rotate(-8deg); } }
 @media (prefers-reduced-motion: reduce) { .scene .ring { animation: none; } .panel { transform: none !important; } }
 a.primary.big { display: inline-block; text-decoration: none; }
+
+.proof { display: inline-block; margin-top: .4rem; padding: .3rem .8rem; border: 1.5px solid var(--ok); border-radius: 99px; font-size: .85rem; }
+.proof a { color: var(--ok); text-decoration: none; }
+
+/* stall posters print on one A4 sheet */
+@page { size: A4; margin: 12mm; }
+@media print {
+  .no-print, .banner { display: none !important; }
+  body { background: #fff; }
+  .poster { padding-top: 0; }
+  .poster .qr { width: 95mm; height: 95mm; }
+}

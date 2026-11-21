@@ -9,6 +9,7 @@ export default defineConfig({
   base: process.env.VITE_BASE ?? '/',
   plugins: [react()],
   build: {
+    sourcemap: true, // the code is open source anyway; Lighthouse wants maps for big bundles
     chunkSizeWarningLimit: 700, // ponytail: the bch chunk is mostly libauth (~600 kB); lazy-load it per page if first paint matters
     rolldownOptions: {
       output: {
