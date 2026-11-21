@@ -1,7 +1,7 @@
 // Transaction builders shared by the web app and the node scripts.
 // Callers pass unlockers, so the same code works with a local key (scripts) or a WizardConnect placeholder (app).
 import { Contract, TransactionBuilder } from 'cashscript';
-import { hexToBin, binToHex, decodeTransaction, cashAddressToLockingBytecode, secp256k1, sha256 } from '@bitauth/libauth';
+import { hexToBin, binToHex, decodeTransaction, cashAddressToLockingBytecode, secp256k1, sha256, utf8ToBin } from '@bitauth/libauth';
 import StampMinter from '../contracts/StampMinter.json' with { type: 'json' };
 import StampMinter2 from '../contracts/StampMinter2.json' with { type: 'json' };
 import StampMinter3 from '../contracts/StampMinter3.json' with { type: 'json' };
@@ -388,4 +388,44 @@ export async function buildAddStall({ rally, provider, signer, stall, feeCoin, c
     .addOutput({ to: minters[id].tokenAddress, amount: DUST, token: vaultCoin.token })
     .addOutput({ to: changeTo, amount: feeCoin.utxo.satoshis - lanes - fee });
   return { builder, rally: next };
+}
+
+/** BCMR registry for a rally (stamp type = first commitment byte), plus what the genesis commits to: sha256 + uri.
+ *  icons: true for the official rallies, whose art lives next to the registry (public/art/<type>.png, made on #/art);
+ *  a community rally hosted elsewhere has no icons. Shared by scripts/rally.mjs and #/organize. */
+export function bcmrRegistry(rally, registryUrl, minor = 0, icons = true) {
+  const now = new Date().toISOString();
+  const web = new URL('.', registryUrl).href;
+  const icon = (type) => (icons ? { icon: new URL(`art/${type}.png`, web).href } : {});
+  const body = JSON.stringify({
+    $schema: 'https://cashtokens.org/bcmr-v2.schema.json',
+    version: { major: 1, minor, patch: 0 },
+    latestRevision: now,
+    registryIdentity: { name: 'Jelajah', description: 'Stamp rallies on Bitcoin Cash', uris: { ...icon('00'), web } },
+    identities: {
+      [rally.category]: {
+        [now]: {
+          name: `${rally.name} stamps`,
+          description: rally.description,
+          token: {
+            category: rally.category, symbol: 'JELAJAH',
+            nfts: {
+              parse: {
+                bytecode: '00d2517f75', // OP_0 OP_UTXOTOKENCOMMITMENT OP_1 OP_SPLIT OP_DROP -> first byte
+                types: Object.fromEntries([
+                  ['00', { name: `${rally.name} Trophy`, description: `Completed ${rally.name}`, uris: icon('00') }],
+                  ...rally.merchants.map((m) => {
+                    const type = m.id.toString(16).padStart(2, '0');
+                    return [type, { name: `${m.emoji} ${m.name} stamp`, description: m.tagline, uris: icon(type) }];
+                  }),
+                ]),
+              },
+            },
+          },
+          uris: { ...icon('00'), web },
+        },
+      },
+    },
+  }, null, 2) + '\n';
+  return { body, hash: binToHex(sha256.hash(utf8ToBin(body))), uri: registryUrl.replace(/^https:\/\//, '') };
 }

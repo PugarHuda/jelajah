@@ -8,7 +8,7 @@ import { SimplePool } from 'nostr-tools/pool';
 import { nip19 } from 'nostr-tools';
 import { RELAYS, NIP39_KIND, rallyEvent, findRallies, buildProofTx, linkEvent, nip39Event, findVerified, loginChallenge, loginEvent, checkLogin } from './lib/identity.js';
 import { rally, provider, minters, vault, rallyLink, fromLink, passportFromLink, officialRallies, rallyFromPayload, type Merchant, type Rally } from './chain';
-import { genesisMatches, stallSales, isVoucher, buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane, buildReclaim, buildAddStall, buildPassportClaim, isTrophyOf } from './lib/tx.js';
+import { bcmrRegistry, rallyContracts, genesisMatches, stallSales, isVoucher, buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane, buildReclaim, buildAddStall, buildPassportClaim, isTrophyOf } from './lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, receiveZeroCoin, type Coin } from './wallet';
 import { Stamp, Trophy } from './Stamp';
 import { SLIDES_URL, REPO_URL, VOTE_ADDRESS } from './links';
@@ -376,7 +376,8 @@ function Organize() {
     const t = setInterval(() => tick((n) => n + 1), 500);
     return () => clearInterval(t);
   }, [wc.state, lock]);
-  const [f, setF] = useState({ name: '', needed: '3', reward: '4000', rewardsInPool: '2', durationDays: '30', levy: '', bonusNeeded: '', bonusReward: '' });
+  const [f, setF] = useState({ name: '', needed: '3', reward: '4000', rewardsInPool: '2', durationDays: '30', levy: '', bonusNeeded: '', bonusReward: '', bcmrUrl: '' });
+  const [bcmrBody, setBcmrBody] = useState<string | null>(null);
   const [stalls, setStalls] = useState<StallRow[]>([
     { name: '', emoji: '🍜', price: '5000', memberPrice: '4500', address: '' },
     { name: '', emoji: '☕', price: '5000', memberPrice: '4500', address: '' },
@@ -421,6 +422,10 @@ function Organize() {
   let problem: string | null = null;
   let need = 0n;
   try { const c = cfg(); checkRallyConfig(c); need = genesisNeed(c); } catch (e) { problem = e instanceof Error ? e.message : String(e); }
+  if (!problem && f.bcmrUrl.trim() && !/^https:\/\/[^\s]+\.json$/.test(f.bcmrUrl.trim())) problem = tr('The metadata URL must be https://… ending in .json', 'URL metadata harus https://… berakhiran .json');
+  // organizer's fee in a levy rally, enforced by the contracts: levies above the reward stay in the pool until reclaim
+  // (lower bound: RewardVault2.merge() lets at most 600 sats per input go to fees)
+  const margin = f.levy.trim() ? Number(f.needed) * (Number(f.levy) - 600) - 600 - Number(f.reward) : 0;
 
   async function open() {
     setErr(null);
@@ -443,7 +448,9 @@ function Organize() {
       // the rally's organizer key (for reclaim) is made here, not in the wallet: reclaim is then signed locally on #/reclaim
       const reclaimKey = generatePrivateKey();
       const r = planRally({ network: rally.network, cfg: c, organizerPub: binToHex(secp256k1.derivePublicKeyCompressed(reclaimKey) as Uint8Array), baseTxid: base.utxo.txid });
-      const { builder } = buildGenesis({ provider, rally: r, rewardsInPool: c.rewardsInPool, base, organizerLock: lock! });
+      // optional BCMR: wallets show the rally's names once the organizer hosts this file at that URL (hash locked in the genesis)
+      const reg = f.bcmrUrl.trim() ? bcmrRegistry(r, f.bcmrUrl.trim(), 0, false) : null;
+      const { builder } = buildGenesis({ provider, rally: r, rewardsInPool: c.rewardsInPool, base, organizerLock: lock!, bcmr: reg ?? undefined });
       const prize = sats(BigInt(r.reward) * BigInt(c.rewardsInPool));
       setBusy(tr('Approve the rally in your wallet…', 'Setujui pembukaan rally di wallet…'));
       const txid = await signAndSend(m, builder, [base], tr(`Open the rally "${r.name}" and lock ${prize} of prizes`, `Buka rally "${r.name}" dan kunci hadiah ${prize}`), 0);
@@ -451,6 +458,7 @@ function Organize() {
       try { localStorage.setItem(reclaimStoreKey(r as Rally), wif); } catch { /* shown below for backup anyway */ }
       setReclaimWif(wif);
       setMade({ name: r.name, category: r.category });
+      if (reg) setBcmrBody(reg.body);
       setLink(await rallyLink({ ...r, genesisTx: txid } as Rally));
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); }
   }
@@ -474,6 +482,7 @@ function Organize() {
               ? <button className="ghost" onClick={list}>{tr('List it on Nostr (shows on #/rallies)', 'Daftarkan di Nostr (muncul di #/rallies)')}</button>
               : <p className="small">✅ {tr(`Listed on ${listed} relays`, `Terdaftar di ${listed} relay`)} · <a href="#/rallies" onClick={() => setTimeout(() => location.reload())}>#/rallies</a></p>}
             {err && <p className="error" role="alert">{err}</p>}
+            {bcmrBody && <p className="small">🪪 <a href={URL.createObjectURL(new Blob([bcmrBody], { type: 'application/json' }))} download="bcmr.json">{tr('Download bcmr.json', 'Unduh bcmr.json')}</a> {tr(`and host it, unchanged, at ${f.bcmrUrl.trim()}: wallets then show your rally's names (its hash is locked in the genesis).`, `lalu host apa adanya di ${f.bcmrUrl.trim()}: wallet akan menampilkan nama rally-mu (hash-nya terkunci di genesis).`)}</p>}
             {reclaimWif && <p className="warn small">🔑 <b>{tr('Back up your reclaim key.', 'Simpan kunci reclaim-mu.')}</b> {tr('It is the only way to take the leftover pool back after the rally ends (link + #/reclaim). It is also saved in this browser.', 'Hanya dengan kunci ini sisa pool bisa diambil setelah rally berakhir (link + #/reclaim). Kunci ini juga tersimpan di browser ini.')}<br /><code className="wrap">{reclaimWif}</code></p>}
           </div>
         </div>
@@ -487,6 +496,7 @@ function Organize() {
           <label>{tr('Levy per stamp (sats, optional)', 'Levy per stamp (sats, opsional)')}<input type="number" min={0} value={f.levy} onChange={set('levy')} placeholder={tr('none', 'tanpa')} /></label>
           <label>{tr('Bonus tier: stalls (optional, needs a levy)', 'Tingkat bonus: jumlah warung (opsional, perlu levy)')}<input type="number" min={2} value={f.bonusNeeded} onChange={set('bonusNeeded')} placeholder={tr('none', 'tanpa')} /></label>
           <label>{tr('Bonus reward (sats)', 'Hadiah bonus (sats)')}<input type="number" min={1} value={f.bonusReward} onChange={set('bonusReward')} disabled={!f.bonusNeeded.trim()} /></label>
+          <label className="wide">{tr('Wallet metadata URL (optional: where you will host bcmr.json, e.g. GitHub Pages)', 'URL metadata wallet (opsional: tempat kamu akan meng-host bcmr.json, mis. GitHub Pages)')}<input value={f.bcmrUrl} onChange={set('bcmrUrl')} placeholder="https://you.github.io/rally/bcmr.json" /></label>
         </div>
         <h2>{tr('Stalls', 'Warung')}</h2>
         {stalls.map((s, i) => (
@@ -505,7 +515,9 @@ function Organize() {
           {stalls.length > 1 && <button className="ghost" onClick={() => setStalls(stalls.slice(0, -1))}>− {tr('Remove the last', 'Hapus yang terakhir')}</button>}
         </p>
         {problem ? <p className="error" role="alert">{problem}</p>
-          : <p className="hint">{tr(`Your wallet will lock about ${sats(need)} (prize pool, one coin per stall lane, fees).`, `Wallet-mu akan mengunci sekitar ${sats(need)} (pool hadiah, satu koin per jalur warung, fee).`)}</p>}
+          : <p className="hint">{tr(`Your wallet will lock about ${sats(need)} (prize pool, one coin per stall lane, fees).`, `Wallet-mu akan mengunci sekitar ${sats(need)} (pool hadiah, satu koin per jalur warung, fee).`)}
+            {margin > 0 && tr(` Your fee: every set's levies exceed its reward by at least ${sats(margin)}; that surplus stays in the pool and comes back to you with reclaim after the rally ends.`,
+              ` Fee-mu: levy tiap set melebihi hadiahnya minimal ${sats(margin)}; surplus itu tertahan di pool dan kembali kepadamu lewat reclaim setelah rally berakhir.`)}</p>}
         {lock
           ? <button className="primary big" disabled={!!problem || !!busy} onClick={open}>{busy ?? tr('Open the rally', 'Buka rally')}</button>
           : <button className="primary big" onClick={wc.connect} disabled={wc.state === 'connecting' || wc.state === 'connected'}>{wc.state === 'connected' ? tr('Loading wallet…', 'Memuat wallet…') : tr('Connect wallet', 'Hubungkan wallet')}</button>}
@@ -823,6 +835,21 @@ function Stats() {
   // Jelajah ID: which collectors have a verified Nostr identity (looked up from public relays, verified on chain)
   const [ids, setIds] = useState<Record<string, string>>({});
   useEffect(() => { rallyStats({ rally, provider, minters, vault }).then(setS, (e) => setErr(String(e))); }, []);
+  // all seasons: every official rally on this network is a season; trophies and stamps add up per collector (on demand:
+  // it reads each rally's whole history)
+  const [seasons, setSeasons] = useState<{ pkh: string; trophies: number; stamps: number; seasons: number }[] | 'loading' | null>(null);
+  async function loadSeasons() {
+    setSeasons('loading');
+    try {
+      const all = await Promise.all(officialRallies.map((r) => rallyStats({ rally: r, provider, ...rallyContracts(r, provider) })));
+      const by = new Map<string, { pkh: string; trophies: number; stamps: number; seasons: number }>();
+      all.forEach((st) => st.collectors.forEach((c: StatsData['collectors'][number]) => {
+        const x = by.get(c.pkh) ?? { pkh: c.pkh, trophies: 0, stamps: 0, seasons: 0 };
+        by.set(c.pkh, { ...x, trophies: x.trophies + c.trophies, stamps: x.stamps + c.stamps, seasons: x.seasons + 1 });
+      }));
+      setSeasons([...by.values()].sort((a, b) => b.trophies - a.trophies || b.seasons - a.seasons || b.stamps - a.stamps).slice(0, 10));
+    } catch (e) { setErr(String(e)); setSeasons(null); }
+  }
   useEffect(() => {
     if (!s?.collectors.length) return;
     const pool = new SimplePool();
@@ -860,6 +887,17 @@ function Stats() {
           <tbody>{s.collectors.map((c) => <tr key={c.pkh}><td><a href={`#/u/${addressOf(hexToBin(`76a914${c.pkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}><code>{shortAddr(c.pkh)}</code></a>{ids[c.pkh] && <> <a className="small" href={`https://njump.me/${nip19.npubEncode(ids[c.pkh])}`} target="_blank" rel="noreferrer" title={tr('Verified Jelajah ID: this address and this Nostr key prove each other', 'Jelajah ID terverifikasi: alamat ini dan kunci Nostr ini saling membuktikan')}>✓ Nostr</a></>}</td><td>{c.stalls}/{rally.merchants.length}</td><td>{c.stamps}</td><td>{'🏆'.repeat(Math.min(c.trophies, 5))}{c.trophies > 5 ? ` ×${c.trophies}` : ''}</td></tr>)}</tbody>
         </table>
       </>)}
+      <h2>{tr('All seasons', 'Semua musim')}</h2>
+      <p className="muted small">{tr(`Every official Jelajah rally on this network is a season (${officialRallies.length} so far). Their collectors, added up from each rally's history.`,
+        `Setiap rally resmi Jelajah di network ini adalah satu musim (${officialRallies.length} sejauh ini). Kolektornya dijumlahkan dari riwayat tiap rally.`)}</p>
+      {seasons === null && <button className="ghost" onClick={loadSeasons}>{tr('Load the all-season leaderboard', 'Muat papan peringkat semua musim')}</button>}
+      {seasons === 'loading' && <p className="muted">{tr('Reading every season…', 'Membaca semua musim…')}</p>}
+      {Array.isArray(seasons) && (seasons.length === 0 ? <p className="muted">{tr('No collectors yet.', 'Belum ada kolektor.')}</p> : (
+        <table>
+          <thead><tr><th>{tr('Collector', 'Kolektor')}</th><th>{tr('Seasons', 'Musim')}</th><th>Stamp{ID ? '' : 's'}</th><th>{tr('Trophies', 'Trofi')}</th></tr></thead>
+          <tbody>{seasons.map((c) => <tr key={c.pkh}><td><a href={`#/u/${addressOf(hexToBin(`76a914${c.pkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}><code>{shortAddr(c.pkh)}</code></a></td><td>{c.seasons}</td><td>{c.stamps}</td><td>{c.trophies}</td></tr>)}</tbody>
+        </table>
+      ))}
       <a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a>
     </main>
   );

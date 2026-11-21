@@ -83,6 +83,10 @@ node scripts/rally.mjs bcmr    --network chipnet --registry https://<host>/bcmr.
 
 **Community rallies on Nostr:** after opening a rally on `#/organize`, the organizer can list it on public relays (a signed kind-30078 event carrying the share link's `?r=` payload). `#/rallies` lists them for the current network. Listings are signature-checked, and each rally is checked again by the same link rules when it opens, with the community-rally warning. Still no server.
 
+**Seasons:** every official rally on a network is a season. `#/stats` can add up every season's collectors (trophies, stamps, seasons played), read from each rally's history, and collector pages show their record per rally.
+
+**Wallet metadata for community rallies:** `#/organize` takes an optional https URL for `bcmr.json`. The genesis commits to its hash (the same `bcmrRegistry` the CLI uses), and the organizer downloads the file and hosts it there, unchanged. Without our art, a community rally's registry has names but no icons.
+
 **Gift links:** `#/gift` makes a key in the browser and puts it in the link's `#fragment`, which browsers never send to a server. Fund its address, send the link, and the receiver connects a wallet and sweeps it, so someone with an empty wallet can buy their first stamp. The link is the money: whoever opens it first can take it, and the giver can take it back the same way.
 
 **Quality:** Lighthouse (mobile) scores 100 for accessibility, best practices and SEO. `oxlint` reports no warnings.
@@ -101,7 +105,7 @@ All four are tested against the VM first (`npm run check`, 68 checks, about 40 o
 - **UI tests:** `npm run test:ui` runs 8 Playwright tests against the production build: organizer rule checks, tampered links, the device signature, posters and the language switch.
 
 ## Mainnet levy rally (21 Nov 2026, live demo)
-The live demo is a **levy rally**: `StampMinter3` + `RewardVault2`, the anti-collusion design, with a bonus tier, member prices and 2 lanes per stall. Add `?net=chipnet` for the test rally. Each stamp: 1,500 sats to the stall (1,200 for trophy holders) + 2,500 levy to the pool. Set of 3 different stalls → 3,000; all 4 → 4,500. Pool seeded with 4 rewards, and every set's levies refill it. Open for 60 days.
+The live demo is a **levy rally**: `StampMinter3` + `RewardVault2`, the anti-collusion design, with a bonus tier, member prices and 2 lanes per stall. Add `?net=chipnet` for the test rally. Each stamp: 1,500 sats to the stall (1,200 for trophy holders) + 2,500 levy to the pool. Set of 3 different stalls → 3,000; all 4 → 4,500. Pool seeded with 4 rewards, and every set's levies refill it. Open for 60 days. **Organizer fee without a new contract:** each set's levies (7,500) exceed its reward (3,000) by at least 2,100 sats after merge fees (at most 600 per merged input); that surplus stays in the vault and returns to the organizer with `reclaim` after the end. `#/organize` shows this margin for any levy rally.
 - Genesis: [`e0ed3240…`](https://blockchair.com/bitcoin-cash/transaction/e0ed3240f589bafe01996f2a8f54a4f32077ecb212df24a7cfcdb2ab6c19752e) · category `6dd1cc7da85cdb72d7cbe597a505b11197173ebb25c3e49e079c778ac1a5cbf3`
 - Reward vault: `bitcoincash:rwh78jaglz5vvz5w793d3zlsw6unl574tn8h5r0shrspwxmlztgmqdlj6sakf`
 - BCMR metadata, hash-committed in the genesis: [`bcmr-levy.json`](https://pugarhuda.github.io/jelajah/bcmr-levy.json)

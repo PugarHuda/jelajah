@@ -1,6 +1,6 @@
 # Launch posts (draft, post on 21 Nov 2026 = H-1)
 
-Fill in `<DORAHACKS_LINK>` after submitting. Attach `public/stamps.png` (or a screen recording of a purchase) to the first X post.
+Fill in `https://dorahacks.io/buidl/51463` after submitting. Attach `public/stamps.png` (or a screen recording of a purchase) to the first X post.
 
 ## X thread (@BangDropID)
 
@@ -41,7 +41,7 @@ Also in:
 🇮🇩 Bahasa Indonesia / English
 
 Code + attack tests: https://github.com/PugarHuda/jelajah
-Vote / BUIDL: <DORAHACKS_LINK>
+Vote / BUIDL: https://dorahacks.io/buidl/51463
 
 ## Telegram (BCH BLAZE group)
 
@@ -59,7 +59,7 @@ Halo semua! Update dari **Jelajah** (stamp rally di Bitcoin Cash, dari Jogja) �
 
 Demo: https://jelajah-bch.vercel.app
 Code: https://github.com/PugarHuda/jelajah
-BUIDL: <DORAHACKS_LINK>
+BUIDL: https://dorahacks.io/buidl/51463
 
 Feedback sangat diterima, terutama dari yang sudah coba pakai Selene / Paytaca 🙏
 

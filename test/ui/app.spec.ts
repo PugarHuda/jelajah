@@ -95,3 +95,12 @@ test('a collector page rejects something that is neither an address nor a key', 
   await page.goto('/?lang=en#/u/bitcoincash:nonsense');
   await expect(page.locator('.error')).toContainText('Not a BCH address or npub');
 });
+
+test('the organizer form only takes an https .json metadata URL', async ({ page }) => {
+  await page.goto('/?lang=en#/organize');
+  const url = page.getByLabel(/Wallet metadata URL/);
+  await url.fill('http://example.com/bcmr.json');
+  await expect(page.locator('.error')).toContainText('https://');
+  await url.fill('https://example.com/rally/bcmr.json');
+  await expect(page.locator('.hint')).toContainText('Your wallet will lock about');
+});
