@@ -45,7 +45,7 @@ export function Profile() {
       const stamps: Record<number, number> = {};
       held.filter((c) => !c.startsWith('00')).forEach((c) => { const s = parseInt(c.slice(0, 2), 16); stamps[s] = (stamps[s] ?? 0) + 1; });
       const trophies = held.filter((c) => c.startsWith('00'));
-      setP({ address, npub, record, stamps, bought: held.filter((c) => !c.startsWith('00') && c.slice(2, 42) === pkh).length, trophies: trophies.length, bonus: trophies.filter((c) => c.length > 42).length, streak: stampedDays && streakOf(stampedDays, todayWib()), days: stampedDays?.length ?? 0 });
+      setP({ address, npub, record, stamps, bought: held.filter((c) => !c.startsWith('00') && c.slice(2, 42) === pkh).length, trophies: trophies.length, bonus: trophies.filter((c) => c.length > 42 && c.endsWith('02')).length, streak: stampedDays && streakOf(stampedDays, todayWib()), days: stampedDays?.length ?? 0 });
     })().catch((e) => setErr(e instanceof Error ? e.message : String(e))).finally(() => pool.close(RELAYS));
   }, [q]);
   return (

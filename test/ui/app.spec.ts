@@ -161,3 +161,8 @@ test('every page renders without a script error', async ({ page }) => {
   }
   expect(errors).toEqual([]);
 });
+
+test('a streak link whose levies cannot cover the streak reward is ignored', async ({ page }) => {
+  await page.goto(`/?lang=en&r=${short({ ...streakRally, streakReward: 999999 })}`);
+  await expect(page.locator('.pill')).toHaveText('BCH mainnet');
+});

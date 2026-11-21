@@ -282,7 +282,7 @@ function Rally() {
         {trophies.length > 0 && (
           <section className="shelf">
             <h2>{tr('Trophy shelf', 'Rak trofi')}</h2>
-            <div className="trophies">{trophies.map((t) => <Trophy key={t.utxo.txid} name={rally.name} bonus={t.utxo.token!.nft!.commitment.length > 42} />)}</div>
+            <div className="trophies">{trophies.map((t) => <Trophy key={t.utxo.txid} name={rally.name} bonus={t.utxo.token!.nft!.commitment.endsWith("02") && t.utxo.token!.nft!.commitment.length > 42} />)}</div>
           </section>
         )}
 

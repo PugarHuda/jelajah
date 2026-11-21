@@ -40,7 +40,7 @@ export function parseRally(json: string | null): Rally | undefined {
       && [r.needed, r.reward, r.endTime].every(Number.isInteger) && [undefined, 2, 3, 4].includes(r.minter)
       && (r.sponsor === undefined || (r.minter === 3 && hex(r.sponsor.category, 64) && hex(r.sponsor.vmCategory, 64) && hex(r.sponsor.sponsorPub, 66)
         && Number.isInteger(r.sponsor.value) && Number.isInteger(r.sponsor.endTime) && r.merchants.every((m) => r.sponsor!.value < (m.memberPrice ?? m.price))))
-      && ((r.minter ?? 1) < 3 || Number.isInteger(r.levy)) && (r.minter !== 4 || (Number.isInteger(r.streakDays) && (r.streakDays ?? 0) >= 2 && Number.isInteger(r.streakReward))) && (r.bonusNeeded === undefined || (Number.isInteger(r.bonusNeeded) && Number.isInteger(r.bonusReward))) && (r.lanes === undefined || (Number.isInteger(r.lanes) && r.lanes >= 1 && r.lanes <= 8));
+      && ((r.minter ?? 1) < 3 || Number.isInteger(r.levy)) && (r.minter !== 4 || (Number.isInteger(r.streakDays) && (r.streakDays ?? 0) >= 2 && Number.isInteger(r.streakReward) && r.streakDays! * (r.levy! - 1000) - 1000 >= r.streakReward!)) && (r.bonusNeeded === undefined || (Number.isInteger(r.bonusNeeded) && Number.isInteger(r.bonusReward))) && (r.lanes === undefined || (Number.isInteger(r.lanes) && r.lanes >= 1 && r.lanes <= 8));
     if (!ok) return undefined;
     checkRallyConfig({ ...r, rewardsInPool: 1 }); // the same economic rules the CLI enforces (throws -> ignored below)
     if (r.sponsor) r.sponsor.name = String(r.sponsor.name ?? 'sponsor').slice(0, 40);
