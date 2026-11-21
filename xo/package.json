@@ -5,7 +5,7 @@
   "description": "Jelajah stamp purchase as an XO template (Build with XO / Migrate to XO bounties)",
   "dependencies": {
     "@bitauth/libauth": "^3.1.0-next.8",
-    "@xo-cash/engine": "^0.1.1-next.18029697917",
+    "@xo-cash/engine": "^0.1.1-next.18230317763",
     "@xo-cash/templates": "^0.0.12",
     "@xo-cash/types": "^0.0.9"
   }

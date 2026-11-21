@@ -41,7 +41,7 @@ Every step is one wallet prompt, and each one is a real covenant transaction on 
 - **Cool?** The stamp is printed by the payment itself. The prize sits in a covenant nobody can touch. The trophy is a membership card.
 - **Slick?** One button per step, works on a phone, Bahasa Indonesia / English, rupiah prices, stall posters with QR codes. No sign-up.
 - **Does it work?** The full lifecycle is on mainnet: stamps, claim and trophy (links below). There are 68 VM checks, about 40 of them attack cases, plus 8 Playwright UI tests. Every feature was also run with a real wallet (Selene) over WizardConnect.
-- **Does it make money?** Organisers (malls, festivals, tourism boards) pay per rally. Sponsors fund subsidised stamps. Every stamp is a paid visit the stall can prove on the `#/stats` dashboard.
+- **Does it make money?** Organisers (malls, festivals, tourism boards) pay per rally. Sponsors fund subsidised stamps. Every stamp is a paid visit the stall can prove on the `#/stats` dashboard, and the stall's till (`#/till/<id>`) rings the moment one is paid.
 
 **What makes it a rally and not a loyalty card.** A loyalty card is one shop paying back its own customers. Jelajah is **many independent stalls behind one prize pool**, and the hard part is keeping that pool honest:
 - the vault loops over stamps from *different* stalls;
@@ -89,7 +89,7 @@ Jelajah ID links a BCH address and a Nostr key, with no identity server:
 Live on mainnet: proof [`da731db2…`](https://blockchair.com/bitcoin-cash/transaction/da731db2956c3ab85474339e96c338155073869cb7fcb40d1a26ce3cc0dd437f). Offline tests refuse 5 forgery shapes, shadowing by junk events, and wrong-site logins.
 
 ### Build with XO / Migrate to XO (`xo/`)
-Jelajah's buy-and-stamp step as an XO template. Its locking script assembles byte-for-byte to the live StampMinter covenant, so the XO engine spends the same minters as the web app. Executed on chipnet ([`ef106294…`](https://chipnet.imaginary.cash/tx/ef106294af3bd134fad1b7dc02a00ad5402abd306648a39bde67d798ad2c1f00)) and inspected in blaze.xo.cash. The invitation and template JSON are in the repo.
+Jelajah's whole customer journey as an XO template: `buyStamp` and `claimSet`. Its locking scripts assemble byte-for-byte to the live StampMinter and RewardVault covenants, so the XO engine spends the same minters and vault as the web app. Executed on chipnet: a stamp ([`ef106294…`](https://chipnet.imaginary.cash/tx/ef106294af3bd134fad1b7dc02a00ad5402abd306648a39bde67d798ad2c1f00), inspected in blaze.xo.cash), then a full set of 3 stamps and **the claim [`71ca9dee…`](https://chipnet.imaginary.cash/tx/71ca9deebc3f056becba02cd2702d6579ba2a5465c9df7425bb38329596fc7be)** (reward + trophy, dry run checked by the BCH 2026 VM first). The invitations and template JSON are in the repo.
 **Feedback (~500 words)**
 
 > ⚠️ DRAFT prepared by Claude from the facts in `xo/README.md`. The bounty asks for personal feedback: Pugar, rewrite this in your own words, and keep, cut or add to it based on what you actually felt while building. Delete this note before submitting.

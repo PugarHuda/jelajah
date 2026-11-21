@@ -214,3 +214,29 @@ export function checkLogin(event, challenge, origin, maxAge = 300) {
 
 export const plainAddress = (lockOrAddress, prefix) =>
   typeof lockOrAddress === 'string' ? lockOrAddress : lockingBytecodeToCashAddress({ bytecode: lockOrAddress, prefix }).address;
+
+// ---- rally discovery on Nostr: an organizer lists a rally (its ?r= share payload) so others can find it, no server.
+// One replaceable event per rally and organizer (kind 30078, d = "jelajah-rally:<category>", t = "jelajah-rally").
+export const RALLY_TAG = 'jelajah-rally';
+const R_PAYLOAD = /^[A-Za-z0-9_-]{20,6000}$/; // base64url of the deflated rally JSON, same as the ?r= link
+
+/** @param {{ name: string, network: string, category: string, r: string }} rally */
+export const rallyEvent = ({ name, network, category, r }) => ({
+  kind: LINK_KIND,
+  created_at: Math.floor(Date.now() / 1000),
+  tags: [['d', `${RALLY_TAG}:${category}`], ['t', RALLY_TAG], ['network', network], ['r', r], ['alt', 'A Jelajah stamp rally on Bitcoin Cash']],
+  content: String(name).slice(0, 60),
+});
+
+/** Listed rallies, newest first. Signature-checked; the rally itself is shape- and rule-checked again when its link opens. */
+export async function findRallies(pool, network) {
+  const events = await pool.querySync(RELAYS, { kinds: [LINK_KIND], '#t': [RALLY_TAG] }, { maxWait: 4000 });
+  const latest = new Map(); // one per (author, d): replaceable
+  for (const e of events) {
+    const tag = (k) => e.tags.find((t) => t[0] === k)?.[1];
+    if (!tag('d')?.startsWith(`${RALLY_TAG}:`) || tag('network') !== network || !R_PAYLOAD.test(tag('r') ?? '') || !verifyFresh(e)) continue;
+    const key = `${e.pubkey}:${tag('d')}`;
+    if ((latest.get(key)?.created_at ?? -1) < e.created_at) latest.set(key, { name: String(e.content).slice(0, 60), r: tag('r'), pubkey: e.pubkey, created_at: e.created_at });
+  }
+  return [...latest.values()].sort((a, b) => b.created_at - a.created_at);
+}

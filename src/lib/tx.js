@@ -159,36 +159,45 @@ export function pickSet(rally, stamps, n = rally.needed) {
 
 /** Per-stall sales and claims, read from the chain: every spend of a minter is one paid stamp.
  *  ponytail: one Electrum round trip per tx, fine for hundreds of stamps; index by height if a rally gets big. */
+// Transactions at a covenant's address (unconfirmed ones too), minus the genesis and any txids in `skip`.
+async function txsOf(rally, provider, contract, skip) {
+  const hist = await provider.performRequest('blockchain.address.get_history', contract.address);
+  const ids = hist.map((h) => h.tx_hash).filter((id) => id !== rally.genesisTx && !skip?.has(id));
+  return Promise.all(ids.map(async (id) => {
+    const tx = decodeTransaction(hexToBin(await provider.getRawTransaction(id)));
+    if (typeof tx === 'string') throw new Error(tx);
+    return { id, tx };
+  }));
+}
+const ofRally = (rally, o) => o?.token && binToHex(o.token.category) === rally.category;
+// A real spend of a covenant hands the rally's minting NFT back to that covenant at out[0]. Only the
+// covenant holds that NFT, so junk sent to its address (or a fake NFT of another category) never counts.
+const spends = (rally, c) => ({ tx }) => ofRally(rally, tx.outputs[0]) && tx.outputs[0].token.nft?.capability === 'minting'
+  && binToHex(tx.outputs[0].lockingBytecode) === binToHex(cashAddressToLockingBytecode(c.address).bytecode);
+
+/** Every real sale at one stall: { ids: all txids looked at, sales: [{ id, buyerPkh, paid }] }. Pass the previous
+ *  `ids` as `skip` to poll cheaply (the stall's till page). */
+export async function stallSales({ rally, provider, minter, merchantId, skip }) {
+  const txs = await txsOf(rally, provider, minter, skip);
+  const sales = txs.filter(spends(rally, minter))
+    .filter(({ tx }) => ofRally(rally, tx.outputs[2]) && tx.outputs[2].token.nft?.commitment[0] === merchantId)
+    .map(({ id, tx }) => ({ id, buyerPkh: binToHex(tx.outputs[2].token.nft.commitment.slice(1)), paid: tx.outputs[1].valueSatoshis }));
+  return { ids: txs.map((t) => t.id), sales };
+}
+
 export async function rallyStats({ rally, provider, minters, vault }) {
-  const txsOf = async (contract) => {
-    const hist = await provider.performRequest('blockchain.address.get_history', contract.address);
-    const ids = hist.map((h) => h.tx_hash).filter((id) => id !== rally.genesisTx);
-    return Promise.all(ids.map(async (id) => {
-      const tx = decodeTransaction(hexToBin(await provider.getRawTransaction(id)));
-      if (typeof tx === 'string') throw new Error(tx);
-      return { id, tx };
-    }));
-  };
-  const ofRally = (o) => o?.token && binToHex(o.token.category) === rally.category;
-  const lockOf = (c) => binToHex(cashAddressToLockingBytecode(c.address).bytecode);
-  // A real spend of a covenant hands the rally's minting NFT back to that covenant at out[0]. Only the
-  // covenant holds that NFT, so junk sent to its address (or a fake NFT of another category) never counts.
-  const spends = (c) => ({ tx }) => ofRally(tx.outputs[0]) && tx.outputs[0].token.nft?.capability === 'minting'
-    && binToHex(tx.outputs[0].lockingBytecode) === lockOf(c);
   // collectors: pkh -> stalls visited, stamps bought, trophies won (every stamp and trophy commits to its owner's pkh)
   const people = new Map();
   const who = (pkh) => people.get(pkh) ?? people.set(pkh, { pkh, stalls: new Set(), stamps: 0, trophies: 0 }).get(pkh);
   const stalls = await Promise.all(rally.merchants.map(async (m) => {
-    const sales = (await txsOf(minters[m.id])).filter(spends(minters[m.id]))
-      .filter(({ tx }) => ofRally(tx.outputs[2]) && tx.outputs[2].token.nft?.commitment[0] === m.id);
-    const buyers = new Set(sales.map(({ tx }) => binToHex(tx.outputs[2].token.nft.commitment.slice(1))));
-    sales.forEach(({ tx }) => { const p = who(binToHex(tx.outputs[2].token.nft.commitment.slice(1))); p.stamps++; p.stalls.add(m.id); });
-    const revenue = sales.reduce((s, { tx }) => s + tx.outputs[1].valueSatoshis, 0n);
-    return { id: m.id, stamps: sales.length, buyers: buyers.size, revenue };
+    const { sales } = await stallSales({ rally, provider, minter: minters[m.id], merchantId: m.id });
+    sales.forEach((s) => { const p = who(s.buyerPkh); p.stamps++; p.stalls.add(m.id); });
+    const revenue = sales.reduce((s, x) => s + x.paid, 0n);
+    return { id: m.id, stamps: sales.length, buyers: new Set(sales.map((s) => s.buyerPkh)).size, revenue };
   }));
   // claims mint a trophy (commitment 0x00 + pkh) at out[2]; reclaim does not
-  const claimTxs = (await txsOf(vault)).filter(spends(vault))
-    .filter(({ tx }) => ofRally(tx.outputs[2]) && tx.outputs[2].token.nft?.commitment[0] === 0);
+  const claimTxs = (await txsOf(rally, provider, vault)).filter(spends(rally, vault))
+    .filter(({ tx }) => ofRally(rally, tx.outputs[2]) && tx.outputs[2].token.nft?.commitment[0] === 0);
   claimTxs.forEach(({ tx }) => who(binToHex(tx.outputs[2].token.nft.commitment.slice(1, 21))).trophies++); // bonus trophies carry a tier byte
   const collectors = [...people.values()].map((p) => ({ ...p, stalls: p.stalls.size }))
     .sort((a, b) => b.trophies - a.trophies || b.stalls - a.stalls || b.stamps - a.stamps).slice(0, 10);

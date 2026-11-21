@@ -37,6 +37,13 @@ try {
 
   // fund the XO account from the rally organizer if it is empty
   let spendable = await engine.listSpendableUnspentOutputs();
+  // the engine syncs headers on start; give it time to see coins it already has before funding it again
+  const bch = (l) => l.filter((u) => !u.token);
+  for (let i = 0; i < 40 && bch(spendable).length === 0 && (await engine.listUnspentOutputs()).length > 0; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    spendable = await engine.listSpendableUnspentOutputs();
+  }
+  spendable = bch(spendable);
   if (spendable.length === 0) {
     const receive = await engine.generateLockingBytecodeFromDefaultPolicy('receive');
     const provider = new ElectrumNetworkProvider('chipnet');
@@ -48,13 +55,16 @@ try {
       .addOutput({ to: hexToBin(receive), amount: 30_000n })
       .addOutput({ to: lock, amount: coin.satoshis - 31_000n }).send();
     console.log('funded XO account', txid);
-    for (let i = 0; i < 30 && spendable.length === 0; i++) { await new Promise((r) => setTimeout(r, 2000)); spendable = await engine.listSpendableUnspentOutputs(); }
+    for (let i = 0; i < 30 && spendable.length === 0; i++) { await new Promise((r) => setTimeout(r, 2000)); spendable = bch(await engine.listSpendableUnspentOutputs()); }
   }
   const funding = spendable.sort((a, b) => Number(BigInt(b.valueSatoshis) - BigInt(a.valueSatoshis)))[0];
 
   const { minters } = rallyContracts(rally, new ElectrumNetworkProvider('chipnet'));
   const [minter] = await minters[stallId].getUtxos();
-  const buyerLockingScript = await engine.generateLockingBytecodeFromDefaultPolicy('receive');
+  // one fixed receive address for every stamp: a set must be bought by one key (the default policy rotates addresses)
+  const saved = JSON.parse(readFileSync(walletFile));
+  if (!saved.buyer) writeFileSync(walletFile, JSON.stringify({ ...saved, buyer: await engine.generateLockingBytecodeFromDefaultPolicy('receive') }));
+  const buyerLockingScript = JSON.parse(readFileSync(walletFile)).buyer;
   // same CashASM as the template's minterRedeemBytecode, with this stall's values
   const minterUnlocking = () => {
     const asm = jelajahStampTemplate.scripts.minterRedeemBytecode

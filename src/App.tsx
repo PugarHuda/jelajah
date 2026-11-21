@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
 import qrcode from 'qrcode-generator';
 import { hexToBin, binToHex, cashAddressToLockingBytecode, secp256k1, sha256, generatePrivateKey, encodePrivateKeyWif, decodePrivateKeyWif, encodeLockingBytecodeP2pkh, hash160 } from '@bitauth/libauth';
@@ -6,9 +6,9 @@ import { TransactionBuilder, SignatureTemplate, type Utxo } from 'cashscript';
 import { generateSecretKey, getPublicKey, finalizeEvent, type NostrEvent } from 'nostr-tools/pure';
 import { SimplePool } from 'nostr-tools/pool';
 import { nip19 } from 'nostr-tools';
-import { RELAYS, NIP39_KIND, buildProofTx, linkEvent, nip39Event, findVerified, loginChallenge, loginEvent, checkLogin } from './lib/identity.js';
+import { RELAYS, NIP39_KIND, rallyEvent, findRallies, buildProofTx, linkEvent, nip39Event, findVerified, loginChallenge, loginEvent, checkLogin } from './lib/identity.js';
 import { rally, provider, minters, vault, rallyLink, fromLink, passportFromLink, type Merchant, type Rally } from './chain';
-import { isVoucher, buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane, buildReclaim, buildAddStall, buildPassportClaim, isTrophyOf } from './lib/tx.js';
+import { stallSales, isVoucher, buildStamp, buildClaim, isRallyNft, rallyStats, mergeLevies, checkRallyConfig, genesisNeed, planRally, buildGenesis, presenceMessage, signPresence, presenceCode, parsePresenceCode, pickLane, buildReclaim, buildAddStall, buildPassportClaim, isTrophyOf } from './lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf, receiveZeroCoin, type Coin } from './wallet';
 import { Stamp, Trophy } from './Stamp';
 import { SLIDES_URL, REPO_URL, VOTE_ADDRESS } from './links';
@@ -53,6 +53,10 @@ export default function App() {
   if (window.location.hash === '#/reclaim') return <Reclaim />;
   if (window.location.hash === '#/solidcash') return <SolidCashPage />;
   if (window.location.hash === '#/identity') return <IdentityPage />;
+  if (window.location.hash.startsWith('#/till/')) return <Till />;
+  if (window.location.hash.startsWith('#/u/')) return <Profile />;
+  if (window.location.hash === '#/rallies') return <Rallies />;
+  if (window.location.hash.startsWith('#/gift')) return <Gift />;
   if (window.location.hash === '#/passport' && passportFromLink) return <PassportPage />;
   if (window.location.hash === '#/art') return ( // press image: every stamp + the trophy
     <main className="art">{rally.merchants.map((m) => <Stamp key={m.id} m={m} inked size={220} />)}<Trophy name={rally.name} size={220} /></main>
@@ -313,11 +317,14 @@ function Rally() {
             <dt>SolidCash</dt><dd><a href="#/solidcash" onClick={() => setTimeout(() => location.reload())}>{tr('The stall card in SolidCash →', 'Kartu warung di SolidCash →')}</a></dd>
             <dt>Jelajah ID</dt><dd><a href="#/identity" onClick={() => setTimeout(() => location.reload())}>{tr('Link your BCH address with Nostr →', 'Tautkan alamat BCH-mu dengan Nostr →')}</a></dd>
             <dt>{tr('Organizers', 'Penyelenggara')}</dt><dd><a href="#/organize" onClick={() => setTimeout(() => location.reload())}>{tr('Open your own rally →', 'Buka rally-mu sendiri →')}</a> · <a href="#/reclaim" onClick={() => setTimeout(() => location.reload())}>{tr('reclaim after the end', 'ambil sisa pool')}</a></dd>
+            <dt>{tr('Stall tills', 'Kasir warung')}</dt><dd>{rally.merchants.map((m) => <a key={m.id} href={`#/till/${m.id}`} onClick={() => setTimeout(() => location.reload())}>🔔 {m.name}</a>)}</dd>
+            <dt>{tr('More rallies', 'Rally lain')}</dt><dd><a href="#/rallies" onClick={() => setTimeout(() => location.reload())}>{tr('Community rallies on Nostr →', 'Rally komunitas di Nostr →')}</a></dd>
+            <dt>{tr('Gift', 'Hadiah')}</dt><dd><a href="#/gift" onClick={() => setTimeout(() => location.reload())}>{tr('Give a friend sats for their first stamp →', 'Beri teman sats untuk stamp pertamanya →')}</a></dd>
             <dt>{tr('Stall posters', 'Poster warung')}</dt><dd>{rally.merchants.map((m) => <a key={m.id} href={`#/stall/${m.id}`}>{m.emoji} {m.name}</a>)}</dd>
           </dl>
         </section>
       </main>
-      <footer>Jelajah · {tr('stamp rallies on Bitcoin Cash · built for BCH BLAZE 2026', 'stamp rally di Bitcoin Cash · dibuat untuk BCH BLAZE 2026')} {lock && <span className="muted">· {tr('your stamp address', 'alamat stamp-mu')} {addressOf(lock, true)}</span>}</footer>
+      <footer>Jelajah · {tr('stamp rallies on Bitcoin Cash · built for BCH BLAZE 2026', 'stamp rally di Bitcoin Cash · dibuat untuk BCH BLAZE 2026')} {lock && <span className="muted">· {tr('your stamp address', 'alamat stamp-mu')} {addressOf(lock, true)} · <a href={`#/u/${addressOf(lock)}`} onClick={() => setTimeout(() => location.reload())}>{tr('your collector page', 'halaman kolektormu')}</a></span>}</footer>
     </>
   );
 }
@@ -378,6 +385,19 @@ function Organize() {
   const [err, setErr] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const [reclaimWif, setReclaimWif] = useState<string | null>(null);
+  const [made, setMade] = useState<{ name: string; category: string } | null>(null);
+  const [listed, setListed] = useState<number | null>(null);
+  async function list() { // optional: put the rally on #/rallies (a Nostr event carrying the share link's payload)
+    setErr(null);
+    try {
+      const signer = await nostrSigner();
+      const event = await signer.sign(rallyEvent({ ...made!, network: rally.network, r: new URL(link!).searchParams.get('r')! }));
+      const pool = new SimplePool();
+      const res = await Promise.allSettled(pool.publish(RELAYS, event));
+      pool.close(RELAYS);
+      setListed(res.filter((r) => r.status === 'fulfilled').length);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+  }
 
   const payout = (address: string) => {
     if (!address.trim()) return lock ? binToHex(lock) : '76a914' + '00'.repeat(20) + '88ac'; // default: the organizer
@@ -429,6 +449,7 @@ function Organize() {
       const wif = encodePrivateKeyWif(reclaimKey, rally.network === 'mainnet' ? 'mainnet' : 'testnet');
       try { localStorage.setItem(reclaimStoreKey(r as Rally), wif); } catch { /* shown below for backup anyway */ }
       setReclaimWif(wif);
+      setMade({ name: r.name, category: r.category });
       setLink(await rallyLink({ ...r, genesisTx: txid } as Rally));
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); }
   }
@@ -448,6 +469,10 @@ function Organize() {
             <h3>{tr('Your rally is live', 'Rally-mu sudah live')} 🎉</h3>
             <p className="small" style={{ wordBreak: 'break-all' }}><a href={link}>{link}</a></p>
             <p className="muted small">{tr('The rally lives in this link: save it. Stall posters: open the link and add #/stall/1, #/stall/2, …', 'Rally ada di dalam link ini, simpan baik-baik. Poster warung: buka link lalu tambahkan #/stall/1, #/stall/2, …')}</p>
+            {listed === null
+              ? <button className="ghost" onClick={list}>{tr('List it on Nostr (shows on #/rallies)', 'Daftarkan di Nostr (muncul di #/rallies)')}</button>
+              : <p className="small">✅ {tr(`Listed on ${listed} relays`, `Terdaftar di ${listed} relay`)} · <a href="#/rallies" onClick={() => setTimeout(() => location.reload())}>#/rallies</a></p>}
+            {err && <p className="error" role="alert">{err}</p>}
             {reclaimWif && <p className="warn small">🔑 <b>{tr('Back up your reclaim key.', 'Simpan kunci reclaim-mu.')}</b> {tr('It is the only way to take the leftover pool back after the rally ends (link + #/reclaim). It is also saved in this browser.', 'Hanya dengan kunci ini sisa pool bisa diambil setelah rally berakhir (link + #/reclaim). Kunci ini juga tersimpan di browser ini.')}<br /><code className="wrap">{reclaimWif}</code></p>}
           </div>
         </div>
@@ -831,7 +856,7 @@ function Stats() {
         <h2>{tr('Top collectors', 'Kolektor teratas')}</h2>
         <table>
           <thead><tr><th>{tr('Collector', 'Kolektor')}</th><th>{tr('Stalls visited', 'Warung dikunjungi')}</th><th>Stamp{ID ? '' : 's'}</th><th>{tr('Trophies', 'Trofi')}</th></tr></thead>
-          <tbody>{s.collectors.map((c) => <tr key={c.pkh}><td><code>{shortAddr(c.pkh)}</code>{ids[c.pkh] && <> <a className="small" href={`https://njump.me/${nip19.npubEncode(ids[c.pkh])}`} target="_blank" rel="noreferrer" title={tr('Verified Jelajah ID: this address and this Nostr key prove each other', 'Jelajah ID terverifikasi: alamat ini dan kunci Nostr ini saling membuktikan')}>✓ Nostr</a></>}</td><td>{c.stalls}/{rally.merchants.length}</td><td>{c.stamps}</td><td>{'🏆'.repeat(Math.min(c.trophies, 5))}{c.trophies > 5 ? ` ×${c.trophies}` : ''}</td></tr>)}</tbody>
+          <tbody>{s.collectors.map((c) => <tr key={c.pkh}><td><a href={`#/u/${addressOf(hexToBin(`76a914${c.pkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}><code>{shortAddr(c.pkh)}</code></a>{ids[c.pkh] && <> <a className="small" href={`https://njump.me/${nip19.npubEncode(ids[c.pkh])}`} target="_blank" rel="noreferrer" title={tr('Verified Jelajah ID: this address and this Nostr key prove each other', 'Jelajah ID terverifikasi: alamat ini dan kunci Nostr ini saling membuktikan')}>✓ Nostr</a></>}</td><td>{c.stalls}/{rally.merchants.length}</td><td>{c.stamps}</td><td>{'🏆'.repeat(Math.min(c.trophies, 5))}{c.trophies > 5 ? ` ×${c.trophies}` : ''}</td></tr>)}</tbody>
         </table>
       </>)}
       <a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a>
@@ -944,6 +969,219 @@ function Device() {
         {sig && <><img className="qr" src={qrImage(sig)} alt={tr('Signed code for the buyer', 'Kode bertanda tangan untuk pembeli')} /><code className="wrap small">{sig}</code></>}
       </>)}
       <p className="muted small">{tr('The code works once, for this buyer, at this stall, in this rally: a screenshot is useless to anyone else, and to them after they buy.', 'Kode ini berlaku sekali, untuk pembeli ini, di warung ini, di rally ini: screenshot tidak berguna bagi orang lain, dan bagi mereka setelah membeli.')}</p>
+    </main>
+  );
+}
+
+const back = <p><a href="#" onClick={() => setTimeout(() => location.reload())}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>;
+
+// ---- #/till/<stall id>: the stall's cashier screen. Rings on every paid stamp as soon as it hits the mempool,
+// and keeps the totals, all read from the stall covenant's own history (no server, nothing to fake).
+type Sale = { id: string; buyerPkh: string; paid: bigint; fresh: boolean };
+function Till() {
+  const id = Number(location.hash.match(/^#\/till\/(\d+)/)?.[1] ?? 0);
+  const m = rally.merchants.find((x) => x.id === id);
+  const [sales, setSales] = useState<Sale[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [bell, setBell] = useState<AudioContext | null>(null);
+  const bellRef = useRef<AudioContext | null>(null);
+  useEffect(() => { bellRef.current = bell; }, [bell]);
+  useEffect(() => {
+    if (!m) return;
+    const seen = new Set<string>();
+    let first = true, stop = false, timer = 0;
+    const poll = async () => {
+      try {
+        const { ids, sales: got } = await stallSales({ rally, provider, minter: minters[m.id], merchantId: m.id, skip: seen });
+        ids.forEach((x: string) => seen.add(x));
+        const fresh = !first;
+        setSales((s) => [...got.map((x: Omit<Sale, 'fresh'>) => ({ ...x, fresh })).reverse(), ...(s ?? [])]);
+        if (fresh && got.length) ring(bellRef.current);
+        first = false;
+        setErr(null);
+      } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+      if (!stop) timer = window.setTimeout(poll, 5000);
+    };
+    poll();
+    return () => { stop = true; clearTimeout(timer); };
+  }, [m]);
+  if (!m) return <main className="organize"><p className="error">{tr('No such stall', 'Warung tidak ada')}</p>{back}</main>;
+  const total = (sales ?? []).reduce((s, x) => s + x.paid, 0n);
+  const fresh = (sales ?? []).filter((x) => x.fresh);
+  return (
+    <main className="poster device">
+      <p className="eyebrow">{rally.name} · {tr('till', 'kasir')}</p>
+      <h1>{m.emoji} {m.name}</h1>
+      {!bell && <button className="primary" onClick={() => { const c = new AudioContext(); ring(c); setBell(c); }}>🔔 {tr('Turn on the sale bell', 'Nyalakan bel penjualan')}</button>}
+      <p className="lede">{sales === null ? tr('Reading the chain…', 'Membaca chain…')
+        : tr(`${sales.length} stamps sold · ${sats(total)} paid to this stall`, `${sales.length} stamp terjual · ${sats(total)} dibayar ke warung ini`)}</p>
+      {fresh.length > 0 && <p className="hint"><b>🔔 +{fresh.length} {tr('since this screen opened', 'sejak layar ini dibuka')} · {sats(fresh.reduce((s, x) => s + x.paid, 0n))}</b></p>}
+      <ul>{(sales ?? []).slice(0, 20).map((x) => (
+        <li key={x.id}>{x.fresh ? '🔔 ' : ''}{sats(x.paid)} · <a href={`#/u/${addressOf(hexToBin(`76a914${x.buyerPkh}88ac`))}`} onClick={() => setTimeout(() => location.reload())}>{shortAddr(x.buyerPkh)}</a> · <a href={explorerTx(x.id)} target="_blank" rel="noreferrer">{x.id.slice(0, 10)}…</a></li>
+      ))}</ul>
+      {err && <p className="error" role="alert">{err}</p>}
+      <p className="muted small">{tr('Keep this open on the stall’s phone or tablet. Every stamp here is a payment the covenant already checked, so a ring means the money is in.', 'Biarkan terbuka di ponsel atau tablet warung. Setiap stamp di sini adalah pembayaran yang sudah dicek covenant, jadi kalau bel berbunyi, uangnya sudah masuk.')}</p>
+      {back}
+    </main>
+  );
+}
+function ring(ctx: AudioContext | null) {
+  navigator.vibrate?.(200);
+  if (!ctx) return;
+  [0, 0.18].forEach((t, i) => {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = i ? 1320 : 880;
+    g.gain.setValueAtTime(0.3, ctx.currentTime + t);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.5);
+    o.connect(g).connect(ctx.destination);
+    o.start(ctx.currentTime + t);
+    o.stop(ctx.currentTime + t + 0.5);
+  });
+}
+
+// ---- #/u/<BCH address or npub>: a collector's page. What they hold in this rally, read from the chain, and their
+// verified Nostr identity (Jelajah ID) if they linked one. Shareable: nothing here is self-reported.
+type ProfileData = { address: string; npub?: string; stamps: Record<number, number>; bought: number; trophies: number; bonus: number };
+function Profile() {
+  const q = decodeURIComponent(location.hash.slice('#/u/'.length)).trim();
+  const [p, setP] = useState<ProfileData | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    const pool = new SimplePool();
+    (async () => {
+      let address: string;
+      let npub: string | undefined;
+      if (q.includes(':')) {
+        const l = cashAddressToLockingBytecode(q);
+        if (typeof l === 'string') throw new Error(tr('Not a BCH address or npub', 'Bukan alamat BCH atau npub'));
+        address = addressOf(l.bytecode);
+        const r = await findVerified(pool, { address }, provider).catch(() => null);
+        if (r?.ok) npub = nip19.npubEncode(r.nostrPubkey!);
+      } else {
+        const pk = q.startsWith('npub') ? nip19.decode(q).data as string : q;
+        const r = await findVerified(pool, { nostrPubkey: pk }, provider);
+        if (!r.ok) throw new Error(r.reason ?? tr('No verified BCH address for this Nostr key', 'Belum ada alamat BCH terverifikasi untuk kunci Nostr ini'));
+        address = r.address!;
+        npub = nip19.npubEncode(pk);
+      }
+      const pkh = binToHex((cashAddressToLockingBytecode(address) as { bytecode: Uint8Array }).bytecode.slice(3, 23));
+      const held = (await provider.getUtxos(address)).filter((u) => isRallyNft(rally, u)).map((u) => u.token!.nft!.commitment);
+      const stamps: Record<number, number> = {};
+      held.filter((c) => !c.startsWith('00')).forEach((c) => { const s = parseInt(c.slice(0, 2), 16); stamps[s] = (stamps[s] ?? 0) + 1; });
+      const trophies = held.filter((c) => c.startsWith('00'));
+      setP({ address, npub, stamps, bought: held.filter((c) => !c.startsWith('00') && c.slice(2, 42) === pkh).length, trophies: trophies.length, bonus: trophies.filter((c) => c.length > 42).length });
+    })().catch((e) => setErr(e instanceof Error ? e.message : String(e))).finally(() => pool.close(RELAYS));
+  }, [q]);
+  return (
+    <main className="organize">
+      <p className="eyebrow">{rally.name} · {tr('collector', 'kolektor')}</p>
+      <h1>{p?.npub ? `✓ ${p.npub.slice(0, 16)}…` : p ? `${p.address.slice(0, p.address.indexOf(':') + 9)}…` : tr('Collector', 'Kolektor')}</h1>
+      {!p && !err && <p className="muted">{tr('Reading the chain and public relays…', 'Membaca chain dan relay publik…')}</p>}
+      {err && <p className="error" role="alert">{err}</p>}
+      {p && (<>
+        <p className="muted small"><code className="wrap">{p.address}</code>{p.npub && <> ⇄ <a href={`https://njump.me/${p.npub}`} target="_blank" rel="noreferrer">{tr('verified Nostr', 'Nostr terverifikasi')}</a></>}</p>
+        <div className="trophies">
+          {rally.merchants.map((m) => <div key={m.id} title={m.name}><Stamp m={m} inked={!!p.stamps[m.id]} size={96} />{p.stamps[m.id] > 1 && <b> ×{p.stamps[m.id]}</b>}</div>)}
+        </div>
+        <p>{tr(`${Object.keys(p.stamps).length}/${rally.merchants.length} stalls in hand · ${p.bought} stamps bought by this address · ${p.trophies} trophies`,
+          `${Object.keys(p.stamps).length}/${rally.merchants.length} warung di tangan · ${p.bought} stamp dibeli alamat ini · ${p.trophies} trofi`)}{p.bonus > 0 && ` (${p.bonus} bonus)`}</p>
+        {p.trophies > 0 && <div className="trophies">{Array.from({ length: Math.min(p.trophies, 6) }, (_, i) => <Trophy key={i} name={rally.name} bonus={i < p.bonus} size={96} />)}</div>}
+        <p className="muted small">{tr('Read from the chain just now. Stamps bought by this address are the ones it can claim a reward with; traded stamps are collectibles.', 'Dibaca dari chain barusan. Stamp yang dibeli alamat ini yang bisa diklaim hadiahnya; stamp hasil tukar hanya koleksi.')}</p>
+        <p className="small">{tr('Share this page', 'Bagikan halaman ini')}: <code className="wrap">{location.href}</code></p>
+      </>)}
+      {back}
+    </main>
+  );
+}
+
+// ---- #/rallies: community rallies listed on Nostr by their organizers (from #/organize). Discovery without a server.
+function Rallies() {
+  const [list, setList] = useState<{ name: string; r: string; pubkey: string; created_at: number }[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    const pool = new SimplePool();
+    findRallies(pool, rally.network).then(setList, (e) => setErr(String(e))).finally(() => pool.close(RELAYS));
+  }, []);
+  return (
+    <main className="organize">
+      <p className="eyebrow">{rally.network === 'mainnet' ? 'BCH mainnet' : 'chipnet (test)'} · Nostr</p>
+      <h1>{tr('Community rallies', 'Rally komunitas')}</h1>
+      <p className="lede">{tr('Rallies their organizers listed on public Nostr relays. Anyone can list one: check who runs it before you buy. Each rally is checked again when you open it.', 'Rally yang didaftarkan penyelenggaranya di relay Nostr publik. Siapa pun bisa mendaftarkan: cek siapa penyelenggaranya sebelum membeli. Setiap rally dicek ulang saat dibuka.')}</p>
+      {list === null && !err && <p className="muted">{tr('Asking the relays…', 'Bertanya ke relay…')}</p>}
+      {list?.length === 0 && <p className="muted">{tr('None listed yet.', 'Belum ada.')} <a href="#/organize" onClick={() => setTimeout(() => location.reload())}>{tr('Open one →', 'Buka satu →')}</a></p>}
+      <ul>{list?.map((x) => <li key={x.pubkey + x.r.slice(0, 24)}><a href={`${location.pathname}?r=${x.r}`}>{x.name || tr('(untitled)', '(tanpa nama)')}</a> <span className="muted small">· {nip19.npubEncode(x.pubkey).slice(0, 14)}… · {new Date(x.created_at * 1000).toLocaleDateString(ID ? 'id-ID' : 'en-US')}</span></li>)}</ul>
+      {err && <p className="error" role="alert">{err}</p>}
+      {back}
+    </main>
+  );
+}
+
+// ---- #/gift/<wif>: a gift link holding a few sats, so someone with an empty wallet can buy their first stamp.
+// The key lives only in the link's #fragment, which browsers never send to a server. Whoever opens it first can take it.
+function Gift() {
+  const [wif] = useState(() => {
+    const w = location.hash.slice('#/gift/'.length);
+    if (w) return w;
+    const made = encodePrivateKeyWif(generatePrivateKey(), rally.network === 'mainnet' ? 'mainnet' : 'testnet');
+    history.replaceState(null, '', `${location.pathname}${location.search}#/gift/${made}`); // a reload keeps the same key
+    return made;
+  });
+  const key = decodePrivateKeyWif(wif);
+  const giftLock = typeof key === 'string' ? null : encodeLockingBytecodeP2pkh(hash160(secp256k1.derivePublicKeyCompressed(key.privateKey) as Uint8Array));
+  const address = giftLock ? addressOf(giftLock) : '';
+  const wc = useWizardConnect({ dappName: 'Jelajah', dappIcon: new URL('favicon.svg', location.origin + import.meta.env.BASE_URL).href });
+  const lock = wc.state === 'connected' ? buyerLock(wc.manager) : null;
+  const [, tick] = useState(0);
+  useEffect(() => { // xpubs can land after "connected"
+    if (wc.state !== 'connected' || lock) return;
+    const t = setInterval(() => tick((n) => n + 1), 500);
+    return () => clearInterval(t);
+  }, [wc.state, lock]);
+  const [balance, setBalance] = useState<bigint | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    if (!address) return;
+    const look = () => provider.getUtxos(address).then((u) => setBalance(u.filter((x) => !x.token).reduce((s, x) => s + x.satoshis, 0n))).catch(() => {});
+    look();
+    const t = setInterval(look, 6000);
+    return () => clearInterval(t);
+  }, [address]);
+  async function take() {
+    setErr(null);
+    try {
+      if (typeof key === 'string') throw new Error(key);
+      const coins = (await provider.getUtxos(address)).filter((u) => !u.token);
+      const total = coins.reduce((s, u) => s + u.satoshis, 0n);
+      const fee = 200n + 150n * BigInt(coins.length);
+      if (total - fee < 546n) throw new Error(tr('This gift is empty (or already taken).', 'Hadiah ini kosong (atau sudah diambil).'));
+      const sig = new SignatureTemplate(key.privateKey);
+      const tb = new TransactionBuilder({ provider });
+      coins.forEach((u) => tb.addInput(u, sig.unlockP2PKH()));
+      setDone((await tb.addOutput({ to: lock!, amount: total - fee }).send()).txid);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+  }
+  if (!giftLock) return <main className="organize"><p className="error">{tr('This gift link is broken.', 'Link hadiah ini rusak.')}</p>{back}</main>;
+  return (
+    <main className="organize">
+      <p className="eyebrow">{rally.network === 'mainnet' ? 'BCH mainnet' : 'chipnet (test)'} · {tr('gift link', 'link hadiah')}</p>
+      <h1>🎁 {balance ? sats(balance) : tr('A Jelajah gift', 'Hadiah Jelajah')}</h1>
+      {done ? <p className="hint">✅ {tr('In your wallet', 'Sudah di wallet-mu')}: <a href={explorerTx(done)} target="_blank" rel="noreferrer">{done.slice(0, 16)}…</a>. <a href={location.pathname + location.search} onClick={() => setTimeout(() => location.reload())}>{tr('Now buy your first stamp →', 'Sekarang beli stamp pertamamu →')}</a></p>
+        : balance ? (lock
+          ? <button className="primary big" onClick={take}>{tr(`Take ${sats(balance)} into my wallet`, `Ambil ${sats(balance)} ke wallet-ku`)}</button>
+          : <button className="primary big" onClick={wc.connect} disabled={wc.state === 'connecting' || wc.state === 'connected'}>{wc.state === 'connected' ? tr('Loading wallet…', 'Memuat wallet…') : tr('Connect wallet to take it', 'Hubungkan wallet untuk mengambilnya')}</button>)
+        : <p className="muted">{balance === null ? tr('Checking…', 'Mengecek…') : tr('Empty: fund it below, or it was already taken.', 'Kosong: isi di bawah, atau sudah diambil.')}</p>}
+      {err && <p className="error" role="alert">{err}</p>}
+      <details className="small" open={balance === 0n}>
+        <summary>{tr('Make a gift', 'Buat hadiah')}</summary>
+        <p>{tr('1. Send a few thousand sats to this address (enough for one stamp or more):', '1. Kirim beberapa ribu sats ke alamat ini (cukup untuk satu stamp atau lebih):')}</p>
+        <img className="qr small" src={qrImage(address)} alt={address} /><br /><code className="wrap">{address}</code>
+        <p>{tr('2. Share this page’s link. The link IS the money: whoever opens it first can take it, so send it privately.', '2. Bagikan link halaman ini. Link ini adalah uangnya: siapa pun yang membukanya lebih dulu bisa mengambilnya, jadi kirim secara pribadi.')}</p>
+        <code className="wrap">{location.href}</code>
+        <p className="muted">{tr('Changed your mind? Open the link yourself and take it back.', 'Berubah pikiran? Buka link-nya sendiri dan ambil kembali.')}</p>
+      </details>
+      {wc.uri && wc.qrUri && <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri} title="WizardConnect" subtitle={tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca')} />}
+      {back}
     </main>
   );
 }

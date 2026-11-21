@@ -130,3 +130,18 @@ console.log('PASS login: the right challenge passes; a wrong challenge, another 
   assert.ok(lookups <= 80, `${lookups} lookups`);
   console.log(`PASS 40 forgeries with fake txids still lose (${lookups} lookups, budget 80)`);
 }
+
+{ // rally discovery: signed, right network, well-formed payload, newest per (author, rally); everything else dropped
+  const { findRallies, rallyEvent } = await import('../src/lib/identity.js');
+  const k = generateSecretKey();
+  const r = 'A'.repeat(40);
+  const ev = (over, key = k) => finalizeEvent({ ...rallyEvent({ name: 'Jelajah Test', network: 'chipnet', category: 'ab'.repeat(32), r }), ...over }, key);
+  const old = ev({ created_at: 1000 });
+  const newer = ev({ created_at: 2000, content: 'Renamed' });
+  const tampered = { ...ev({ created_at: 3000 }), content: 'Hijacked' };
+  const otherNet = ev({ tags: rallyEvent({ name: 'x', network: 'mainnet', category: 'cd'.repeat(32), r }).tags });
+  const badPayload = ev({ tags: rallyEvent({ name: 'x', network: 'chipnet', category: 'ef'.repeat(32), r: 'javascript:alert(1)' }).tags });
+  const list = await findRallies({ querySync: async () => [old, newer, tampered, otherNet, badPayload] }, 'chipnet');
+  assert.deepEqual(list.map((x) => x.name), ['Renamed']);
+  console.log('PASS rally discovery keeps only the newest signed, well-formed listing for this network');
+}

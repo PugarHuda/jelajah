@@ -77,6 +77,14 @@ node scripts/rally.mjs bcmr    --network chipnet --registry https://<host>/bcmr.
 
 **Stall device key:** `#/device` shows the secret key under "Back up or move this key" and can import one, so a stall can change phones without a new rally.
 
+**Stall till:** `#/till/<stall id>` is the cashier screen. It rings (and vibrates) on every paid stamp as soon as it reaches the mempool, and shows the stall's sales and buyers. Everything comes from the stall covenant's own history (`stallSales` in `src/lib/tx.js`, shared with `#/stats`), so a ring means the covenant already checked the payment.
+
+**Collector pages:** `#/u/<BCH address or npub>` shows what a collector holds in the rally (stamps per stall, how many they bought themselves, trophies) and their verified Jelajah ID, all read live from the chain and public relays. `#/stats` links every top collector to theirs.
+
+**Community rallies on Nostr:** after opening a rally on `#/organize`, the organizer can list it on public relays (a signed kind-30078 event carrying the share link's `?r=` payload). `#/rallies` lists them for the current network. Listings are signature-checked, and each rally is checked again by the same link rules when it opens, with the community-rally warning. Still no server.
+
+**Gift links:** `#/gift` makes a key in the browser and puts it in the link's `#fragment`, which browsers never send to a server. Fund its address, send the link, and the receiver connects a wallet and sweeps it, so someone with an empty wallet can buy their first stamp. The link is the money: whoever opens it first can take it, and the giver can take it back the same way.
+
 **Quality:** Lighthouse (mobile) scores 100 for accessibility, best practices and SEO. `oxlint` reports no warnings.
 
 **Stall dashboard:** open `#/stats` in the app. Stamps sold, unique buyers, sats paid to each stall and sets claimed, all recomputed in the browser from each covenant's history, plus a **top-collectors** board (stalls visited, stamps, trophies per address). Prices also show a rupiah estimate (a CoinGecko rate, nothing about the user is sent). A transaction only counts if it really spent the covenant (the rally's minting NFT goes back to it at out[0]), so nobody can inflate the numbers by sending junk to a minter address.
@@ -141,11 +149,10 @@ CashScript 0.14 · libauth · WizardConnect (`@wizardconnect/react`) · React + 
 
 ## Bounties in this repo
 - **FoldingCash Reward Claims:** [`claims/`](claims/README.md). Pull-based Merkle claims built on a second, on-chain "claimed" tree, run on real FoldingCash distro data on chipnet.
-- **Build with XO / Migrate to XO:** [`xo/`](xo/README.md). Jelajah's buy-and-stamp step as an XO template that assembles byte-for-byte to the live StampMinter covenant, executed through the XO engine on chipnet.
+- **Build with XO / Migrate to XO:** [`xo/`](xo/README.md). Jelajah's whole journey as an XO template (`buyStamp` + `claimSet`) that assembles byte-for-byte to the live StampMinter and RewardVault covenants. Three stamps and the claim [`71ca9dee…`](https://chipnet.imaginary.cash/tx/71ca9deebc3f056becba02cd2702d6579ba2a5465c9df7425bb38329596fc7be) (reward + trophy) were executed through the XO engine on chipnet.
 - **SolidCash:** [`solidcash/`](solidcash/contracts/StampCard.scash). The stall's loyalty card in SolidCash: a covenant-verified card mapping, structs, an enum, a library with a loop, modifiers, events and custom errors, with checkSig auth. It is 6.6 kB and has 7 solidhat tests. The full lifecycle ran on **BCH mainnet**: [deploy](https://blockchair.com/bitcoin-cash/transaction/14d3ce94683315902f4d278c14b49781e6799b8b44d61e1cd39692d773af15d8) → fund → 3 visits → [redeem](https://blockchair.com/bitcoin-cash/transaction/8d122760c076254b72ee42f9dbdfcee26fe0ad940a6181b53a5fa11399202994), and on chipnet before that (see [`solidcash/deployments/`](solidcash/deployments/) and the app's `#/solidcash` page). Upstream PR: [solidcash#14](https://github.com/solidcash/solidcash/pull/14), which prints each compiler warning once.
 - **Decentralised Identity:** [`docs/IDENTITY.md`](docs/IDENTITY.md). Jelajah ID links a BCH address and a Nostr key, each vouching for the other: an on-chain proof tx, a signed Nostr event, an independent verifier CLI and page (`#/identity`), and challenge login. It is live on mainnet.
 
 ## Not yet
 - Prices and rewards in PUSD (ParyonUSD).
-- An XO follow-up action for the claim.
 - Merkle pull-claims for rallies with thousands of people.

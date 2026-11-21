@@ -1,7 +1,7 @@
 {
   "$schema": "https://libauth.org/schemas/wallet-template-v0.schema.json",
   "name": "Jelajah stamp",
-  "description": "Pay a stall in a Jelajah stamp rally and receive its stamp NFT in the same transaction.",
+  "description": "Pay a stall in a Jelajah stamp rally and receive its stamp NFT in the same transaction; burn a full set at the rally vault for the reward and a trophy.",
   "icon": "stamp",
   "version": "1",
   "supported": [
@@ -18,7 +18,7 @@
   "roles": {
     "buyer": {
       "name": "Buyer",
-      "description": "Pays the stall and receives its stamp.",
+      "description": "Pays the stall and receives its stamp; later burns a full set for the reward.",
       "icon": "buyer"
     }
   },
@@ -55,6 +55,41 @@
         ]
       },
       "transaction": "buyStampTransaction"
+    },
+    "claimSet": {
+      "name": "Claim the reward",
+      "description": "Burn $(<needed>) stamps from different stalls for $(<reward>) satoshis and a trophy.",
+      "icon": "trophy",
+      "roles": {
+        "buyer": {
+          "requirements": {
+            "variables": [
+              "rallyCategory",
+              "rallyVmCategory",
+              "needed",
+              "reward",
+              "organizerPub",
+              "endTime",
+              "vaultSatoshis",
+              "vaultRemaining",
+              "buyerLockingScript",
+              "trophyCommitmentHex"
+            ]
+          }
+        }
+      },
+      "requirements": {
+        "participants": [
+          {
+            "role": "buyer",
+            "slots": {
+              "min": 1,
+              "max": 1
+            }
+          }
+        ]
+      },
+      "transaction": "claimSetTransaction"
     }
   },
   "transactions": {
@@ -82,9 +117,49 @@
           "outputIndex": 2
         }
       ]
+    },
+    "claimSetTransaction": {
+      "name": "Rally set claimed",
+      "description": "Burned $(<needed>) stamps for $(<reward>) satoshis and a trophy.",
+      "icon": "trophy",
+      "inputs": [
+        {
+          "input": "vaultInput",
+          "inputIndex": 0
+        }
+      ],
+      "outputs": [
+        {
+          "output": "vaultOutput",
+          "outputIndex": 0
+        },
+        {
+          "output": "rewardOutput",
+          "outputIndex": 1
+        },
+        {
+          "output": "trophyOutput",
+          "outputIndex": 2
+        }
+      ]
     }
   },
   "inputs": {
+    "vaultInput": {
+      "name": "Rally vault",
+      "description": "The rally's reward pool, holding the vault's minting NFT.",
+      "icon": "contract",
+      "valueSatoshis": "$(<vaultSatoshis>)",
+      "token": {
+        "category": "$(<rallyCategory>)",
+        "amount": "0",
+        "nft": {
+          "capability": "minting",
+          "commitment": ""
+        }
+      },
+      "unlockingScript": "vaultClaimUnlockingBytecode"
+    },
     "minterInput": {
       "name": "Stall minter",
       "description": "The stall's covenant coin, holding the rally's minting NFT.",
@@ -102,6 +177,55 @@
     }
   },
   "outputs": {
+    "vaultOutput": {
+      "name": "Rally vault",
+      "description": "The vault keeps its minting NFT and pays out exactly one reward.",
+      "icon": "contract",
+      "lockingScript": "rewardVault",
+      "valueSatoshis": "$(<vaultRemaining>)",
+      "token": {
+        "category": "$(<rallyCategory>)",
+        "amount": "0",
+        "nft": {
+          "capability": "minting",
+          "commitment": ""
+        }
+      },
+      "selectable": false,
+      "balance": {
+        "satoshis": "<bigint: 0n>",
+        "fungibleTokens": "<bigint: 0n>",
+        "nonfungibleTokens": 0
+      },
+      "roles": {
+        "buyer": {
+          "relevant": false
+        }
+      }
+    },
+    "rewardOutput": {
+      "name": "Your reward",
+      "description": "$(<reward>) satoshis to the buyer of the stamps.",
+      "icon": "receive",
+      "lockingScript": "$(<buyerLockingScript>)",
+      "valueSatoshis": "$(<reward>)",
+      "token": null
+    },
+    "trophyOutput": {
+      "name": "Your trophy",
+      "description": "Trophy NFT: 00 followed by your public key hash.",
+      "icon": "trophy",
+      "lockingScript": "$(<buyerLockingScript>)",
+      "valueSatoshis": "$(<tokenDust>)",
+      "token": {
+        "category": "$(<rallyCategory>)",
+        "amount": "0",
+        "nft": {
+          "capability": "none",
+          "commitment": "$(<trophyCommitmentHex>)"
+        }
+      }
+    },
     "minterOutput": {
       "name": "Stall minter",
       "description": "The minter goes back to the covenant unchanged.",
@@ -153,6 +277,24 @@
     }
   },
   "lockingScripts": {
+    "rewardVault": {
+      "name": "Jelajah reward vault",
+      "description": "Pays one reward per set of stamps from different stalls, all bought by the claimer.",
+      "icon": "contract",
+      "lockingType": "p2sh",
+      "lockingBytecode": "vaultRedeemBytecode",
+      "selectable": false,
+      "balance": {
+        "satoshis": "<bigint: 0n>",
+        "fungibleTokens": "<bigint: 0n>",
+        "nonfungibleTokens": 0
+      },
+      "roles": {
+        "buyer": {
+          "relevant": false
+        }
+      }
+    },
     "stampMinter": {
       "name": "Jelajah stall minter",
       "description": "Lets a stamp out only when the stall is paid at least its price, in the same transaction.",
@@ -173,6 +315,8 @@
     }
   },
   "scripts": {
+    "vaultRedeemBytecode": "<endTime> <organizerPub> <reward> <needed> <rallyVmCategory> OP_5 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_1 OP_UTXOTOKENCOMMITMENT OP_1 OP_SPLIT OP_NIP OP_0 OP_1 OP_BEGIN OP_DUP OP_5 OP_PICK OP_LESSTHANOREQUAL OP_DUP OP_TOALTSTACK OP_IF OP_DUP OP_UTXOTOKENCATEGORY OP_4 OP_PICK OP_EQUALVERIFY OP_DUP OP_UTXOTOKENCOMMITMENT OP_SIZE <0x15> OP_NUMEQUALVERIFY OP_DUP OP_1 OP_SPLIT OP_DROP OP_BIN2NUM OP_DUP OP_4 OP_PICK OP_GREATERTHAN OP_VERIFY OP_DUP OP_4 OP_ROLL OP_DROP OP_SWAP OP_2SWAP OP_ROT OP_OVER OP_1 OP_SPLIT OP_NIP OP_5 OP_PICK OP_EQUALVERIFY OP_ROT OP_1ADD OP_NIP OP_NIP OP_ENDIF OP_FROMALTSTACK OP_NOT OP_UNTIL OP_DROP OP_0 OP_OUTPUTBYTECODE OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_0 OP_UTXOTOKENCOMMITMENT OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_0 OP_UTXOVALUE OP_6 OP_PICK OP_SUB OP_NUMEQUALVERIFY <0x76a914> OP_2 OP_PICK OP_CAT <0x88ac> OP_CAT OP_1 OP_OUTPUTBYTECODE OP_OVER OP_EQUALVERIFY OP_1 OP_OUTPUTVALUE OP_6 OP_ROLL OP_GREATERTHANOREQUAL OP_VERIFY OP_1 OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_2 OP_OUTPUTBYTECODE OP_EQUALVERIFY OP_2 OP_OUTPUTTOKENCATEGORY OP_3 OP_ROLL OP_EQUALVERIFY OP_2 OP_OUTPUTTOKENCOMMITMENT <0x00> OP_3 OP_ROLL OP_CAT OP_EQUALVERIFY OP_3 OP_BEGIN OP_DUP OP_TXOUTPUTCOUNT OP_LESSTHAN OP_DUP OP_TOALTSTACK OP_IF OP_DUP OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_1ADD OP_ENDIF OP_FROMALTSTACK OP_NOT OP_UNTIL OP_2DROP OP_2DROP OP_2DROP OP_1 OP_ELSE OP_5 OP_ROLL OP_1 OP_NUMEQUALVERIFY OP_4 OP_ROLL OP_CHECKLOCKTIMEVERIFY OP_DROP OP_4 OP_ROLL OP_4 OP_ROLL OP_CHECKSIG OP_NIP OP_NIP OP_NIP OP_ENDIF",
+    "vaultClaimUnlockingBytecode": "OP_0 <vaultRedeemBytecode>",
     "minterRedeemBytecode": "<merchantId> <stallPrice> <stallLockingScript> OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_0 OP_OUTPUTBYTECODE OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_0 OP_UTXOTOKENCOMMITMENT OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_0 OP_UTXOVALUE OP_NUMEQUALVERIFY OP_1 OP_OUTPUTBYTECODE OP_EQUALVERIFY OP_1 OP_OUTPUTVALUE OP_LESSTHANOREQUAL OP_VERIFY OP_1 OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_0 OP_UTXOTOKENCATEGORY <0x20> OP_SPLIT OP_DROP OP_2 OP_OUTPUTTOKENCATEGORY OP_EQUALVERIFY OP_2 OP_OUTPUTBYTECODE OP_SIZE <0x19> OP_NUMEQUALVERIFY OP_DUP OP_3 OP_SPLIT OP_NIP <0x14> OP_SPLIT OP_DROP OP_SWAP <0x76a914> OP_2 OP_PICK OP_CAT <0x88ac> OP_CAT OP_EQUALVERIFY OP_2 OP_OUTPUTTOKENCOMMITMENT OP_ROT OP_ROT OP_CAT OP_EQUALVERIFY OP_2 OP_OUTPUTTOKENAMOUNT OP_0 OP_NUMEQUALVERIFY OP_TXOUTPUTCOUNT OP_4 OP_LESSTHANOREQUAL OP_VERIFY OP_TXOUTPUTCOUNT OP_4 OP_NUMEQUAL OP_IF OP_3 OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_ENDIF OP_1",
     "minterUnlockingBytecode": "<minterRedeemBytecode>",
     "stampCommitment": "<merchantId> <buyerLockingScript> OP_3 OP_SPLIT OP_NIP <20> OP_SPLIT OP_DROP OP_CAT"
@@ -215,6 +359,51 @@
       "name": "Your address",
       "description": "Where your stamp goes. Must be P2PKH: the rally binds it to your key.",
       "type": "locking_script"
+    },
+    "rallyCategory": {
+      "name": "Rally category",
+      "description": "The rally's token category (as shown in wallets).",
+      "type": "bytes"
+    },
+    "rallyVmCategory": {
+      "name": "Rally category (VM order)",
+      "description": "The same category in the byte order the VM sees.",
+      "type": "bytes"
+    },
+    "needed": {
+      "name": "Stamps per set",
+      "description": "How many different stalls make a set.",
+      "type": "integer"
+    },
+    "reward": {
+      "name": "Reward",
+      "description": "Satoshis paid for one set.",
+      "type": "satoshis"
+    },
+    "organizerPub": {
+      "name": "Organizer key",
+      "description": "May reclaim the pool after the rally ends.",
+      "type": "bytes"
+    },
+    "endTime": {
+      "name": "Rally end",
+      "description": "Unix time after which the organizer may reclaim.",
+      "type": "integer"
+    },
+    "vaultSatoshis": {
+      "name": "Vault satoshis",
+      "description": "Satoshis in the vault coin now.",
+      "type": "integer"
+    },
+    "vaultRemaining": {
+      "name": "Vault after the claim",
+      "description": "Vault satoshis minus one reward.",
+      "type": "integer"
+    },
+    "trophyCommitmentHex": {
+      "name": "Trophy commitment",
+      "description": "00 followed by your public key hash, as hex.",
+      "type": "string"
     },
     "stampCommitmentHex": {
       "name": "Stamp commitment",

@@ -62,17 +62,36 @@ test('the language switch flips the UI to Indonesian and back', async ({ page })
   await expect(page.locator('h1')).toContainText('Jajan di 3 warung');
 });
 
-test('the SolidCash page lists every step of the recorded chipnet run', async ({ page }) => {
-  const run = JSON.parse(readFileSync(new URL('../../solidcash/deployments/chipnet.json', import.meta.url), 'utf8'));
-  await page.goto('/?lang=en#/solidcash');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('SolidCash');
-  await expect(page.locator('ol li')).toHaveCount(Object.keys(run.txs).length);
-  await expect(page.locator(`a[href$="${run.txs.redeem}"]`)).toBeVisible();
-});
+for (const net of ['mainnet', 'chipnet']) {
+  test(`the SolidCash page lists every step of the recorded ${net} run`, async ({ page }) => {
+    const run = JSON.parse(readFileSync(new URL(`../../solidcash/deployments/${net}.json`, import.meta.url), 'utf8'));
+    await page.goto('/?lang=en#/solidcash');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('SolidCash');
+    const section = page.locator('section').filter({ has: page.getByRole('heading', { name: net, exact: true }) });
+    await expect(section.locator('ol li')).toHaveCount(Object.keys(run.txs).length);
+    await expect(section.locator(`a[href$="${run.txs.redeem}"]`)).toBeVisible();
+  });
+}
 
 test('Jelajah ID refuses to search an empty query and shows a Nostr key before any wallet', async ({ page }) => {
   await page.goto('/?lang=en#/identity');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Bitcoin Cash and Nostr');
   await expect(page.getByRole('button', { name: 'Verify' })).toBeDisabled();
   await expect(page.locator('code').first()).toContainText('npub1');
+});
+
+test('a new gift link keeps its key in the #fragment, so a reload shows the same gift address', async ({ page }) => {
+  await page.goto('/?lang=en#/gift');
+  await expect(page).toHaveURL(/#\/gift\/[KL5][1-9A-HJ-NP-Za-km-z]{50,51}$/);
+  const url = page.url();
+  const address = await page.locator('details code.wrap').first().textContent();
+  expect(address).toMatch(/^bitcoincash:q/);
+  await page.reload();
+  expect(page.url()).toBe(url);
+  await expect(page.locator('details code.wrap').first()).toHaveText(address!);
+});
+
+test('a collector page rejects something that is neither an address nor a key', async ({ page }) => {
+  await page.goto('/?lang=en#/u/bitcoincash:nonsense');
+  await expect(page.locator('.error')).toContainText('Not a BCH address or npub');
 });
