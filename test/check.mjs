@@ -431,3 +431,107 @@ await fails('replaying a used presence code (the minter coin it named is gone)',
   assert.equal(streakOf(['2026-10-31', '2026-11-01'], '2026-11-01'), 2); // across a month
   console.log('PASS streak counts consecutive days');
 }
+
+// ---- StampMinter4 + RewardVault3: dated stamps, and a streak reward for consecutive days
+{
+  const StampMinter4 = artifact('StampMinter4'), RewardVault3 = artifact('RewardVault3');
+  const STREAK_DAYS = 3n, STREAK = 15_000n; // 3 x LEVY = 25,500 >= 15,000: a streak faked in one sitting pays itself
+  const vault3 = new Contract(RewardVault3, [vmCategory, 3n, REWARD, 0n, 0n, STREAK_DAYS, STREAK, binToHex(organizer.pub), END], { provider });
+  const vault3Lock = binToHex(cashAddressToLockingBytecode(vault3.address).bytecode);
+  provider.addUtxo(vault3.address, randomUtxo({ satoshis: 100_000n, token: minting }));
+  const m4 = merchants3.map((m, i) => {
+    const c = new Contract(StampMinter4, [m.lock, PRICE, MEMBER, `0${i + 1}`, vault3Lock, LEVY, ''], { provider });
+    provider.addUtxo(c.address, randomUtxo({ satoshis: DUST, token: minting }));
+    return c;
+  });
+  const D = 20_413; // 2025-11-21 (days since 1970)
+  const dayHex = (d) => binToHex(Uint8Array.of(d & 0xff, d >> 8));
+  const fred = key(6), gina = key(7);
+  const dated = (who) => async () => (await nftsOf(who)).filter((u) => u.token.nft.commitment.length === 46 && !u.token.nft.commitment.startsWith('00'))
+    .sort((a, b) => a.token.nft.commitment.slice(42).localeCompare(b.token.nft.commitment.slice(42)));
+  async function buy4(i, buyer, day, { locktimeDay = day } = {}) {
+    const [minterUtxo] = (await m4[i].getUtxos()).filter((u) => u.token);
+    const coin = fund(buyer);
+    return new TransactionBuilder({ provider })
+      .addInput(minterUtxo, m4[i].unlock.stamp(new Uint8Array(64)))
+      .addInput(coin, buyer.sig.unlockP2PKH())
+      .addOutput({ to: m4[i].tokenAddress, amount: DUST, token: minterUtxo.token })
+      .addOutput({ to: hexToBin(merchants3[i].lock), amount: PRICE })
+      .addOutput(nftOut(buyer, `0${i + 1}` + binToHex(buyer.pkh) + dayHex(day)))
+      .addOutput({ to: hexToBin(vault3Lock), amount: LEVY })
+      .addOutput({ to: hexToBin(buyer.lock), amount: coin.satoshis - PRICE - DUST - LEVY - 2_000n })
+      .setLocktime(locktimeDay * 86400 + 3600)
+      .send();
+  }
+  await fails('dated stamp whose day is not its locktime day (dated in the future)', () => buy4(0, fred, D + 1, { locktimeDay: D }));
+  for (const [i, d] of [[0, D], [1, D + 1], [2, D + 2]]) await buy4(i, fred, d);
+  console.log('PASS fred bought dated stamps on 3 consecutive days (day = locktime / 86400, CLTV-enforced)');
+
+  const vaultCoin3 = async () => (await vault3.getUtxos()).find((u) => u.token);
+  async function streak(stamps, holder, { pay = STREAK, tier = '03' } = {}) {
+    const v = await vaultCoin3();
+    const tb = new TransactionBuilder({ provider }).addInput(v, vault3.unlock.streak());
+    stamps.forEach((s) => tb.addInput(s, holder.sig.unlockP2PKH()));
+    tb.addInput(fund(holder, 10_000n), holder.sig.unlockP2PKH());
+    return tb
+      .addOutput({ to: vault3.tokenAddress, amount: v.satoshis - pay, token: v.token })
+      .addOutput({ to: hexToBin(holder.lock), amount: pay + 6_000n })
+      .addOutput(nftOut(holder, '00' + binToHex(holder.pkh) + tier))
+      .send();
+  }
+  // gina: days D, D+1, D+3 (a gap)
+  for (const [i, d] of [[0, D], [1, D + 1], [2, D + 3]]) await buy4(i, gina, d);
+  await fails('streak with a gap day', async () => streak(await dated(gina)(), gina));
+  await fails('streak paying more than streakReward', async () => streak(await dated(fred)(), fred, { pay: STREAK + 1n }));
+  await fails('streak that mints a plain trophy instead of the streak one', async () => streak(await dated(fred)(), fred, { tier: '' }));
+  await fails('streak out of day order', async () => { const s = await dated(fred)(); return streak([s[1], s[0], s[2]], fred); });
+  const before = (await vaultCoin3()).satoshis;
+  await streak(await dated(fred)(), fred);
+  assert.equal((await vaultCoin3()).satoshis, before - STREAK);
+  assert.ok((await nftsOf(fred)).some((u) => u.token.nft.commitment === '00' + binToHex(fred.pkh) + '03'));
+  console.log(`PASS fred burned stamps from 3 consecutive days for the streak reward (${STREAK}) and the streak trophy 00‖pkh‖03`);
+
+  // the set claim still works on dated stamps (gina's 3 stalls, days don't matter there)
+  {
+    const v = await vaultCoin3();
+    const tb = new TransactionBuilder({ provider }).addInput(v, vault3.unlock.claim());
+    for (const s of (await dated(gina)()).sort((a, b) => a.token.nft.commitment.localeCompare(b.token.nft.commitment))) tb.addInput(s, gina.sig.unlockP2PKH());
+    tb.addInput(fund(gina, 10_000n), gina.sig.unlockP2PKH());
+    await tb.addOutput({ to: vault3.tokenAddress, amount: v.satoshis - REWARD, token: v.token })
+      .addOutput({ to: hexToBin(gina.lock), amount: REWARD + 6_000n })
+      .addOutput(nftOut(gina, '00' + binToHex(gina.pkh)))
+      .send();
+    console.log('PASS the set claim works on dated stamps too (RewardVault3.claim)');
+  }
+}
+
+{ // the app's own builders on a streak rally (minter 4): buildStamp dates each stamp, buildStreak finds the run
+  const { rallyContracts, buildStamp, buildStreak, checkRallyConfig, stampDay } = await import('../src/lib/tx.js');
+  assert.throws(() => checkRallyConfig({ needed: 3, reward: 3000, rewardsInPool: 1, levy: 2500, streakDays: 3, streakReward: 4000,
+    merchants: [1, 2, 3].map((id) => ({ id, price: 1500 })) }), /anti-collusion.*streak/);
+  const cat2 = binToHex(crypto.getRandomValues(new Uint8Array(32)));
+  const rally4 = { network: 'mock', category: cat2, vmCategory: binToHex(hexToBin(cat2).reverse()), needed: 3, reward: 3000, levy: 2500,
+    minter: 4, streakDays: 3, streakReward: 3500, organizerPub: binToHex(organizer.pub), endTime: Number(END), lanes: 1,
+    merchants: [11, 12, 13].map((n, i) => ({ id: i + 1, price: 1500, memberPrice: 1200, lock: key(n).lock })) };
+  const { minters, vault } = rallyContracts(rally4, provider);
+  const mint4 = { category: cat2, amount: 0n, nft: { capability: 'minting', commitment: '' } };
+  Object.values(minters).forEach((c) => provider.addUtxo(c.address, randomUtxo({ satoshis: DUST, token: mint4 })));
+  provider.addUtxo(vault.address, randomUtxo({ satoshis: 20_000n, token: mint4 }));
+  const hana = key(8), lock = hexToBin(hana.lock);
+  const coins = async () => (await provider.getUtxosForLockingBytecode(hana.lock)).map((utxo) => ({ utxo, unlocker: hana.sig.unlockP2PKH() }));
+  const realNow = Date.now;
+  for (let k = 0; k < 3; k++) {
+    Date.now = () => realNow() + k * 86_400_000; // a day later each time
+    fund(hana, 20_000n);
+    const { builder } = await buildStamp({ rally: rally4, provider, minters, merchantId: (k % 3) + 1, buyerLock: lock, coins: (await coins()).filter((c) => !c.utxo.token) });
+    await builder.send();
+  }
+  Date.now = realNow;
+  const stamps = (await coins()).filter((c) => c.utxo.token?.category === cat2);
+  const days = stamps.map((s) => stampDay(s.utxo.token.nft.commitment)).sort();
+  assert.deepEqual(days.map((d) => d - days[0]), [0, 1, 2]);
+  const { builder } = await buildStreak({ rally: rally4, provider, vault, buyerLock: lock, stamps, coins: (await coins()).filter((c) => !c.utxo.token) });
+  await builder.send();
+  assert.ok((await nftsOf(hana)).some((u) => u.token.category === cat2 && u.token.nft.commitment === '00' + binToHex(hana.pkh) + '03'));
+  console.log('PASS the app builders: 3 dated stamps on 3 days, then buildStreak paid the streak reward and minted the streak trophy');
+}

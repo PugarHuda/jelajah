@@ -1,0 +1,80 @@
+pragma cashscript ^0.14.0;
+
+// StampMinter v4 = StampMinter3 + a date on every stamp, for streak rewards (RewardVault3.streak()).
+// The stamp commitment is merchantId ‖ buyer pkh ‖ day (2 bytes, little endian, days since 1970-01-01 UTC), and day is
+// tx.locktime / 86400 with the locktime enforced (CLTV): a stamp can't be dated in the future. BCH has no expiry, so
+// a buyer CAN backdate a stamp (an older locktime); that's why every dated stamp still pays the levy: a streak faked
+// in one sitting costs `streakDays` levies, which is at least the streak reward (checked when the rally is opened).
+//
+// Layout as StampMinter3:
+//   in[0]  this minter -> out[0] this minter, unchanged
+//   in[1]  OPTIONAL the buyer's Trophy -> out[4] the same Trophy (member price)
+//   out[1] merchant, out[2] dated stamp to the buyer, out[3] levy to the vault, then optional BCH-only change
+contract StampMinter4(bytes merchantLock, int minPrice, int memberPrice, bytes1 merchantId, bytes vaultLock, int levy, bytes presenceKey) {
+    function stamp(datasig presence) {
+        require(this.activeInputIndex == 0);
+
+        // minter continues unchanged
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
+        require(tx.outputs[0].nftCommitment == tx.inputs[0].nftCommitment);
+        require(tx.outputs[0].value == tx.inputs[0].value);
+
+        // stamp: immutable NFT (32-byte category, no capability), bound to the buyer's pkh
+        bytes rallyCategory = tx.inputs[0].tokenCategory.split(32)[0];
+        require(tx.outputs[2].tokenCategory == rallyCategory);
+        bytes buyerLock = tx.outputs[2].lockingBytecode;
+        require(buyerLock.length == 25);
+        bytes20 buyerPkh = unsafe_bytes20(buyerLock.split(3)[1].split(20)[0]);
+        require(buyerLock == new LockingBytecodeP2PKH(buyerPkh));
+        bytes stampCommitment = tx.outputs[2].nftCommitment;
+        require(stampCommitment.length == 23);
+        int day = int(stampCommitment.split(21)[1]);
+        require(stampCommitment == merchantId + buyerPkh + toPaddedBytes(day, 2)); // canonical: one encoding per day
+        require(tx.time >= day * 86400); // CLTV: the locktime is enforced, so the stamp is not dated in the future
+        require(tx.locktime / 86400 == day); // and the date is the locktime's day
+        require(tx.outputs[2].tokenAmount == 0);
+
+        if (presenceKey.length > 0) {
+            // bound to the exact minter coin being spent: once this stamp is minted the code is dead (single use)
+            bytes spend = tx.inputs[0].outpointTransactionHash + toPaddedBytes(tx.inputs[0].outpointIndex, 4);
+            require(checkDataSig(presence, rallyCategory + merchantId + buyerPkh + spend, pubkey(presenceKey)));
+        }
+
+        // levy into the vault: separate coins, so buyers never race for the vault coin
+        require(tx.outputs[3].lockingBytecode == vaultLock);
+        require(tx.outputs[3].value >= levy);
+        require(tx.outputs[3].tokenCategory == 0x);
+
+        // member price: in[1] is the buyer's own trophy, and it goes straight back to them at out[4]
+        int price = minPrice;
+        int fixedOutputs = 4;
+        if (tx.inputs.length > 1) {
+            // any of the buyer's trophies (plain 0x00 ‖ pkh, or the bonus one with a trailing tier byte);
+            // nested ifs because CashScript doesn't short-circuit, and split(21) needs at least 21 bytes
+            bytes c = tx.inputs[1].nftCommitment;
+            if (tx.inputs[1].tokenCategory == rallyCategory) {
+                if (c.length >= 21) {
+                    if (c.split(21)[0] == 0x00 + buyerPkh) {
+                        require(tx.outputs[4].lockingBytecode == buyerLock);
+                        require(tx.outputs[4].tokenCategory == rallyCategory);
+                        require(tx.outputs[4].nftCommitment == c);
+                        price = memberPrice;
+                        fixedOutputs = 5;
+                    }
+                }
+            }
+        }
+
+        // merchant gets paid, BCH only
+        require(tx.outputs[1].lockingBytecode == merchantLock);
+        require(tx.outputs[1].value >= price);
+        require(tx.outputs[1].tokenCategory == 0x);
+
+        // nothing else may leave with tokens (no extra mints)
+        require(tx.outputs.length <= fixedOutputs + 1);
+        if (tx.outputs.length == fixedOutputs + 1) {
+            require(tx.outputs[fixedOutputs].tokenCategory == 0x);
+        }
+    }
+}

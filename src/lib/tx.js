@@ -9,6 +9,8 @@ import RewardVault2 from '../contracts/RewardVault2.json' with { type: 'json' };
 import SponsorPool from '../contracts/SponsorPool.json' with { type: 'json' };
 import PassportVault from '../contracts/PassportVault.json' with { type: 'json' };
 import RewardVault from '../contracts/RewardVault.json' with { type: 'json' };
+import StampMinter4 from '../contracts/StampMinter4.json' with { type: 'json' };
+import RewardVault3 from '../contracts/RewardVault3.json' with { type: 'json' };
 
 export const DUST = 1000n;
 const STAMP_FEE = 1500n; // ~2 sat/byte for a 3-4 input stamp tx, generous on purpose
@@ -17,15 +19,19 @@ const CLAIM_FEE = 2500n;
 const hex2 = (n) => n.toString(16).padStart(2, '0');
 
 export function rallyContracts(rally, provider) {
-  // rally.minter: 3 = StampMinter3 + RewardVault2 (levy), 2 = StampMinter2 (member price), else the original StampMinter
-  const vault = rally.minter === 3
+  // rally.minter: 4 = StampMinter4 + RewardVault3 (dated stamps, streak reward), 3 = StampMinter3 + RewardVault2 (levy),
+  // 2 = StampMinter2 (member price), else the original StampMinter
+  const vault = rally.minter === 4
+    ? new Contract(RewardVault3, [rally.vmCategory, BigInt(rally.needed), BigInt(rally.reward), BigInt(rally.bonusNeeded ?? 0),
+      BigInt(rally.bonusReward ?? 0), BigInt(rally.streakDays), BigInt(rally.streakReward), rally.organizerPub, BigInt(rally.endTime)], { provider })
+    : rally.minter === 3
     ? new Contract(RewardVault2, [rally.vmCategory, BigInt(rally.needed), BigInt(rally.reward),
       BigInt(rally.bonusNeeded ?? 0), BigInt(rally.bonusReward ?? 0), BigInt(rally.levy), rally.organizerPub, BigInt(rally.endTime)], { provider })
     : new Contract(RewardVault, [rally.vmCategory, BigInt(rally.needed), BigInt(rally.reward), rally.organizerPub, BigInt(rally.endTime)], { provider });
   const vaultLock = binToHex(cashAddressToLockingBytecode(vault.address).bytecode);
   const minters = Object.fromEntries(rally.merchants.map((m) => [
-    m.id, rally.minter === 3
-      ? new Contract(StampMinter3, [m.lock, BigInt(m.price), BigInt(m.memberPrice), hex2(m.id), vaultLock, BigInt(rally.levy), m.presenceKey ?? ''], { provider })
+    m.id, rally.minter >= 3
+      ? new Contract(rally.minter === 4 ? StampMinter4 : StampMinter3, [m.lock, BigInt(m.price), BigInt(m.memberPrice), hex2(m.id), vaultLock, BigInt(rally.levy), m.presenceKey ?? ''], { provider })
       : rally.minter === 2
         ? new Contract(StampMinter2, [m.lock, BigInt(m.price), BigInt(m.memberPrice), hex2(m.id)], { provider })
         : new Contract(StampMinter, [m.lock, BigInt(m.price), hex2(m.id)], { provider }),
@@ -66,7 +72,7 @@ export async function buildStamp({ rally, provider, minters, merchantId, buyerLo
   if (!minterUtxo) throw new Error('This stall is not open (minter not found)');
   const member = !!trophy && rally.minter >= 2;
   const price = BigInt(member ? merchant.memberPrice : merchant.price);
-  const levy = rally.minter === 3 ? BigInt(rally.levy) : 0n;
+  const levy = rally.minter >= 3 ? BigInt(rally.levy) : 0n;
   // sponsored: a subsidy coin + one voucher pay `sponsor.value` of the price (levy rallies only; SponsorPool checks it)
   const pool = voucher && rally.minter === 3 ? sponsorPool(rally, provider) : null;
   const subsidy = pool ? (await pool.getUtxos()).find((u) => !u.token && u.satoshis === BigInt(rally.sponsor.value)) : null;
@@ -74,7 +80,10 @@ export async function buildStamp({ rally, provider, minters, merchantId, buyerLo
   const off = subsidy ? subsidy.satoshis : 0n;
   const { picked, sum } = pickCoins(coins, price + levy - off + DUST + STAMP_FEE + 546n); // change must clear the 546-sat dust limit
   // levy rallies take the stall's presence signature (ignored by stalls without a presenceKey)
-  const unlock = rally.minter === 3 ? minter.unlock.stamp(presence ?? new Uint8Array(64)) : minter.unlock.stamp();
+  const unlock = rally.minter >= 3 ? minter.unlock.stamp(presence ?? new Uint8Array(64)) : minter.unlock.stamp();
+  // dated stamps (StampMinter4): a locktime two hours back is always below the median time past, so the tx is final now
+  const locktime = Math.floor(Date.now() / 1000) - 7200;
+  const day = rally.minter === 4 ? Math.floor(locktime / 86400) : undefined;
   const tb = new TransactionBuilder({ provider, allowImplicitFungibleTokenBurn: !!subsidy }).addInput(minterUtxo, unlock);
   const wallet = []; // [coin, input index]
   if (member) { wallet.push([trophy, 1]); tb.addInput(trophy.utxo, trophy.unlocker); }
@@ -85,7 +94,8 @@ export async function buildStamp({ rally, provider, minters, merchantId, buyerLo
   picked.forEach((c) => { wallet.push([c, wallet.length + 1 + (subsidy ? 1 : 0)]); tb.addInput(c.utxo, c.unlocker); });
   tb.addOutput({ to: minter.tokenAddress, amount: minterUtxo.satoshis, token: minterUtxo.token })
     .addOutput({ to: hexToBin(merchant.lock), amount: price })
-    .addOutput({ to: buyerLock, amount: DUST, token: stampToken(rally, merchantId, buyerLock) });
+    .addOutput({ to: buyerLock, amount: DUST, token: stampToken(rally, merchantId, buyerLock, day) });
+  if (day !== undefined) tb.setLocktime(locktime); // StampMinter4: the stamp's day is the locktime's day (CLTV)
   if (levy) tb.addOutput({ to: rallyVaultAddress(rally, provider), amount: levy });
   if (member) tb.addOutput({ to: buyerLock, amount: trophy.utxo.satoshis, token: trophy.utxo.token });
   const voucherDust = subsidy ? voucher.utxo.satoshis : 0n;
@@ -122,13 +132,45 @@ export async function buildClaim({ rally, provider, vault, buyerLock, stamps, co
   };
 }
 
+/** Streak (RewardVault3): burn `streakDays` dated stamps from consecutive days for the streak reward + a streak trophy.
+ *  stamps, coins: [{ utxo, unlocker }]. Picks the latest run of consecutive days among the buyer's own dated stamps.
+ *  @param {{ rally: any, provider: any, vault: any, buyerLock: Uint8Array, stamps: any[], coins?: any[], vaultUtxo?: any }} args */
+export async function buildStreak({ rally, provider, vault, buyerLock, stamps, coins = [], vaultUtxo = undefined }) {
+  if (rally.minter !== 4) throw new Error('Streak rewards need a streak rally');
+  vaultUtxo ??= (await vault.getUtxos()).find((u) => isMintingCoin(rally, u));
+  if (!vaultUtxo) throw new Error('This rally is over (vault not found)');
+  const reward = BigInt(rally.streakReward), n = rally.streakDays;
+  if (vaultUtxo.satoshis - reward < DUST) throw new Error('The reward pool is too low for this streak');
+  const byDay = new Map();
+  for (const s of stamps) {
+    const c = s.utxo.token.nft.commitment, d = stampDay(c);
+    if (d !== null && c.slice(2, 42) === pkhOf(buyerLock) && !byDay.has(d)) byDay.set(d, s);
+  }
+  const days = [...byDay.keys()].sort((a, b) => b - a);
+  const end = days.find((d) => Array.from({ length: n }, (_, k) => d - k).every((x) => byDay.has(x)));
+  if (end === undefined) throw new Error(`Buy a stamp on ${n} days in a row first`);
+  const set = Array.from({ length: n }, (_, k) => byDay.get(end - n + 1 + k)); // in day order, as the vault checks
+  const stampDust = set.reduce((s, x) => s + x.utxo.satoshis, 0n);
+  const shortfall = DUST + CLAIM_FEE - stampDust;
+  const { picked, sum } = shortfall > 0n ? pickCoins(coins, shortfall) : { picked: [], sum: 0n };
+  const tb = new TransactionBuilder({ provider }).addInput(vaultUtxo, vault.unlock.streak());
+  [...set, ...picked].forEach((s) => tb.addInput(s.utxo, s.unlocker));
+  return {
+    inputs: [...set, ...picked],
+    builder: tb
+      .addOutput({ to: vault.tokenAddress, amount: vaultUtxo.satoshis - reward, token: vaultUtxo.token })
+      .addOutput({ to: buyerLock, amount: reward + stampDust + sum - DUST - CLAIM_FEE })
+      .addOutput({ to: buyerLock, amount: DUST, token: nft(rally, '00' + pkhOf(buyerLock) + '03') }),
+  };
+}
+
 const MERGE_FEE = 950n; // per input (each reveals the ~740-byte vault script); RewardVault2.merge allows up to 1000, never out of the vault coin
 const MAX_MERGE = 30;
 
 /** Levy rallies: fold the levy coins at the vault address into the vault coin. Needs no signature, anyone can send it.
  *  Returns the new vault coin, or null when there is nothing worth merging. */
 export async function mergeLevies({ rally, provider, vault }) {
-  if (rally.minter !== 3) return null;
+  if (!(rally.minter >= 3)) return null;
   const all = await vault.getUtxos();
   const vaultCoin = all.find((u) => isMintingCoin(rally, u));
   // largest first, capped so one merge stays well under the standard tx size; the rest wait for the next merge
@@ -300,7 +342,10 @@ export const isMintingCoin = (rally, u) => u.token?.category === rally.category 
 export const isRallyNft = (rally, utxo) => utxo.token?.category === rally.category && utxo.token.nft;
 const pkhOf = (lock) => Array.from(lock.slice(3, 23), (b) => b.toString(16).padStart(2, '0')).join('');
 const nft = (rally, commitment) => ({ category: rally.category, amount: 0n, nft: { capability: 'none', commitment } });
-const stampToken = (rally, id, buyerLock) => nft(rally, hex2(id) + pkhOf(buyerLock));
+const dayHex = (d) => hex2(d & 0xff) + hex2(d >> 8); // 2 bytes, little endian (StampMinter4)
+const stampToken = (rally, id, buyerLock, day) => nft(rally, hex2(id) + pkhOf(buyerLock) + (day === undefined ? '' : dayHex(day)));
+/** The day (UTC, days since 1970) a dated stamp carries, or null for an undated one. */
+export const stampDay = (commitment) => commitment.length === 46 ? parseInt(commitment.slice(44, 46) + commitment.slice(42, 44), 16) : null;
 
 // ---- opening a rally: shared by scripts/rally.mjs (local key) and the organizer page (WizardConnect)
 
@@ -331,6 +376,14 @@ export function checkRallyConfig(cfg) {
     if (cfg.bonusNeeded * (cfg.levy - 1000) - 1000 < cfg.bonusReward)
       throw new Error(`anti-collusion: ${cfg.bonusNeeded} levies of ${cfg.levy} (minus merge fees) must cover the bonus ${cfg.bonusReward}`);
   }
+  // streak: dated stamps can be backdated (BCH has no expiry), so a streak faked in one sitting must pay for itself
+  if (cfg.streakDays !== undefined) {
+    if (cfg.levy === undefined) throw new Error('a streak reward needs a levy rally');
+    if (!(cfg.streakDays >= 2 && cfg.streakDays <= 30)) throw new Error('streak days must be 2..30');
+    if (cfg.merchants.some((m) => m.presenceKey)) throw new Error('streak rallies have no proof of presence yet');
+    if (cfg.streakDays * (cfg.levy - 1000) - 1000 < cfg.streakReward)
+      throw new Error(`anti-collusion: ${cfg.streakDays} levies of ${cfg.levy} (minus merge fees) must cover the streak reward ${cfg.streakReward}`);
+  }
 }
 
 /** Sats the genesis needs: the pool (+ dust the vault keeps after its last claim), a coin per minter lane, identity, fees. */
@@ -345,7 +398,8 @@ export function planRally({ network, cfg, organizerPub, baseTxid }) {
     vmCategory: binToHex(hexToBin(baseTxid).reverse()), // the VM sees the category in internal byte order
     needed: cfg.needed, reward: cfg.reward, endTime: Math.floor(Date.now() / 1000) + cfg.durationDays * 86400,
     organizerPub, lanes: cfg.lanes ?? 1,
-    ...(cfg.levy !== undefined ? { minter: 3, levy: cfg.levy } : { minter: 2 }),
+    ...(cfg.levy !== undefined ? { minter: cfg.streakDays !== undefined ? 4 : 3, levy: cfg.levy } : { minter: 2 }),
+    ...(cfg.streakDays !== undefined ? { streakDays: cfg.streakDays, streakReward: cfg.streakReward } : {}),
     ...(cfg.bonusNeeded !== undefined ? { bonusNeeded: cfg.bonusNeeded, bonusReward: cfg.bonusReward } : {}),
     merchants: cfg.merchants.map((m) => ({ ...m, memberPrice: m.memberPrice ?? m.price })),
   };

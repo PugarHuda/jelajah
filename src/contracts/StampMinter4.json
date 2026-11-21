@@ -1,0 +1,65 @@
+{
+  "contractName": "StampMinter4",
+  "constructorInputs": [
+    { "name": "merchantLock", "type": "bytes" },
+    { "name": "minPrice", "type": "int" },
+    { "name": "memberPrice", "type": "int" },
+    { "name": "merchantId", "type": "bytes1" },
+    { "name": "vaultLock", "type": "bytes" },
+    { "name": "levy", "type": "int" },
+    { "name": "presenceKey", "type": "bytes" }
+  ],
+  "abi": [
+    {
+      "name": "stamp",
+      "inputs": [
+        { "name": "presence", "type": "datasig" }
+      ]
+    }
+  ],
+  "bytecode": "OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_0 OP_OUTPUTBYTECODE OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_0 OP_UTXOTOKENCOMMITMENT OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_0 OP_UTXOVALUE OP_NUMEQUALVERIFY OP_0 OP_UTXOTOKENCATEGORY 20 OP_SPLIT OP_DROP OP_2 OP_OUTPUTTOKENCATEGORY OP_OVER OP_EQUALVERIFY OP_2 OP_OUTPUTBYTECODE OP_SIZE 19 OP_NUMEQUALVERIFY OP_DUP OP_3 OP_SPLIT OP_NIP 14 OP_SPLIT OP_DROP OP_OVER 76a914 OP_2 OP_PICK OP_CAT 88ac OP_CAT OP_EQUALVERIFY OP_2 OP_OUTPUTTOKENCOMMITMENT OP_SIZE 17 OP_NUMEQUALVERIFY OP_DUP 15 OP_SPLIT OP_NIP OP_BIN2NUM OP_SWAP OP_8 OP_PICK OP_3 OP_PICK OP_CAT OP_2 OP_PICK OP_2 OP_NUM2BIN OP_CAT OP_EQUALVERIFY OP_DUP 805101 OP_MUL OP_CHECKLOCKTIMEVERIFY OP_DROP OP_TXLOCKTIME 805101 OP_DIV OP_NUMEQUALVERIFY OP_2 OP_OUTPUTTOKENAMOUNT OP_0 OP_NUMEQUALVERIFY OP_9 OP_PICK OP_SIZE OP_NIP OP_0 OP_GREATERTHAN OP_IF OP_0 OP_OUTPOINTTXHASH OP_0 OP_OUTPOINTINDEX OP_4 OP_NUM2BIN OP_CAT OP_11 OP_PICK OP_4 OP_PICK OP_9 OP_PICK OP_CAT OP_3 OP_PICK OP_CAT OP_2 OP_PICK OP_CAT OP_12 OP_PICK OP_CHECKDATASIGVERIFY OP_DROP OP_ENDIF OP_3 OP_OUTPUTBYTECODE OP_8 OP_ROLL OP_EQUALVERIFY OP_3 OP_OUTPUTVALUE OP_8 OP_ROLL OP_GREATERTHANOREQUAL OP_VERIFY OP_3 OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_4 OP_ROLL OP_4 OP_TXINPUTCOUNT OP_1 OP_GREATERTHAN OP_IF OP_1 OP_UTXOTOKENCOMMITMENT OP_1 OP_UTXOTOKENCATEGORY OP_6 OP_PICK OP_EQUAL OP_IF OP_SIZE 15 OP_GREATERTHANOREQUAL OP_IF OP_DUP 15 OP_SPLIT OP_DROP 00 OP_5 OP_PICK OP_CAT OP_EQUAL OP_IF OP_4 OP_OUTPUTBYTECODE OP_5 OP_PICK OP_EQUALVERIFY OP_4 OP_OUTPUTTOKENCATEGORY OP_6 OP_PICK OP_EQUALVERIFY OP_4 OP_OUTPUTTOKENCOMMITMENT OP_OVER OP_EQUALVERIFY OP_7 OP_PICK OP_2SWAP OP_NIP OP_ROT OP_5 OP_ROT OP_DROP OP_SWAP OP_ENDIF OP_ENDIF OP_ENDIF OP_DROP OP_ENDIF OP_1 OP_OUTPUTBYTECODE OP_6 OP_ROLL OP_EQUALVERIFY OP_1 OP_OUTPUTVALUE OP_ROT OP_GREATERTHANOREQUAL OP_VERIFY OP_1 OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_TXOUTPUTCOUNT OP_OVER OP_1ADD OP_LESSTHANOREQUAL OP_VERIFY OP_TXOUTPUTCOUNT OP_OVER OP_1ADD OP_NUMEQUAL OP_IF OP_DUP OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_ENDIF OP_2DROP OP_2DROP OP_2DROP OP_2DROP OP_1",
+  "source": "pragma cashscript ^0.14.0;\r\n\r\n// StampMinter v4 = StampMinter3 + a date on every stamp, for streak rewards (RewardVault3.streak()).\r\n// The stamp commitment is merchantId ‖ buyer pkh ‖ day (2 bytes, little endian, days since 1970-01-01 UTC), and day is\r\n// tx.locktime / 86400 with the locktime enforced (CLTV): a stamp can't be dated in the future. BCH has no expiry, so\r\n// a buyer CAN backdate a stamp (an older locktime); that's why every dated stamp still pays the levy: a streak faked\r\n// in one sitting costs `streakDays` levies, which is at least the streak reward (checked when the rally is opened).\r\n//\r\n// Layout as StampMinter3:\r\n//   in[0]  this minter -> out[0] this minter, unchanged\r\n//   in[1]  OPTIONAL the buyer's Trophy -> out[4] the same Trophy (member price)\r\n//   out[1] merchant, out[2] dated stamp to the buyer, out[3] levy to the vault, then optional BCH-only change\r\ncontract StampMinter4(bytes merchantLock, int minPrice, int memberPrice, bytes1 merchantId, bytes vaultLock, int levy, bytes presenceKey) {\r\n    function stamp(datasig presence) {\r\n        require(this.activeInputIndex == 0);\r\n\r\n        // minter continues unchanged\r\n        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);\r\n        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);\r\n        require(tx.outputs[0].nftCommitment == tx.inputs[0].nftCommitment);\r\n        require(tx.outputs[0].value == tx.inputs[0].value);\r\n\r\n        // stamp: immutable NFT (32-byte category, no capability), bound to the buyer's pkh\r\n        bytes rallyCategory = tx.inputs[0].tokenCategory.split(32)[0];\r\n        require(tx.outputs[2].tokenCategory == rallyCategory);\r\n        bytes buyerLock = tx.outputs[2].lockingBytecode;\r\n        require(buyerLock.length == 25);\r\n        bytes20 buyerPkh = unsafe_bytes20(buyerLock.split(3)[1].split(20)[0]);\r\n        require(buyerLock == new LockingBytecodeP2PKH(buyerPkh));\r\n        bytes stampCommitment = tx.outputs[2].nftCommitment;\r\n        require(stampCommitment.length == 23);\r\n        int day = int(stampCommitment.split(21)[1]);\r\n        require(stampCommitment == merchantId + buyerPkh + toPaddedBytes(day, 2)); // canonical: one encoding per day\r\n        require(tx.time >= day * 86400); // CLTV: the locktime is enforced, so the stamp is not dated in the future\r\n        require(tx.locktime / 86400 == day); // and the date is the locktime's day\r\n        require(tx.outputs[2].tokenAmount == 0);\r\n\r\n        if (presenceKey.length > 0) {\r\n            // bound to the exact minter coin being spent: once this stamp is minted the code is dead (single use)\r\n            bytes spend = tx.inputs[0].outpointTransactionHash + toPaddedBytes(tx.inputs[0].outpointIndex, 4);\r\n            require(checkDataSig(presence, rallyCategory + merchantId + buyerPkh + spend, pubkey(presenceKey)));\r\n        }\r\n\r\n        // levy into the vault: separate coins, so buyers never race for the vault coin\r\n        require(tx.outputs[3].lockingBytecode == vaultLock);\r\n        require(tx.outputs[3].value >= levy);\r\n        require(tx.outputs[3].tokenCategory == 0x);\r\n\r\n        // member price: in[1] is the buyer's own trophy, and it goes straight back to them at out[4]\r\n        int price = minPrice;\r\n        int fixedOutputs = 4;\r\n        if (tx.inputs.length > 1) {\r\n            // any of the buyer's trophies (plain 0x00 ‖ pkh, or the bonus one with a trailing tier byte);\r\n            // nested ifs because CashScript doesn't short-circuit, and split(21) needs at least 21 bytes\r\n            bytes c = tx.inputs[1].nftCommitment;\r\n            if (tx.inputs[1].tokenCategory == rallyCategory) {\r\n                if (c.length >= 21) {\r\n                    if (c.split(21)[0] == 0x00 + buyerPkh) {\r\n                        require(tx.outputs[4].lockingBytecode == buyerLock);\r\n                        require(tx.outputs[4].tokenCategory == rallyCategory);\r\n                        require(tx.outputs[4].nftCommitment == c);\r\n                        price = memberPrice;\r\n                        fixedOutputs = 5;\r\n                    }\r\n                }\r\n            }\r\n        }\r\n\r\n        // merchant gets paid, BCH only\r\n        require(tx.outputs[1].lockingBytecode == merchantLock);\r\n        require(tx.outputs[1].value >= price);\r\n        require(tx.outputs[1].tokenCategory == 0x);\r\n\r\n        // nothing else may leave with tokens (no extra mints)\r\n        require(tx.outputs.length <= fixedOutputs + 1);\r\n        if (tx.outputs.length == fixedOutputs + 1) {\r\n            require(tx.outputs[fixedOutputs].tokenCategory == 0x);\r\n        }\r\n    }\r\n}\r\n",
+  "fingerprint": "d0ca198ad5976a0c17f08551c73466abc908193190094bd427be37c80efb2713",
+  "debug": {
+    "bytecode": "c0009d00cd00c78800d100ce8800d200cf8800cc00c69d00ce01207f7552d1788852cd8201199d76537f7701147f75780376a91452797e0288ac7e8852d28201179d7601157f77817c587953797e527952807e88760380510195b175c503805101969d52d3009d5979827700a06300c800c954807e5b79547959797e53797e52797e5c79bb756853cd587a8853cc587aa26953d10088547a54c351a06351cf51ce56798763820115a2637601157f75010055797e876354cd55798854d156798854d27888577972777b557b757c686868756851cd567a8851cc7ba26951d10088c4788ba169c4788b9c6376d10088686d6d6d6d51",
+    "sourceMap": "15:16:15:37;:41::42;:8::44:1;18:27:18:28:0;:16::45:1;:59::60:0;:49::77:1;:8::79;19:27:19:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;20:27:20:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;21:27:21:28:0;:16::35:1;:49::50:0;:39::57:1;:8::59;24:40:24:41:0;:30::56:1;:63::65:0;:30::66:1;:::69;25:27:25:28:0;:16::43:1;:47::60:0;:8::62:1;26:37:26:38:0;:26::55:1;27:16:27:32;:36::38:0;:8::40:1;28:42:28:51:0;:58::59;:42::60:1;:::63;:70::72:0;:42::73:1;:::76;29:16:29:25:0;:29::63;:54::62;;:29::63:1;;;:8::65;30:43:30:44:0;:32::59:1;31:16:31:38;:42::44:0;:8::46:1;32:22:32:37:0;:44::46;:22::47:1;:::50;:18::51;33:16:33:31:0;:35::45;;:48::56;;:35:::1;:73::76:0;;:78::79;:59::80:1;:35;:8::82;34:27:34:30:0;:33::38;:27:::1;:8::40;;35:16:35:27:0;:30::35;:16:::1;:8::44;36:27:36:28:0;:16::41:1;:45::46:0;:8::48:1;38:12:38:23:0;;:::30:1;;:33::34:0;:12:::1;:36:42:9:0;40::40:37;:26::62:1;:89::90:0;:79::105:1;:107::108:0;:65::109:1;:26;41:33:41:41:0;;:43::56;;:59::69;;:43:::1;:72::80:0;;:43:::1;:83::88:0;;:43:::1;:97::108:0;;:12::112:1;38:36:42:9;;45:27:45:28:0;:16::45:1;:49::58:0;;:8::60:1;46:27:46:28:0;:16::35:1;:39::43:0;;:16:::1;:8::45;47:27:47:28:0;:16::43:1;:47::49:0;:8::51:1;50:20:50:28:0;;51:27:51;52:12:52;:31::32;:12:::1;:34:67:9:0;55:32:55:33;:22::48:1;56:26:56:27:0;:16::42:1;:46::59:0;;:16:::1;:61:66:13:0;57:20:57:28:1;:32::34:0;:20:::1;:36:65:17:0;58:24:58:25;:32::34;:24::35:1;:::38;:42::46:0;:49::57;;:42:::1;:24;:59:64:21:0;59:43:59:44;:32::61:1;:65::74:0;;:24::76:1;60:43:60:44:0;:32::59:1;:63::76:0;;:24::78:1;61:43:61:44:0;:32::59:1;:63::64:0;:24::66:1;62:32:62:43:0;;:24::44:1;;;63:39:63:40:0;:24::41:1;;;58:59:64:21;57:36:65:17;56:61:66:13;52:34:67:9;;70:27:70:28:0;:16::45:1;:49::61:0;;:8::63:1;71:27:71:28:0;:16::35:1;:39::44:0;:16:::1;:8::46;72:27:72:28:0;:16::43:1;:47::49:0;:8::51:1;75:16:75:33:0;:37::49;:::53:1;:16;:8::55;76:12:76:29:0;:33::45;:::49:1;:12;:51:78:9:0;77:31:77:43;:20::58:1;:62::64:0;:12::66:1;76:51:78:9;14:37:79:5;;;;",
+    "logs": [],
+    "requires": [
+      { "ip": 9, "line": 15 },
+      { "ip": 14, "line": 18 },
+      { "ip": 19, "line": 19 },
+      { "ip": 24, "line": 20 },
+      { "ip": 29, "line": 21 },
+      { "ip": 38, "line": 25 },
+      { "ip": 43, "line": 27 },
+      { "ip": 58, "line": 29 },
+      { "ip": 63, "line": 31 },
+      { "ip": 80, "line": 33 },
+      { "ip": 84, "line": 34 },
+      { "ip": 89, "line": 35 },
+      { "ip": 93, "line": 36 },
+      { "ip": 123, "line": 41 },
+      { "ip": 130, "line": 45 },
+      { "ip": 136, "line": 46 },
+      { "ip": 140, "line": 47 },
+      { "ip": 174, "line": 59 },
+      { "ip": 179, "line": 60 },
+      { "ip": 183, "line": 61 },
+      { "ip": 202, "line": 70 },
+      { "ip": 207, "line": 71 },
+      { "ip": 211, "line": 72 },
+      { "ip": 216, "line": 75 },
+      { "ip": 225, "line": 77 }
+    ],
+    "sourceTags": "117:117:sc;189:189:sc"
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.14.0",
+    "options": {
+      "enforceFunctionParameterTypes": true,
+      "enforceLocktimeGuard": true
+    }
+  },
+  "updatedAt": "2026-11-21T15:53:24.270Z"
+}
