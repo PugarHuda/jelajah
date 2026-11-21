@@ -6,6 +6,15 @@
 
 **Not a loyalty card, a rally.** A loyalty card is one shop paying back its own customers. Jelajah puts **many independent stalls behind one shared prize pool** that pays only for stamps from *different* stalls, and the pool can't be drained even if stalls collude: in a levy rally, colluding stalls end up paying the prize themselves.
 
+| | Per-shop loyalty card (stamp in the payment, redeemed from the shop's reserve) | **Jelajah rally** |
+|---|---|---|
+| Who pays the reward | The same shop that sold the stamps | **One shared pool**, filled by every stall's levy |
+| What a reward needs | Repeat visits to one shop | Stamps from **N different stalls** (the vault loops and checks) |
+| Stalls colluding with a buyer | Not a concern: one shop, its own money | **Can't drain the pool**: a set's levies pay its own reward (levy rallies) |
+| Proof the buyer was there | The payment | Optional **stall-device signature**, single use (proof of presence) |
+| What the reward NFT does | Collectible | **Membership card**: lower price at every stall, enforced by each stall's covenant |
+| Who else can fund it | Nobody | **Sponsors**: voucher links (`#/sponsor`), the stall still gets its full price |
+
 **Links**
 - Live demo: https://jelajah-bch.vercel.app
 - Code: https://github.com/PugarHuda/jelajah

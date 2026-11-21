@@ -15,7 +15,7 @@ import { ElectrumNetworkProvider, SignatureTemplate, TransactionBuilder } from '
 
 const SEED_FILE = new URL('./.wallet.chipnet.json', import.meta.url); // gitignored; created on the first run
 export const provider = new ElectrumNetworkProvider('chipnet');
-const addr = (lock: Uint8Array) => (lockingBytecodeToCashAddress({ bytecode: lock, prefix: 'bchtest' }) as { address: string }).address;
+const addr = (lock: Uint8Array, tokenSupport = false) => (lockingBytecodeToCashAddress({ bytecode: lock, prefix: 'bchtest', tokenSupport }) as { address: string }).address;
 const p2pkh = (priv: Uint8Array) => encodeLockingBytecodeP2pkh(hash160(secp256k1.derivePublicKeyCompressed(priv) as Uint8Array));
 
 export class TestWallet {
@@ -32,7 +32,7 @@ export class TestWallet {
   }
 
   key(path: string, i: number) { return (deriveHdPrivateNodeChild(this.branches[path], i) as HdPrivateNodeValid).privateKey; }
-  address(path = 'receive', i = 0) { return addr(p2pkh(this.key(path, i))); }
+  address(path = 'receive', i = 0, tokens = false) { return addr(p2pkh(this.key(path, i)), tokens); }
   async balance() { // receive/0 holds the change of every purchase, change/0 the top-ups
     const all = (await Promise.all([this.address('receive', 0), this.address('change', 0)].map((a) => provider.getUtxos(a)))).flat();
     return all.filter((u) => !u.token).reduce((s, u) => s + u.satoshis, 0n);

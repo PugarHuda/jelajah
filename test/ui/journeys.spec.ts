@@ -189,3 +189,19 @@ test('switching language on an inner page keeps the page and flips the text', as
   await page.getByRole('link', { name: 'Mulai rally →' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Jajan di 3 warung');
 });
+
+test('a judge opens the 3-transaction proof of the levy cycle on the home page', async ({ page }) => {
+  await page.goto('/?lang=en');
+  await page.getByText('How the pool pays for itself').click();
+  const cycle = page.locator('details.cycle');
+  await expect(cycle.getByRole('link')).toHaveCount(5);
+  await expect(cycle.getByRole('link', { name: /🏆 e411c9b9/ })).toHaveAttribute('href', /blockchair\.com\/bitcoin-cash\/transaction\/e411c9b9/);
+});
+
+test('a sponsor finds the voucher page from the rally and is asked for a wallet (chipnet)', async ({ page }) => {
+  await page.goto('/?net=chipnet&lang=en');
+  await page.getByRole('link', { name: 'Sponsors: hand out vouchers →' }).click();
+  await expect(page.getByRole('heading', { name: '🎟 Hand out vouchers' })).toBeVisible();
+  await page.getByRole('button', { name: 'Connect the sponsor wallet' }).click();
+  await expect(page.getByText('Scan with Selene or Paytaca')).toBeVisible();
+});

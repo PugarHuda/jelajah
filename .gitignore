@@ -43,3 +43,4 @@ playwright-report
 # electrum-cash header caches written by the XO engine
 Electrum-*.sqlite*
 test/ui/.wallet.*.json
+test/ui/.reclaim.*.json

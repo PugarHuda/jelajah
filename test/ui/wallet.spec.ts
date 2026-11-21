@@ -1,9 +1,12 @@
 // End to end with a paired wallet: a buyer clicks Connect, "scans" the QR (the test wallet reads the wiz:// URI under it),
 // buys at 3 stalls and claims the set. Every transaction is signed over WizardConnect and broadcast to chipnet.
 import { test, expect, type Page } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import { TestWallet } from './wizard-wallet';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { TestWallet, provider } from './wizard-wallet';
+import { SignatureTemplate, TransactionBuilder } from 'cashscript';
+import { decodePrivateKeyWif, encodeLockingBytecodeP2pkh, hash160, lockingBytecodeToCashAddress, secp256k1 } from '@bitauth/libauth';
 
+const RECLAIM_FILE = new URL('./.reclaim.chipnet.json', import.meta.url); // gitignored
 const read = (f: string) => JSON.parse(readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8'));
 const demo = read('claims/.demo.chipnet.json');
 // chipnet coins to top the wallet up from (the stalls pay the organizer, so most of it flows back)
@@ -41,6 +44,7 @@ test('a buyer pairs a wallet, buys at 3 stalls and claims the set (chipnet, real
     await stall.getByRole('button', { name: /^Buy/ }).click();
     await done(page, `Stamped at ${name}`);
     await expect(page.locator('article.stall', { hasText: name })).toHaveClass(/have/, { timeout: 60_000 });
+    if (!(await page.locator('.progress').innerText()).startsWith('3/3')) await expect(page.getByText(/more stalls? to go\. Next stop:/)).toBeVisible();
   }
   const claim = page.getByRole('button', { name: /^Claim/ });
   await expect(claim).toBeEnabled({ timeout: 60_000 });
@@ -85,4 +89,121 @@ test('a collector links their BCH address to a Nostr key and anyone can verify i
   await page.getByRole('button', { name: 'Verify' }).click();
   await expect(page.getByRole('heading', { name: '✅ Verified' })).toBeVisible({ timeout: 90_000 });
   w.close();
+});
+
+test('a stall device makes its key, an organizer opens a rally with it, a buyer buys with the device code (chipnet)', async ({ page, browser }) => {
+  test.setTimeout(10 * 60_000);
+  const w = new TestWallet();
+  // 1. the stall's phone: open #/device, read the presence key it made
+  const device = await (await browser.newContext()).newPage();
+  await device.goto('/?net=chipnet&lang=en#/device');
+  const presenceKey = await device.getByText(/^0[23][0-9a-f]{64}$/).innerText();
+  // 2. the organizer: one stall with that key, a set of 1, a levy that pays the reward
+  await page.goto('/?net=chipnet&lang=en#/organize');
+  await page.getByRole('button', { name: '− Remove the last' }).click();
+  await page.getByRole('button', { name: '− Remove the last' }).click();
+  await page.getByPlaceholder('Jelajah Malioboro').fill('QA rally');
+  await page.getByLabel('Stamps for a set').fill('1');
+  await page.getByLabel('Reward per set (sats)').fill('600');
+  await page.getByLabel('Rewards to fund now').fill('1');
+  await page.getByLabel('Days open').fill('1');
+  await page.getByLabel('Levy per stamp (sats, optional)').fill('2600');
+  await page.getByLabel('Name', { exact: true }).fill('QA Warung');
+  await page.getByLabel('Price', { exact: true }).fill('700');
+  await page.getByLabel('Member price').fill('700');
+  await page.getByLabel(/Proof of presence/).fill(presenceKey);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  const openBtn = page.getByRole('button', { name: 'Open the rally' });
+  await pair(page, w, /^Connect wallet$/, openBtn);
+  await openBtn.click();
+  await expect(page.getByRole('heading', { name: /Your rally is live/ })).toBeVisible({ timeout: 180_000 });
+  await expect(page.getByText('Back up your reclaim key.')).toBeVisible();
+  await page.getByRole('button', { name: /List it on Nostr/ }).click();
+  await expect(page.getByText(/Listed on [1-9] relays/)).toBeVisible({ timeout: 60_000 });
+  const link = await page.locator('.claim a').first().getAttribute('href') as string;
+  // keep the reclaim key: the reclaim test below takes the pool back once this 1-day rally has ended
+  const reclaimWif = await page.locator('.warn code').innerText();
+  writeFileSync(RECLAIM_FILE, JSON.stringify({ link, reclaimWif, opensAt: Math.floor(Date.now() / 1000) + 86_400 + 3_600 + 600 }));
+  w.close();
+  // 3. the buyer opens the shared link, connects, taps Buy: the stall asks for proof of presence
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(link);
+  await expect(buyer.getByRole('heading', { name: 'QA Warung' })).toBeVisible({ timeout: 60_000 });
+  const w2 = new TestWallet();
+  await pair(buyer, w2, /^Connect wallet$/, buyer.getByRole('button', { name: /Jelajah test wallet · [1-9]/ }));
+  await buyer.locator('article.stall', { hasText: 'QA Warung' }).getByRole('button', { name: /^Buy/ }).click();
+  const panel = buyer.getByRole('dialog', { name: 'Proof of presence' });
+  const buyerCode = await panel.locator('code').innerText();
+  // 4. the stall device reads the buyer's code and shows its signed reply
+  await device.goto(`${link}#/device/1`);
+  await device.reload();
+  await device.getByPlaceholder("buyer's code").fill(buyerCode);
+  const reply = await device.locator('code.small').last().innerText();
+  // 5. the buyer types the reply and buys
+  await panel.getByPlaceholder("stall's code").fill(reply);
+  await panel.getByRole('button', { name: 'Buy with the stall’s code' }).click();
+  await done(buyer, 'Stamped at QA Warung');
+  await expect(buyer.getByRole('button', { name: /^Claim/ })).toBeEnabled({ timeout: 60_000 });
+  await buyer.getByRole('button', { name: /^Claim/ }).click();
+  await done(buyer, 'Set claimed');
+  w2.close();
+});
+
+test('a sponsor turns a voucher into a link, a buyer takes it and pays less for a stamp (chipnet)', async ({ page, browser }) => {
+  test.setTimeout(8 * 60_000);
+  const w = new TestWallet();
+  await giveVoucher(read('scripts/.organizer.chipnet.json').wif, w.address('receive', 0, true)); // the sponsor's wallet gets its vouchers
+  // the sponsor: #/sponsor, connect, one link
+  await page.goto('/?net=chipnet&lang=en#/sponsor');
+  await pair(page, w, /Connect the sponsor wallet/, page.getByText(/Your wallet holds [1-9]\d* voucher/));
+  await page.getByLabel('Links to make (1–20)').fill('1');
+  await page.getByRole('button', { name: 'Make 1 voucher link' }).click();
+  await expect(page.getByRole('heading', { name: /1 voucher link/ })).toBeVisible({ timeout: 120_000 });
+  const link = (await page.getByRole('textbox', { name: 'Voucher links' }).inputValue()).trim();
+  w.close();
+  // the buyer: opens the link, takes the voucher, buys a stamp with it
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(link);
+  await expect(buyer.getByRole('heading', { level: 1 })).toContainText('1 voucher', { timeout: 60_000 });
+  const w2 = new TestWallet();
+  await pair(buyer, w2, /Connect wallet to take it/, buyer.getByRole('button', { name: /^Take/ }));
+  await buyer.getByRole('button', { name: /^Take/ }).click();
+  await expect(buyer.getByText('In your wallet')).toBeVisible({ timeout: 60_000 });
+  await buyer.getByRole('link', { name: /Now buy your first stamp/ }).click();
+  await pair(buyer, w2, /^Connect wallet$/, buyer.getByText('You hold a voucher.'));
+  const buy = buyer.locator('article.stall', { hasText: 'Es Dawet' }).getByRole('button', { name: /🎟/ });
+  await expect(buy).toBeVisible({ timeout: 60_000 }); // the price on the button already has the voucher taken off
+  await buy.click();
+  await done(buyer, 'Stamped at Es Dawet');
+  w2.close();
+});
+
+// the sponsor (the chipnet organizer key) sends one voucher token to the buyer, like an airdrop after a sign-up
+async function giveVoucher(wif: string, to: string) {
+  const { sponsor } = JSON.parse(readFileSync(new URL('../../src/rally.chipnet.json', import.meta.url), 'utf8'));
+  const priv = (decodePrivateKeyWif(wif) as { privateKey: Uint8Array }).privateKey;
+  const lock = encodeLockingBytecodeP2pkh(hash160(secp256k1.derivePublicKeyCompressed(priv) as Uint8Array));
+  const from = (lockingBytecodeToCashAddress({ bytecode: lock, prefix: 'bchtest', tokenSupport: true }) as { address: string }).address;
+  const utxos = await provider.getUtxos(from);
+  const v = utxos.find((u) => u.token?.category === sponsor.category && !u.token.nft);
+  if (!v) throw new Error('the sponsor has no vouchers left');
+  const fund = utxos.filter((u) => !u.token).sort((a, b) => Number(b.satoshis - a.satoshis))[0];
+  const sig = new SignatureTemplate(priv);
+  const b = new TransactionBuilder({ provider }).addInput(v, sig.unlockP2PKH()).addInput(fund, sig.unlockP2PKH())
+    .addOutput({ to, amount: 1000n, token: { category: sponsor.category, amount: 1n } });
+  if (v.token!.amount > 1n) b.addOutput({ to: from, amount: 1000n, token: { category: sponsor.category, amount: v.token!.amount - 1n } });
+  const rest = v.satoshis + fund.satoshis - 1000n - (v.token!.amount > 1n ? 1000n : 0n) - 600n;
+  if (rest >= 546n) b.addOutput({ to: from, amount: rest });
+  await b.send();
+}
+
+test('after the QA rally ends, its organizer takes the leftover pool back (chipnet)', async ({ page }) => {
+  const saved = existsSync(RECLAIM_FILE) ? JSON.parse(readFileSync(RECLAIM_FILE, 'utf8')) : null;
+  test.skip(!saved || Date.now() / 1000 < saved.opensAt, 'runs once the QA rally from the organizer test has ended (1 day)');
+  await page.goto(`${saved.link}#/reclaim`);
+  await page.getByPlaceholder('K… / L… / c…').fill(saved.reclaimWif);
+  await page.getByPlaceholder('bchtest:z…').fill(new TestWallet().address('change', 0, true));
+  await page.getByRole('button', { name: 'Reclaim the pool' }).click();
+  await expect(page.getByText(/Reclaimed: /)).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('alert')).toHaveCount(0);
 });

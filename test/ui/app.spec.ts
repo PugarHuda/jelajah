@@ -151,6 +151,13 @@ test('the rupiah rate survives a CoinGecko failure through its cache', async ({ 
   await expect(page.locator('body')).toContainText('≈ Rp');
 });
 
+test('with CoinGecko down and no cache, the rupiah rate comes from CoinPaprika', async ({ page }) => {
+  await page.route('**/api.coingecko.com/**', (r) => r.fulfill({ status: 429, body: '' }));
+  await page.route('**/api.coinpaprika.com/**', (r) => r.fulfill({ json: { quotes: { IDR: { price: 4_000_000 } } }, headers: { 'access-control-allow-origin': '*' } }));
+  await page.goto('/?lang=en');
+  await expect(page.locator('body')).toContainText('≈ Rp');
+});
+
 test('every page renders without a script error', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));

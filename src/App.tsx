@@ -19,7 +19,16 @@ import { Till } from './pages/Till';
 import { Profile } from './pages/Profile';
 import { Rallies } from './pages/Rallies';
 import { Gift } from './pages/Gift';
+import { Sponsor } from './pages/Sponsor';
 import { LOADED_AT, sats, idrPerBch, idrRate, rupiah, ID, tr, switchLang, cost, stallOf, mapUrl, shareUrl, shareTx, qrImage, hex } from './shared';
+
+// the live mainnet levy rally, and one full set of it on chain (README "A full levy cycle on mainnet")
+const LEVY_MAINNET = '6dd1cc7da85cdb72d7cbe597a505b11197173ebb25c3e49e079c778ac1a5cbf3';
+const CYCLE = {
+  stamps: ['8718bc42c871cd9e5cb37c0a51c2aced4e488457a3678412161497692b5ea98e', 'e38a96c376715f1e1093d7c8f495af8e5f27ed9ed9b4f172c16306058f090674', 'd1b5d0fd15261160dd314b7755a851af9e358fc91917a51b4119e0a44fe63419'],
+  merge: 'de77ed6ef2bbabfe7627c767285f3234618f43875924d12393e1bfda0d80a6fc',
+  claim: 'e411c9b9730f2f69cf062b83375dff3afbc91f0d02764549c59174ce2ed948ee',
+};
 
 export default function App() {
   const stallFromHash = window.location.hash.match(/^#\/stall\/(\d+)/)?.[1];
@@ -35,6 +44,7 @@ export default function App() {
   if (window.location.hash === '#/rallies') return <Rallies />;
   if (window.location.hash === '#/story') return <Story />;
   if (window.location.hash.startsWith('#/gift')) return <Gift />;
+  if (window.location.hash === '#/sponsor') return <Sponsor />;
   if (window.location.hash === '#/passport' && passportFromLink) return <PassportPage />;
   if (window.location.hash === '#/art') return ( // press image: every stamp + the trophy
     <main className="art">{rally.merchants.map((m) => <Stamp key={m.id} m={m} inked size={220} />)}<Trophy name={rally.name} size={220} /></main>
@@ -191,6 +201,17 @@ function Rally() {
             <p className="muted small">Not one shop's loyalty card: many stalls, one shared prize pool, and only stamps from <b>different</b> stalls count.</p>
           </>)}
           {proof && proof.stamps > 0 && <p className="proof"><a href="#/stats">{tr(`${proof.stamps} paid stamps · ${proof.sets} sets claimed on ${rally.network}, read from the chain`, `${proof.stamps} stamp terbayar · ${proof.sets} set diklaim di ${rally.network}, dibaca dari chain`)}</a></p>}
+          {rally.category === LEVY_MAINNET && (
+            <details className="cycle small">
+              <summary>{tr('How the pool pays for itself: one full set on mainnet, in 3 transactions', 'Cara pool membiayai dirinya sendiri: satu set penuh di mainnet, dalam 3 transaksi')}</summary>
+              <ol>
+                <li>{tr('Buy at 3 different stalls: each pays the stall 1,500 and puts a 2,500 levy in the pool', 'Beli di 3 warung berbeda: tiap stamp membayar warung 1.500 dan menaruh levy 2.500 di pool')} · {CYCLE.stamps.map((t, i) => <a key={t} href={explorerTx(t)} target="_blank" rel="noreferrer">{['☕', '🍜', '🍢'][i]} {t.slice(0, 8)}</a>)}</li>
+                <li>{tr('Anyone folds the levies into the pool (no signature)', 'Siapa pun bisa menggabungkan levy ke pool (tanpa tanda tangan)')} · <a href={explorerTx(CYCLE.merge)} target="_blank" rel="noreferrer">{CYCLE.merge.slice(0, 8)}</a></li>
+                <li>{tr('Claim: the set burns, 3,000 comes back out of those 7,500 of levies, plus a trophy', 'Klaim: set dibakar, 3.000 kembali dari 7.500 levy itu, plus trofi')} · <a href={explorerTx(CYCLE.claim)} target="_blank" rel="noreferrer">🏆 {CYCLE.claim.slice(0, 8)}</a></li>
+              </ol>
+              <p className="muted">{tr('So every set funds its own reward: even if all its stalls refunded the buyer off-chain, the pool cannot be drained.', 'Jadi tiap set membiayai hadiahnya sendiri: walau semua warungnya mengembalikan uang pembeli di luar chain, pool tidak bisa dikuras.')}</p>
+            </details>
+          )}
         </section>
 
         {LOADED_AT > rally.endTime && (
@@ -238,6 +259,15 @@ function Rally() {
             })}
           </div>
 
+          {collected.size > 0 && !ready && (() => { // the game loop: what's left, and where to walk next
+            const left = rally.merchants.filter((m) => !collected.has(m.id));
+            const n = rally.needed - collected.size;
+            return (
+              <p className="hint next" aria-live="polite">🧭 {tr(`${n} more stall${n > 1 ? 's' : ''} to go. Next stop:`, `Tinggal ${n} warung lagi. Mampir berikutnya:`)}{' '}
+                {left.map((m, i) => <span key={m.id}>{i > 0 && ' · '}<a href={`#stall-${m.id}`} onClick={(e) => { e.preventDefault(); document.getElementById(`stall-${m.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>{m.emoji} {m.name}</a>{m.place && <> (<a href={mapUrl(m.place)} target="_blank" rel="noreferrer">📍 {tr('map', 'peta')}</a>)</>}</span>)}
+              </p>
+            );
+          })()}
           <div className={`claim ${ready ? 'ready' : ''}`}>
             <div>
               <h3>{ready ? tr('Your set is complete', 'Set kamu sudah lengkap') : tr('Complete the set', 'Lengkapi set')}</h3>
@@ -261,7 +291,7 @@ function Rally() {
           {!connected && <p className="hint">{tr("Connect a wallet (Selene, Paytaca, Cashonize) to start. Each stamp costs the stall's price plus a tiny network fee.", 'Hubungkan wallet (Selene, Paytaca, Cashonize) untuk mulai. Tiap stamp seharga warungnya ditambah biaya jaringan yang sangat kecil.')}</p>}
           {rally.sponsor && (
             <p className="hint">🎟 {tr(`Sponsored by ${rally.sponsor.name}: a voucher takes ${sats(rally.sponsor.value)} off a stamp, and the stall still gets its full price.`,
-              `Disponsori ${rally.sponsor.name}: satu voucher memotong ${sats(rally.sponsor.value)} dari harga stamp, dan warung tetap dibayar penuh.`)}{hasVoucher && tr(' You hold a voucher.', ' Kamu punya voucher.')}</p>
+              `Disponsori ${rally.sponsor.name}: satu voucher memotong ${sats(rally.sponsor.value)} dari harga stamp, dan warung tetap dibayar penuh.`)}{hasVoucher && tr(' You hold a voucher.', ' Kamu punya voucher.')} <a href="#/sponsor">{tr('Sponsors: hand out vouchers →', 'Sponsor: bagikan voucher →')}</a></p>
           )}
           {(rally.minter ?? 1) >= 2 && (
             <p className="hint">{member

@@ -15,8 +15,11 @@ const cachedRate = (() => { try { return JSON.parse(localStorage.getItem(RATE_KE
 export let idrPerBch: number | null = cachedRate?.idr ?? null;
 export const idrRate: Promise<void> = cachedRate && Date.now() - cachedRate.at < 30 * 60_000 ? Promise.resolve()
   : fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash&vs_currencies=idr')
-    .then((r) => r.json()).then((j) => {
-      const idr = j['bitcoin-cash']?.idr;
+    .then((r) => r.json()).then((j) => j['bitcoin-cash']?.idr)
+    .catch(() => undefined)
+    // second source when CoinGecko rate-limits or is down (CoinPaprika: CORS open, reachable from Indonesia, unlike Coinbase/Kraken)
+    .then((idr) => typeof idr === 'number' ? idr : fetch('https://api.coinpaprika.com/v1/tickers/bch-bitcoin-cash?quotes=IDR').then((r) => r.json()).then((j) => Number(j.quotes?.IDR?.price)))
+    .then((idr) => {
       if (typeof idr !== 'number' || !(idr > 0)) return;
       idrPerBch = idr;
       try { localStorage.setItem(RATE_KEY, JSON.stringify({ idr, at: Date.now() })); } catch { /* private mode: no cache */ }

@@ -28,11 +28,15 @@ export function Gift() {
     return () => clearInterval(t);
   }, [wc.state, lock]);
   const [balance, setBalance] = useState<bigint | null>(null);
+  const [vouchers, setVouchers] = useState(0n); // a sponsor's voucher links (#/sponsor) are gifts carrying one voucher
   const [done, setDone] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     if (!address) return;
-    const look = () => provider.getUtxos(address).then((u) => setBalance(u.filter((x) => !x.token).reduce((s, x) => s + x.satoshis, 0n))).catch(() => {});
+    const look = () => provider.getUtxos(address).then((u) => {
+      setBalance(u.reduce((s, x) => s + x.satoshis, 0n));
+      setVouchers(u.filter((x) => rally.sponsor && x.token?.category === rally.sponsor.category && !x.token.nft).reduce((s, x) => s + x.token!.amount, 0n));
+    }).catch(() => {});
     look();
     const t = setInterval(look, 6000);
     return () => clearInterval(t);
@@ -41,21 +45,27 @@ export function Gift() {
     setErr(null);
     try {
       if (typeof key === 'string') throw new Error(key);
-      const coins = (await provider.getUtxos(address)).filter((u) => !u.token);
-      const total = coins.reduce((s, u) => s + u.satoshis, 0n);
-      const fee = 200n + 150n * BigInt(coins.length);
-      if (total - fee < 546n) throw new Error(tr('This gift is empty (or already taken).', 'Hadiah ini kosong (atau sudah diambil).'));
+      const coins = await provider.getUtxos(address);
+      const plain = coins.filter((u) => !u.token), tokens = coins.filter((u) => u.token);
+      const total = plain.reduce((s, u) => s + u.satoshis, 0n);
+      const fee = 200n + 150n * BigInt(coins.length) + 70n * BigInt(tokens.length);
       const sig = new SignatureTemplate(key.privateKey);
       const tb = new TransactionBuilder({ provider });
       coins.forEach((u) => tb.addInput(u, sig.unlockP2PKH()));
-      setDone((await tb.addOutput({ to: lock!, amount: total - fee }).send()).txid);
+      // tokens (a sponsor's voucher) keep their category and amount; the fee comes from plain sats, else from the first token coin
+      const feeFromToken = total - fee < 546n;
+      tokens.forEach((u, i) => tb.addOutput({ to: addressOf(lock!, true), amount: u.satoshis - (feeFromToken && i === 0 ? fee - total : 0n), token: u.token }));
+      if (feeFromToken && (!tokens.length || tokens[0].satoshis - (fee - total) < 1000n)) throw new Error(tr('This gift is empty (or already taken).', 'Hadiah ini kosong (atau sudah diambil).'));
+      if (!feeFromToken) tb.addOutput({ to: lock!, amount: total - fee });
+      setDone((await tb.send()).txid);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   }
   if (!giftLock) return <main className="organize"><p className="error">{tr('This gift link is broken.', 'Link hadiah ini rusak.')}</p>{back}</main>;
   return (
     <main className="organize">
       <p className="eyebrow">{rally.network === 'mainnet' ? 'BCH mainnet' : 'chipnet (test)'} · {tr('gift link', 'link hadiah')}</p>
-      <h1>🎁 {balance ? sats(balance) : tr('A Jelajah gift', 'Hadiah Jelajah')}</h1>
+      <h1>🎁 {balance ? sats(balance) : tr('A Jelajah gift', 'Hadiah Jelajah')}{vouchers > 0n && ` + ${vouchers} voucher 🎟`}</h1>
+      {vouchers > 0n && rally.sponsor && <p className="hint">{tr(`From ${rally.sponsor.name}: each voucher takes ${sats(rally.sponsor.value)} off a stamp, and the stall still gets its full price.`, `Dari ${rally.sponsor.name}: tiap voucher memotong ${sats(rally.sponsor.value)} dari satu stamp, dan warung tetap dibayar penuh.`)}</p>}
       {done ? <p className="hint">✅ {tr('In your wallet', 'Sudah di wallet-mu')}: <a href={explorerTx(done)} target="_blank" rel="noreferrer">{done.slice(0, 16)}…</a>. <a href={location.pathname + location.search}>{tr('Now buy your first stamp →', 'Sekarang beli stamp pertamamu →')}</a></p>
         : balance ? (lock
           ? <button className="primary big" onClick={take}>{tr(`Take ${sats(balance)} into my wallet`, `Ambil ${sats(balance)} ke wallet-ku`)}</button>
