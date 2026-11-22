@@ -151,16 +151,18 @@ test('the rupiah rate survives a CoinGecko failure through its cache', async ({ 
   await expect(page.locator('body')).toContainText('≈ Rp');
 });
 
-test('with CoinGecko down and no cache, the rupiah rate comes from CoinPaprika', async ({ page }) => {
+test('with CoinGecko rate-limited and no cache, the rupiah rate comes from Gate.io × open.er-api (live)', async ({ page }) => {
   await page.route('**/api.coingecko.com/**', (r) => r.fulfill({ status: 429, body: '' }));
-  await page.route('**/api.coinpaprika.com/**', (r) => r.fulfill({ json: { quotes: { IDR: { price: 4_000_000 } } }, headers: { 'access-control-allow-origin': '*' } }));
+  const used: string[] = [];
+  page.on('response', (r) => { if (/gateio|er-api/.test(r.url())) used.push(new URL(r.url()).hostname); });
   await page.goto('/?lang=en');
-  await expect(page.locator('body')).toContainText('≈ Rp');
+  await expect(page.locator('body')).toContainText('≈ Rp', { timeout: 20_000 });
+  expect(used.sort()).toEqual(['api.gateio.ws', 'open.er-api.com']);
 });
 
 test('every page renders without a script error', async ({ page }) => {
   const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('pageerror', (e) => { if (!/due to access control checks/.test(e.message)) errors.push(e.message); }); // WebKit reports caught CORS fetch failures here
   for (const hash of ['', '#/stats', '#/till/1', '#/story', '#/stall/1', '#/rallies', '#/organize', '#/gift', '#/device/1', '#/identity', '#/solidcash', '#/reclaim', '#/u/bitcoincash:qqd2thqn52yy8j85fdk782gffdns9yqelulnlj6s3q', '#/nope']) {
     await page.goto(`/?lang=en${hash}`);
     await page.reload(); // a hash-only goto keeps the document; the router reads the hash on load

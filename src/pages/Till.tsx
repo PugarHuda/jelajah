@@ -13,8 +13,9 @@ export function Till() {
   const m = rally.merchants.find((x) => x.id === id);
   const [sales, setSales] = useState<Sale[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [bell, setBell] = useState<AudioContext | null>(null);
-  const bellRef = useRef<AudioContext | null>(null);
+  // the bell is on even where there is no Web Audio (it still vibrates and notifies); `audio` is null there
+  const [bell, setBell] = useState<{ audio: AudioContext | null } | null>(null);
+  const bellRef = useRef<{ audio: AudioContext | null } | null>(null);
   useEffect(() => { bellRef.current = bell; }, [bell]);
   useEffect(() => {
     if (!m) return;
@@ -34,7 +35,7 @@ export function Till() {
           return [...next.reverse(), ...(s ?? []).filter((x) => !ids.has(x.id))];
         });
         if (fresh && newcomers.length) {
-          ring(bellRef.current);
+          ring(bellRef.current?.audio ?? null);
           notify(`🔔 ${m.name}: +${sats(newcomers.reduce((t: bigint, x: { paid: bigint }) => t + x.paid, 0n))}`, tr(`${newcomers.length} paid stamp${newcomers.length > 1 ? 's' : ''}`, `${newcomers.length} stamp terbayar`));
         }
         first = false;
@@ -52,7 +53,7 @@ export function Till() {
     <main className="poster device">
       <p className="eyebrow">{rally.name} · {tr('till', 'kasir')}</p>
       <h1>{m.emoji} {m.name}</h1>
-      {!bell && <button className="primary" onClick={() => { const c = new AudioContext(); ring(c); setBell(c); if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {}); }}>🔔 {tr('Turn on the sale bell', 'Nyalakan bel penjualan')}</button>}
+      {!bell && <button className="primary" onClick={() => { const c = audioContext(); ring(c); setBell({ audio: c }); if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {}); }}>🔔 {tr('Turn on the sale bell', 'Nyalakan bel penjualan')}</button>}
       {bell && 'Notification' in window && <p className="muted small">{Notification.permission === 'granted'
         ? tr('🔔 On. With the till in the background, this phone also shows a notification for every sale.', '🔔 Aktif. Saat kasir di latar belakang, ponsel ini juga menampilkan notifikasi untuk tiap penjualan.')
         : tr('🔔 On while this screen is open. Allow notifications to hear about sales in the background too.', '🔔 Aktif selama layar ini terbuka. Izinkan notifikasi agar penjualan di latar belakang juga terdengar.')}</p>}
@@ -83,6 +84,12 @@ function notify(title: string, body: string) {
   if (!('Notification' in window) || Notification.permission !== 'granted' || !document.hidden) return;
   const opts = { body, tag: 'jelajah-sale', icon: `${import.meta.env.BASE_URL}icon-512.png` };
   navigator.serviceWorker?.ready.then((r) => r.showNotification(title, opts)).catch(() => { try { new Notification(title, opts); } catch { /* no notifications here */ } });
+}
+
+// older Safari only has the prefixed constructor; no Web Audio at all -> a silent bell (vibration and notifications stay)
+function audioContext(): AudioContext | null {
+  const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  try { return AC ? new AC() : null; } catch { return null; }
 }
 
 function ring(ctx: AudioContext | null) {

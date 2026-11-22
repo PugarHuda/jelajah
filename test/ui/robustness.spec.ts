@@ -6,7 +6,8 @@ const ROUTES = ['', '#/stats', '#/till/1', '#/story', '#/stall/1', '#/rallies', 
 
 function watch(page: Page) {
   const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  // WebKit also reports a blocked cross-origin fetch (e.g. a rate-limited price API) here, though the app catches it
+  page.on('pageerror', (e) => { if (!/due to access control checks/.test(e.message)) errors.push(`pageerror: ${e.message}`); });
   return errors;
 }
 // content wider than the screen = sideways scrolling on a phone

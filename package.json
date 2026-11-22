@@ -11,8 +11,9 @@
     "contracts": "cashc contracts/StampMinter.cash -o src/contracts/StampMinter.json && cashc contracts/RewardVault.cash -o src/contracts/RewardVault.json && cashc contracts/StampMinter2.cash -o src/contracts/StampMinter2.json && cashc contracts/StampMinter3.cash -o src/contracts/StampMinter3.json && node scripts/gen-vault.mjs && cashc contracts/RewardVault2.cash -o src/contracts/RewardVault2.json && cashc contracts/PassportVault.cash -o src/contracts/PassportVault.json && cashc contracts/SponsorPool.cash -o src/contracts/SponsorPool.json && cashc contracts/StampMinter4.cash -o src/contracts/StampMinter4.json && cashc contracts/RewardVault3.cash -o src/contracts/RewardVault3.json",
     "check": "npm run contracts && node test/check.mjs && node test/identity.mjs && npm run claims:check",
     "claims:contracts": "cashc claims/contracts/ClaimPool.cash -o claims/artifacts/ClaimPool.json && cashc claims/contracts/RootKeeper.cash -o claims/artifacts/RootKeeper.json && cashc claims/contracts/RootProposal.cash -o claims/artifacts/RootProposal.json",
-    "test:ui": "playwright test",
-    "test:wallet": "playwright test wallet.spec",
+    "test:ui": "playwright test --project=chromium",
+    "test:browsers": "playwright test --project=iphone --project=firefox",
+    "test:wallet": "playwright test wallet.spec --project=chromium",
     "claims:check": "npm run claims:contracts && node claims/test/check.mjs"
   },
   "dependencies": {

@@ -17,10 +17,10 @@ test('a visitor switches language, opens the wallet prompt and closes it', async
   for (const b of await page.getByRole('button', { name: /^Buy/ }).all()) await expect(b).toBeDisabled();
   await expect(page.getByRole('button', { name: /^Claim/ })).toBeDisabled();
   await page.getByRole('button', { name: 'Connect wallet' }).click();
-  await expect(page.getByText('Scan with Selene or Paytaca')).toBeVisible();
+  await expect(page.getByText(/Scan with Selene or Paytaca|On this phone\? Tap copy/)).toBeVisible();
   await expect(page.getByText(/^wiz:\/\//)).toBeVisible(); // the WizardConnect pairing URI under the QR
   await page.locator('button[aria-label*="lose" i], button:has-text("×")').first().click();
-  await expect(page.getByText('Scan with Selene or Paytaca')).toBeHidden();
+  await expect(page.getByText(/Scan with Selene or Paytaca|On this phone\? Tap copy/)).toBeHidden();
 });
 
 test('home → stall dashboard → collector page → back, all by clicking', async ({ page }) => {
@@ -113,7 +113,7 @@ test('an organizer adds and removes stalls, hits every rule, then reaches the wa
   await page.getByLabel('Streak reward (sats)').fill('3000');
   await expect(page.locator('.error')).toHaveCount(0);
   await page.getByRole('button', { name: 'Connect wallet' }).click();
-  await expect(page.getByText('Scan with Selene or Paytaca')).toBeVisible();
+  await expect(page.getByText(/Scan with Selene or Paytaca|On this phone\? Tap copy/)).toBeVisible();
 });
 
 test('a friend makes a gift link, and a reload keeps the same gift address', async ({ page }) => {
@@ -203,7 +203,7 @@ test('a sponsor finds the voucher page from the rally and is asked for a wallet 
   await page.getByRole('link', { name: 'Sponsors: hand out vouchers →' }).click();
   await expect(page.getByRole('heading', { name: '🎟 Hand out vouchers' })).toBeVisible();
   await page.getByRole('button', { name: 'Connect the sponsor wallet' }).click();
-  await expect(page.getByText('Scan with Selene or Paytaca')).toBeVisible();
+  await expect(page.getByText(/Scan with Selene or Paytaca|On this phone\? Tap copy/)).toBeVisible();
 });
 
 test.describe('an Indonesian browser', () => {
