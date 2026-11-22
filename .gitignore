@@ -46,3 +46,4 @@ Electrum-*.sqlite*
 test/ui/.wallet.*.json
 test/ui/.reclaim.*.json
 test/ui/.voucher-links.*.txt
+scripts/.watch-gifts.mjs
