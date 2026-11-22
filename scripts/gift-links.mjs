@@ -30,17 +30,17 @@ const todo = [];
 for (const g of gifts.slice(0, N)) {
   const a = addr(decodePrivateKeyWif(g.wif).privateKey);
   const held = (await provider.getUtxos(a)).reduce((s, u) => s + u.satoshis, 0n);
-  if (held < SATS) todo.push(a);
+  if (held < SATS) todo.push({ a, top: SATS - held }); // top up to SATS, never send twice
 }
 const coins = (await provider.getUtxos(from)).filter((u) => !u.token);
 const total = coins.reduce((s, u) => s + u.satoshis, 0n);
 const fee = 250n + 150n * BigInt(coins.length) + 40n * BigInt(todo.length);
-const change = total - SATS * BigInt(todo.length) - fee;
-console.log(`funder ${from}: ${total} sats; funding ${todo.length} of ${N} links at ${SATS} sats; change ${change}`);
+const change = total - todo.reduce((t, x) => t + x.top, 0n) - fee;
+console.log(`funder ${from}: ${total} sats; topping up ${todo.length} of ${N} links to ${SATS} sats (${todo.map((x) => x.top).join(', ')}); change ${change}`);
 if (todo.length && !o.dry) {
   if (change < 546n) throw new Error('not enough in the funder');
   const tb = new TransactionBuilder({ provider }).addInputs(coins, new SignatureTemplate(funder).unlockP2PKH());
-  todo.forEach((a) => tb.addOutput({ to: a, amount: SATS }));
+  todo.forEach((x) => tb.addOutput({ to: x.a, amount: x.top }));
   const { txid } = await tb.addOutput({ to: from, amount: change }).send();
   console.log(`funded: https://blockchair.com/bitcoin-cash/transaction/${txid}`);
 }

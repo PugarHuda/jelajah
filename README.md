@@ -21,7 +21,7 @@
 | What the reward NFT does | Collectible | **Membership card**: lower price at every stall, enforced by each stall's covenant |
 | Who else can fund it | Nobody | **Sponsors**: voucher links (`#/sponsor`), the stall still gets its full price |
 
-**▶ Try it on mainnet in 2 minutes (about 12,000 sats in, 3,000 back: a few US cents).** Open https://jelajah-bch.vercel.app, press **Connect wallet** and scan with Selene or Paytaca (WizardConnect). Then:
+**▶ Try it on mainnet in 2 minutes (have about 20,000 sats in the wallet: 3 stamps take 19,500 and the claim pays 4,500 back, so a set costs about 15,000 sats net, a few US cents).** Open https://jelajah-bch.vercel.app, press **Connect wallet** and scan with Selene or Paytaca (WizardConnect). Then:
 1. Buy at 3 stalls: 4,000 sats each (1,500 to the stall + a 2,500 levy into the prize pool), plus about 500 in fees.
 2. Press **Claim**: 3,000 sats come back, along with a Trophy NFT. Your set's own levies paid that reward, which is why colluding stalls can't drain the pool.
 3. Optional: buy at the 4th stall too and the claim becomes the **bonus tier** (4,500 sats). Or buy again after claiming and the button shows **★ member price**: your trophy is your membership card.
