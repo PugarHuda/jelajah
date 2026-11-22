@@ -27,11 +27,11 @@ export const idrRate: Promise<void> = cachedRate && Date.now() - cachedRate.at <
 export const rupiah = (n: number | bigint) => idrPerBch === null ? ''
   : ` ≈ Rp${Math.round(Number(n) / 1e8 * idrPerBch).toLocaleString('id-ID')}`;
 
-// UI language: ?lang=id|en, then the saved choice, then the browser. ponytail: inline pairs, no i18n lib for two languages.
+// UI language: ?lang=id|en, then the saved choice, else English (the judges' language; the ID button switches). ponytail: inline pairs, no i18n lib for two languages.
 export const ID = (() => {
   let saved: string | null = null;
   try { saved = localStorage.getItem('lang'); } catch { /* private mode */ }
-  const l = new URLSearchParams(location.search).get('lang') ?? saved ?? navigator.language;
+  const l = new URLSearchParams(location.search).get('lang') ?? saved ?? 'en';
   return l.toLowerCase().startsWith('id');
 })();
 document.documentElement.lang = ID ? 'id' : 'en';

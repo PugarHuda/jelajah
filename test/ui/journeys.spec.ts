@@ -205,3 +205,15 @@ test('a sponsor finds the voucher page from the rally and is asked for a wallet 
   await page.getByRole('button', { name: 'Connect the sponsor wallet' }).click();
   await expect(page.getByText('Scan with Selene or Paytaca')).toBeVisible();
 });
+
+test.describe('an Indonesian browser', () => {
+  test.use({ locale: 'id-ID' });
+  test('still opens in English by default, and remembers ID once chosen', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Eat at 3 stalls');
+    await page.getByRole('button', { name: 'ID', exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Jajan di 3 warung');
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Jajan di 3 warung');
+  });
+});
