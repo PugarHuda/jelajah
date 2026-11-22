@@ -121,6 +121,7 @@ export function Organize() {
       <h1>{tr('Open your own rally', 'Buka rally-mu sendiri')}</h1>
       <p className="lede">{tr('Name the stalls, set prices and the prize. Your wallet signs one transaction that locks the prize pool in a covenant and gives every stall its stamp minter. Share the link it gives you.',
         'Isi warung, harga, dan hadiah. Wallet-mu menandatangani satu transaksi yang mengunci pool hadiah di covenant dan memberi tiap warung minter stamp-nya. Bagikan link yang muncul.')}</p>
+      <p className="hint">💼 {tr('How you earn, enforced by the contracts: in a levy rally every set’s levies exceed its reward, and that surplus comes back to you with reclaim after the end; and you can sell stall slots to new stalls while the rally runs.', 'Cara kamu mendapat untung, dijamin kontrak: di rally levy, levy tiap set melebihi hadiahnya, dan surplus itu kembali kepadamu lewat reclaim setelah rally berakhir; kamu juga bisa menjual slot ke warung baru selama rally berjalan.')}</p>
       {link ? (
         <div className="claim ready">
           <div>
