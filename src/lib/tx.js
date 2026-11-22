@@ -178,10 +178,19 @@ export async function mergeLevies({ rally, provider, vault }) {
     .sort((a, b) => Number(b.satoshis - a.satoshis)).slice(0, MAX_MERGE);
   if (!vaultCoin || !levies.length) return null;
   const ins = [vaultCoin, ...levies];
-  const amount = ins.reduce((s, u) => s + u.satoshis, 0n) - MERGE_FEE * BigInt(ins.length);
-  const tb = new TransactionBuilder({ provider });
-  ins.forEach((u) => tb.addInput(u, vault.unlock.merge()));
-  const { txid } = await tb.addOutput({ to: vault.tokenAddress, amount, token: vaultCoin.token }).send();
+  const total = ins.reduce((s, u) => s + u.satoshis, 0n);
+  const build = (amount) => {
+    const tb = new TransactionBuilder({ provider });
+    ins.forEach((u) => tb.addInput(u, vault.unlock.merge()));
+    return tb.addOutput({ to: vault.tokenAddress, amount, token: vaultCoin.token });
+  };
+  // pay what the bytes cost (1 sat/byte, the relay minimum, + a small margin), not the covenant's ceiling: the unsigned
+  // merge has the same size whatever the amount, so measure once. A 4-input merge is ~3,560 bytes: 3,580 sats, was 3,800.
+  const ceiling = MERGE_FEE * BigInt(ins.length);
+  const size = BigInt(build(total - ceiling).build().length / 2);
+  const fee = size + 20n < ceiling ? size + 20n : ceiling;
+  const amount = total - fee;
+  const { txid } = await build(amount).send();
   return { ...vaultCoin, txid, vout: 0, satoshis: amount };
 }
 
