@@ -1,4 +1,4 @@
-import { ElectrumNetworkProvider } from 'cashscript';
+import { FailoverProvider } from './lib/failover';
 import { rallyContracts, checkRallyConfig } from './lib/tx.js';
 
 export interface Merchant { id: number; name: string; tagline: string; taglineId?: string; emoji: string; color: string; price: number; memberPrice?: number; lock: string; presenceKey?: string; place?: string }
@@ -71,7 +71,7 @@ export const rallyFromPayload = async (r: string) => parseRally(await inflate(r)
 const archived = Object.values(import.meta.glob<{ default: Partial<Rally> }>('../scripts/rally.*.json', { eager: true })).map((m) => m.default)
   .filter((r): r is Rally => typeof r.category === 'string' && typeof r.network === 'string');
 export const rally: Rally = fromLink ?? (passportFromLink ? byNet(passportFromLink.network) : undefined) ?? (pick ? byNet(pick) : undefined) ?? byNet('mainnet') ?? byNet('chipnet')!;
-export const provider = new ElectrumNetworkProvider(rally.network);
+export const provider = new FailoverProvider(rally.network); // several Fulcrum servers, see lib/failover.ts
 export const { minters, vault } = rallyContracts(rally, provider);
 const live = byNet(rally.network); // not `rally`: that may be a community rally opened from a link
 export const officialRallies: Rally[] = [...(live ? [live] : []), ...archived.filter((r) => r.network === rally.network && r.category !== live?.category)];

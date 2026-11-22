@@ -75,7 +75,7 @@ export function Gift() {
       <details className="small" open={balance === 0n}>
         <summary>{tr('Make a gift', 'Buat hadiah')}</summary>
         <p>{tr('1. Send a few thousand sats to this address (enough for one stamp or more):', '1. Kirim beberapa ribu sats ke alamat ini (cukup untuk satu stamp atau lebih):')}</p>
-        <img className="qr small" src={qrImage(address)} alt={address} /><br /><code className="wrap">{address}</code>
+        <img className="qr small" src={qrImage(`${address}?message=${encodeURIComponent(tr("Jelajah gift", "Hadiah Jelajah"))}`)} alt={address} /> {/* BIP21 message: Selene and Paytaca show it as the payment note */}<br /><code className="wrap">{address}</code>
         <p>{tr('2. Share this page’s link. The link IS the money: whoever opens it first can take it, so send it privately.', '2. Bagikan link halaman ini. Link ini adalah uangnya: siapa pun yang membukanya lebih dulu bisa mengambilnya, jadi kirim secara pribadi.')}</p>
         <code className="wrap">{location.href}</code>
         <p className="muted">{tr('Changed your mind? Open the link yourself and take it back.', 'Berubah pikiran? Buka link-nya sendiri dan ambil kembali.')}</p>

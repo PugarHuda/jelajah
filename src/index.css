@@ -22,7 +22,7 @@
     --muted: #b3a291;
     --faint: #5b4d41;
     --line: #3a2f27;
-    --accent: #e0533f;
+    --accent: #e5604d; /* 5:1 on --card, 5.4:1 on --paper */
     --accent-ink: #1a0f0a;
     --gold: #e0a64a;
     --gold-soft: #3a2c16;
@@ -114,6 +114,7 @@ footer { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size:
 
 .poster { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 2.5rem; gap: .4rem; }
 .poster h1 { font-size: 3rem; color: var(--c); }
+@media (prefers-color-scheme: dark) { .poster h1 { color: var(--ink); text-decoration: underline 6px var(--c); text-underline-offset: 10px; } } /* stall colours are dark: keep them as the underline on screen */
 .qr { width: min(300px, 80vw); height: auto; background: #fff; padding: 10px; border-radius: 12px; margin: 1rem 0 .5rem; image-rendering: pixelated; }
 
 @media (max-width: 560px) {

@@ -6,6 +6,9 @@ import { TestWallet, provider } from './wizard-wallet';
 import { SignatureTemplate, TransactionBuilder } from 'cashscript';
 import { decodePrivateKeyWif, encodeLockingBytecodeP2pkh, hash160, lockingBytecodeToCashAddress, secp256k1 } from '@bitauth/libauth';
 
+// full Chromium in new headless mode: the old headless shell always denies notifications
+test.use({ channel: 'chromium' });
+
 const RECLAIM_FILE = new URL('./.reclaim.chipnet.json', import.meta.url); // gitignored
 const read = (f: string) => JSON.parse(readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8'));
 const demo = read('claims/.demo.chipnet.json');
@@ -39,7 +42,7 @@ async function done(page: Page, success: string | ReturnType<Page['locator']>) {
 // spends chipnet coins on every run: opt in with `npm run test:wallet`
 test.skip(process.env.npm_lifecycle_event !== 'test:wallet' && !process.env.CHIPNET_E2E, 'npm run test:wallet (or CHIPNET_E2E=1) spends chipnet coins');
 
-test('a buyer pairs a wallet, buys at 3 stalls and claims the set (chipnet, real transactions)', async ({ page }) => {
+test('a buyer pairs a wallet, buys at 3 stalls and claims the set (chipnet, real transactions)', async ({ page, browser }) => {
   test.setTimeout(10 * 60_000);
   const w = new TestWallet();
   await w.fundFrom(FUNDERS, 19_500n);
@@ -47,6 +50,19 @@ test('a buyer pairs a wallet, buys at 3 stalls and claims the set (chipnet, real
   page.on('console', (m) => { if (m.type() === 'error') console.log('[page]', m.text()); });
   await pair(page, w, /^Connect wallet$/, page.getByRole('button', { name: /Jelajah test wallet/ }));
   await expect(page.getByRole('button', { name: /Jelajah test wallet · [1-9]/ })).toBeVisible({ timeout: 60_000 }); // coins loaded
+  // the Kopi Joss stall's phone: till open in the background with notifications allowed; every system notification is recorded
+  const tillCtx = await browser.newContext({ permissions: ['notifications'] });
+  await tillCtx.addInitScript(() => {
+    Object.defineProperty(document, 'hidden', { get: () => true });
+    (window as unknown as { notes: string[] }).notes = [];
+    const show = ServiceWorkerRegistration.prototype.showNotification;
+    ServiceWorkerRegistration.prototype.showNotification = function (title, opts) { (window as unknown as { notes: string[] }).notes.push(title); return show.call(this, title, opts); };
+  });
+  const till = await tillCtx.newPage();
+  await till.goto('/?net=chipnet&lang=en#/till/1');
+  await till.getByRole('button', { name: '🔔 Turn on the sale bell' }).click();
+  await expect(till.getByText(/With the till in the background/)).toBeVisible();
+  const boughtKopi = !(await page.locator('article.stall', { hasText: 'Kopi Joss' }).getAttribute('class'))!.includes('have');
   // buy at stalls the wallet has no stamp from yet (a rerun keeps the stamps of an earlier run) until the set is complete
   while (!(await page.locator('.progress').innerText()).startsWith('3/3')) {
     const stall = page.locator('article.stall:not(.have)').first();
@@ -56,6 +72,8 @@ test('a buyer pairs a wallet, buys at 3 stalls and claims the set (chipnet, real
     await expect(page.locator('article.stall', { hasText: name })).toHaveClass(/have/, { timeout: 60_000 });
     if (!(await page.locator('.progress').innerText()).startsWith('3/3')) await expect(page.getByText(/more stalls? to go\. Next stop:/)).toBeVisible();
   }
+  if (boughtKopi) await expect.poll(() => till.evaluate(() => (window as unknown as { notes: string[] }).notes.join(' | ')), { timeout: 60_000 }).toContain('Kopi Joss: +');
+  await tillCtx.close();
   const claim = page.getByRole('button', { name: /^Claim/ });
   await expect(claim).toBeEnabled({ timeout: 60_000 });
   await claim.click();

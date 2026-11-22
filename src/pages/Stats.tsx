@@ -89,6 +89,7 @@ export function Stats() {
         </table>
       ))}
       <a href="#">{tr('← Back to the rally', '← Kembali ke rally')}</a>
+      <p className="muted small">{tr(`Read live from ${rally.network} via ${provider.host} (Fulcrum); if a server is down the app moves to the next one.`, `Dibaca langsung dari ${rally.network} lewat ${provider.host} (Fulcrum); kalau satu server mati, aplikasi pindah ke server berikutnya.`)}</p>
     </main>
   );
 }

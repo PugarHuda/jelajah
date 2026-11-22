@@ -312,6 +312,7 @@ function Rally() {
         {trophies.length > 0 && (
           <section className="shelf">
             <h2>{tr('Trophy shelf', 'Rak trofi')}</h2>
+            {rally.network === 'mainnet' && <p className="muted small">{tr('Your trophies are CashTokens NFTs: any BCH token wallet shows them with their name and art.', 'Trofimu adalah NFT CashTokens: wallet token BCH mana pun menampilkannya lengkap dengan nama dan gambarnya.')} <a href={`https://tokenexplorer.cash/?tokenId=${rally.category}`} target="_blank" rel="noreferrer">tokenexplorer.cash →</a></p>}
             <div className="trophies">{trophies.map((t) => <Trophy key={t.utxo.txid} name={rally.name} bonus={t.utxo.token!.nft!.commitment.endsWith("02") && t.utxo.token!.nft!.commitment.length > 42} />)}</div>
           </section>
         )}
@@ -343,7 +344,7 @@ function Rally() {
               `Anti-farming: hadiah (${sats(rally.reward)}) selalu lebih kecil dari set termurah, jadi warung tidak bisa untung dengan membeli dari dirinya sendiri. Stamp boleh diperjualbelikan sebagai koleksi, tapi hadiah selalu jatuh ke pembeli aslinya.`)}
           </p>
           <dl className="tech">
-            <dt>{tr('Token category', 'Kategori token')}</dt><dd><code>{rally.category}</code></dd>
+            <dt>{tr('Token category', 'Kategori token')}</dt><dd><code>{rally.category}</code>{rally.network === 'mainnet' && <> · <a href={`https://tokenexplorer.cash/?tokenId=${rally.category}`} target="_blank" rel="noreferrer">{tr('verified metadata on tokenexplorer.cash', 'metadata terverifikasi di tokenexplorer.cash')}</a> · <a href={`https://bcmr.paytaca.com/api/tokens/${rally.category}/`} target="_blank" rel="noreferrer">{tr('as wallets see it (Paytaca BCMR)', 'seperti dilihat wallet (BCMR Paytaca)')}</a></>}</dd>
             <dt>{tr('Reward vault', 'Vault hadiah')}</dt><dd><code>{vault.tokenAddress}</code></dd>
             <dt>Genesis</dt><dd><a href={explorerTx(rally.genesisTx)} target="_blank" rel="noreferrer">{rally.genesisTx.slice(0, 16)}…</a></dd>
             <dt>{tr('Stall dashboard', 'Dasbor warung')}</dt><dd><a href="#/stats">{tr('Sales per stall, from the chain', 'Penjualan tiap warung, langsung dari chain')}</a></dd>

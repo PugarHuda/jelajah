@@ -217,3 +217,21 @@ test.describe('an Indonesian browser', () => {
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Jajan di 3 warung');
   });
 });
+
+test('a stall owner without Web NFC sees no NFC button; with it, the tag gets the stall link as a URL record', async ({ page, browser }) => {
+  await page.goto('/?lang=en#/stall/1');
+  await page.reload();
+  await expect(page.getByRole('button', { name: /Print this poster/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /NFC tag/ })).toHaveCount(0);
+  // Chrome on Android exposes NDEFReader; record what the page writes (the phone's NFC radio is the only part not exercised)
+  const android = await (await browser.newContext()).newPage();
+  await android.addInitScript(() => {
+    (window as unknown as { written: unknown[] }).written = [];
+    (window as unknown as { NDEFReader: unknown }).NDEFReader = class { write(m: unknown) { (window as unknown as { written: unknown[] }).written.push(m); return Promise.resolve(); } };
+  });
+  await android.goto('/?lang=en#/stall/1');
+  await android.getByRole('button', { name: '📶 Write this stall to an NFC tag' }).click();
+  await expect(android.getByRole('status')).toContainText('Tag written');
+  const written = await android.evaluate(() => (window as unknown as { written: { records: { recordType: string; data: string }[] }[] }).written);
+  expect(written[0].records[0]).toEqual({ recordType: 'url', data: expect.stringMatching(/\/\?lang=en#stall-1$/) });
+});

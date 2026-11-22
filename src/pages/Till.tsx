@@ -33,7 +33,10 @@ export function Till() {
           const ids = new Set(next.map((x) => x.id));
           return [...next.reverse(), ...(s ?? []).filter((x) => !ids.has(x.id))];
         });
-        if (fresh && newcomers.length) ring(bellRef.current);
+        if (fresh && newcomers.length) {
+          ring(bellRef.current);
+          notify(`🔔 ${m.name}: +${sats(newcomers.reduce((t: bigint, x: { paid: bigint }) => t + x.paid, 0n))}`, tr(`${newcomers.length} paid stamp${newcomers.length > 1 ? 's' : ''}`, `${newcomers.length} stamp terbayar`));
+        }
         first = false;
         setErr(null);
       } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
@@ -49,7 +52,10 @@ export function Till() {
     <main className="poster device">
       <p className="eyebrow">{rally.name} · {tr('till', 'kasir')}</p>
       <h1>{m.emoji} {m.name}</h1>
-      {!bell && <button className="primary" onClick={() => { const c = new AudioContext(); ring(c); setBell(c); }}>🔔 {tr('Turn on the sale bell', 'Nyalakan bel penjualan')}</button>}
+      {!bell && <button className="primary" onClick={() => { const c = new AudioContext(); ring(c); setBell(c); if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {}); }}>🔔 {tr('Turn on the sale bell', 'Nyalakan bel penjualan')}</button>}
+      {bell && 'Notification' in window && <p className="muted small">{Notification.permission === 'granted'
+        ? tr('🔔 On. With the till in the background, this phone also shows a notification for every sale.', '🔔 Aktif. Saat kasir di latar belakang, ponsel ini juga menampilkan notifikasi untuk tiap penjualan.')
+        : tr('🔔 On while this screen is open. Allow notifications to hear about sales in the background too.', '🔔 Aktif selama layar ini terbuka. Izinkan notifikasi agar penjualan di latar belakang juga terdengar.')}</p>}
       <p className="lede">{sales === null ? tr('Reading the chain…', 'Membaca chain…')
         : tr(`${sales.length} stamps sold · ${sats(total)} paid to this stall`, `${sales.length} stamp terjual · ${sats(total)} dibayar ke warung ini`)}</p>
       {fresh.length > 0 && <p className="hint"><b>🔔 +{fresh.length} {tr('since this screen opened', 'sejak layar ini dibuka')} · {sats(fresh.reduce((s, x) => s + x.paid, 0n))}</b></p>}
@@ -71,6 +77,14 @@ function downloadCsv(name: string, sales: Sale[]) {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+// a sale while the till is in the background (another app on the stall's phone): a system notification.
+// Through the service worker: Chrome on Android has no `new Notification()` for pages.
+function notify(title: string, body: string) {
+  if (!('Notification' in window) || Notification.permission !== 'granted' || !document.hidden) return;
+  const opts = { body, tag: 'jelajah-sale', icon: `${import.meta.env.BASE_URL}icon-512.png` };
+  navigator.serviceWorker?.ready.then((r) => r.showNotification(title, opts)).catch(() => { try { new Notification(title, opts); } catch { /* no notifications here */ } });
+}
+
 function ring(ctx: AudioContext | null) {
   navigator.vibrate?.(200);
   if (!ctx) return;
