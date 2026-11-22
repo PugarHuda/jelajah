@@ -20,6 +20,7 @@ import { Profile } from './pages/Profile';
 import { Rallies } from './pages/Rallies';
 import { Gift } from './pages/Gift';
 import { Sponsor } from './pages/Sponsor';
+import { trophyCard, shareOrDownload } from './lib/trophyCard';
 import { LOADED_AT, sats, idrPerBch, idrRate, rupiah, ID, tr, switchLang, cost, stallOf, mapUrl, shareUrl, shareTx, qrImage, hex, wcSubtitle, explain } from './shared';
 
 // the live mainnet levy rally, and one full set of it on chain (README "A full levy cycle on mainnet")
@@ -117,6 +118,22 @@ function Rally() {
       .catch(() => {});
   }, []);
   const rewardsLeft = pool === null ? null : Number((pool - 1000n) / BigInt(rally.reward)); // vault keeps 1000 sats dust
+
+  // a trophy card to post: the BCMR trophy art, the rally, the collector; shared as a file on phones, downloaded elsewhere
+  const [cardMsg, setCardMsg] = useState<string | null>(null);
+  async function shareTrophy() {
+    setCardMsg(null);
+    try {
+      const n = trophies.length;
+      const blob = await trophyCard({
+        rally: rally.name, network: rally.network, collector: addressOf(lock!).replace(/^(.{20}).*(.{6})$/, '$1…$2'), bonus: false,
+        site: location.host + location.pathname.replace(/\/$/, ''), art: `${import.meta.env.BASE_URL}art/00.png`,
+        lines: [tr(n > 1 ? `${n} sets completed` : 'Set completed', n > 1 ? `${n} set selesai` : 'Set selesai'), tr(`${rally.needed} different stalls, paid on chain`, `${rally.needed} warung berbeda, dibayar di chain`)],
+      });
+      const how = await shareOrDownload(blob, 'jelajah-trophy.png', tr(`I completed ${rally.name} on Bitcoin Cash 🏆 ${location.origin}${location.pathname}`, `Aku menyelesaikan ${rally.name} di Bitcoin Cash 🏆 ${location.origin}${location.pathname}`));
+      setCardMsg(how === 'downloaded' ? tr('Saved as jelajah-trophy.png', 'Tersimpan sebagai jelajah-trophy.png') : null);
+    } catch (e) { if (!(e instanceof DOMException && e.name === 'AbortError')) setCardMsg(explain(e)); }
+  }
 
   async function run(label: string, fn: () => Promise<string>) {
     setBusy(label); setError(null);
@@ -325,6 +342,7 @@ function Rally() {
             <h2>{tr('Trophy shelf', 'Rak trofi')}</h2>
             {rally.network === 'mainnet' && <p className="muted small">{tr('Your trophies are CashTokens NFTs: any BCH token wallet shows them with their name and art.', 'Trofimu adalah NFT CashTokens: wallet token BCH mana pun menampilkannya lengkap dengan nama dan gambarnya.')} <a href={`https://tokenexplorer.cash/?tokenId=${rally.category}`} target="_blank" rel="noreferrer">tokenexplorer.cash →</a></p>}
             <div className="trophies">{trophies.map((t) => <Trophy key={t.utxo.txid} name={rally.name} bonus={t.utxo.token!.nft!.commitment.endsWith("02") && t.utxo.token!.nft!.commitment.length > 42} />)}</div>
+            <p className="row"><button className="ghost" onClick={shareTrophy}>📸 {tr('Share my trophy (image)', 'Bagikan trofiku (gambar)')}</button>{cardMsg && <span className="muted small" role="status">{cardMsg}</span>}</p>
           </section>
         )}
 

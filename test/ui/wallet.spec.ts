@@ -87,6 +87,25 @@ test('a buyer pairs a wallet, buys at 3 stalls and claims the set (chipnet, real
   await claim.click();
   await done(page, 'Set claimed');
   await expect(page.getByRole('heading', { name: 'Trophy shelf' })).toBeVisible({ timeout: 60_000 });
+  // the collector posts it: a 1080×1080 PNG trophy card. Where the OS can share files (phones, Chrome here) it goes to the
+  // share sheet: record what the page hands over instead of opening the OS dialog.
+  await page.evaluate(() => {
+    const w = window as unknown as { shared?: { name: string; type: string; size: number; text: string } };
+    navigator.share = async (d?: ShareData) => { const f = d!.files![0]; w.shared = { name: f.name, type: f.type, size: f.size, text: d!.text ?? '' }; };
+  });
+  await page.getByRole('button', { name: '📸 Share my trophy (image)' }).click();
+  const shared = await page.waitForFunction(() => (window as unknown as { shared?: unknown }).shared).then((h) => h.jsonValue()) as { name: string; type: string; size: number; text: string };
+  expect(shared).toMatchObject({ name: 'jelajah-trophy.png', type: 'image/png' });
+  expect(shared.size).toBeGreaterThan(20_000);
+  expect(shared.text).toContain('on Bitcoin Cash 🏆');
+  // a browser that can't share files downloads the same card
+  await page.evaluate(() => { (navigator as unknown as { canShare?: unknown }).canShare = undefined; });
+  const [card] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '📸 Share my trophy (image)' }).click()]);
+  expect(card.suggestedFilename()).toBe('jelajah-trophy.png');
+  const png = readFileSync(await card.path());
+  expect(png.subarray(1, 4).toString()).toBe('PNG');
+  expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1080, 1080]);
+  await expect(page.getByRole('status')).toContainText('Saved as jelajah-trophy.png');
   w.close();
 });
 
