@@ -235,3 +235,30 @@ test('a stall owner without Web NFC sees no NFC button; with it, the tag gets th
   const written = await android.evaluate(() => (window as unknown as { written: { records: { recordType: string; data: string }[] }[] }).written);
   expect(written[0].records[0]).toEqual({ recordType: 'url', data: expect.stringMatching(/\/\?lang=en#stall-1$/) });
 });
+
+test('a judge watches a full mainnet set without a wallet, every number decoded from the chain', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.goto('/?lang=en');
+  await page.getByRole('link', { name: /Watch a full set on mainnet/ }).click();
+  const card = page.locator('section.claim');
+  for (const stall of ['Kopi Joss', 'Bakmi Jawa', 'Sate Klathak']) {
+    await expect(card.getByRole('heading')).toContainText(`Stamp at ${stall}`, { timeout: 60_000 });
+    await expect(card).toContainText(`1,500 sats paid to ${stall}`);
+    await expect(card).toContainText('2,500 sats levy into the prize pool');
+    await expect(card).toContainText(`the ${stall} stamp NFT, minted in this same transaction`);
+    await page.getByRole('button', { name: /Next transaction/ }).click();
+  }
+  await expect(card).toContainText('2,500 sats + 2,500 sats + 2,500 sats');
+  await expect(card).toContainText('went to the miner as the fee');
+  await page.getByRole('button', { name: /Next transaction/ }).click();
+  await expect(card).toContainText('Burned: Kopi Joss · Bakmi Jawa · Sate Klathak');
+  await expect(card).toContainText('the reward paid was 3,000 sats');
+  await expect(card).toContainText('It paid for its own reward.');
+  await expect(card.getByRole('link', { name: /e411c9b9730f/ })).toHaveAttribute('href', /blockchair\.com\/bitcoin-cash\/transaction\/e411c9b9/);
+  await expect(page.getByText(/Honest note: this set was our own test purchase/)).toBeVisible();
+  await page.getByRole('button', { name: 'Step 2' }).click(); // the dots jump back
+  await expect(card.getByRole('heading')).toContainText('Stamp at Bakmi Jawa');
+  await page.getByRole('button', { name: 'Step 5' }).click();
+  await page.getByRole('link', { name: /Now try it yourself/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Eat at 3 stalls');
+});

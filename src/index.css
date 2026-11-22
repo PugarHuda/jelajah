@@ -193,3 +193,13 @@ details.cycle ol { margin: .5rem 0; padding-left: 1.2rem; }
 details.cycle a, .next a { margin-right: .4rem; white-space: nowrap; }
 .vouchers { display: flex; flex-wrap: wrap; gap: .6rem; }
 .vouchers figure { margin: 0; text-align: center; }
+
+/* a link that looks like a button (the replay entry and its last step) */
+a.button { display: inline-block; border-radius: 999px; padding: .6rem 1.1rem; border: 1.5px solid var(--ink); text-decoration: none; }
+/* #/replay: step dots */
+.replay .dots { display: flex; gap: .4rem; list-style: none; padding: 0; margin: 1rem 0; }
+.replay .dots button { width: 2.4rem; height: 2.4rem; padding: 0; }
+.replay .dots .on button { background: var(--ink); color: var(--paper); }
+.replay .dots .done button { border-color: var(--ok); color: var(--ok); }
+.replay ul { padding-left: 1.1rem; }
+.replay li { margin: .35rem 0; }

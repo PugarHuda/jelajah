@@ -20,16 +20,11 @@ import { Profile } from './pages/Profile';
 import { Rallies } from './pages/Rallies';
 import { Gift } from './pages/Gift';
 import { Sponsor } from './pages/Sponsor';
+import { Replay } from './pages/Replay';
+import { LEVY_MAINNET, CYCLE } from './cycle';
 import { trophyCard, shareOrDownload } from './lib/trophyCard';
 import { LOADED_AT, sats, idrPerBch, idrRate, rupiah, ID, tr, switchLang, cost, stallOf, mapUrl, shareUrl, shareTx, qrImage, hex, wcSubtitle, explain } from './shared';
 
-// the live mainnet levy rally, and one full set of it on chain (README "A full levy cycle on mainnet")
-const LEVY_MAINNET = '6dd1cc7da85cdb72d7cbe597a505b11197173ebb25c3e49e079c778ac1a5cbf3';
-const CYCLE = {
-  stamps: ['8718bc42c871cd9e5cb37c0a51c2aced4e488457a3678412161497692b5ea98e', 'e38a96c376715f1e1093d7c8f495af8e5f27ed9ed9b4f172c16306058f090674', 'd1b5d0fd15261160dd314b7755a851af9e358fc91917a51b4119e0a44fe63419'],
-  merge: 'de77ed6ef2bbabfe7627c767285f3234618f43875924d12393e1bfda0d80a6fc',
-  claim: 'e411c9b9730f2f69cf062b83375dff3afbc91f0d02764549c59174ce2ed948ee',
-};
 
 // Google Maps directions (the documented api=1 URL, no key): from where the buyer stands, on foot, through every stall
 // still missing. Places are addresses or "lat,lng"; stalls without one are left out.
@@ -56,6 +51,7 @@ export default function App() {
   if (window.location.hash === '#/story') return <Story />;
   if (window.location.hash.startsWith('#/gift')) return <Gift />;
   if (window.location.hash === '#/sponsor') return <Sponsor />;
+  if (window.location.hash === '#/replay') return <Replay />;
   if (window.location.hash === '#/passport' && passportFromLink) return <PassportPage />;
   if (window.location.hash === '#/art') return ( // press image: every stamp + the trophy
     <main className="art">{rally.merchants.map((m) => <Stamp key={m.id} m={m} inked size={220} />)}<Trophy name={rally.name} size={220} /></main>
@@ -228,6 +224,7 @@ function Rally() {
             <p className="muted small">Not one shop's loyalty card: many stalls, one shared prize pool, and only stamps from <b>different</b> stalls count.</p>
           </>)}
           {proof && proof.stamps > 0 && <p className="proof"><a href="#/stats">{tr(`${proof.stamps} paid stamps · ${proof.sets} sets claimed on ${rally.network}, read from the chain`, `${proof.stamps} stamp terbayar · ${proof.sets} set diklaim di ${rally.network}, dibaca dari chain`)}</a></p>}
+          {rally.category === LEVY_MAINNET && <p><a className="button primary" href="#/replay">▶ {tr('Watch a full set on mainnet: no wallet, 1 minute', 'Lihat satu set penuh di mainnet: tanpa wallet, 1 menit')}</a></p>}
           {rally.category === LEVY_MAINNET && (
             <details className="cycle small">
               <summary>{tr('How the pool pays for itself: one full set on mainnet, in 3 transactions', 'Cara pool membiayai dirinya sendiri: satu set penuh di mainnet, dalam 3 transaksi')}</summary>

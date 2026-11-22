@@ -2,7 +2,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const ROUTES = ['', '#/stats', '#/till/1', '#/story', '#/stall/1', '#/rallies', '#/organize', '#/gift', '#/device/1', '#/identity',
-  '#/solidcash', '#/reclaim', '#/sponsor', '#/u/bitcoincash:qqd2thqn52yy8j85fdk782gffdns9yqelulnlj6s3q', '#/art'];
+  '#/solidcash', '#/reclaim', '#/sponsor', '#/replay', '#/u/bitcoincash:qqd2thqn52yy8j85fdk782gffdns9yqelulnlj6s3q', '#/art'];
 
 function watch(page: Page) {
   const errors: string[] = [];
