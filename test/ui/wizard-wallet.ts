@@ -23,6 +23,7 @@ export class TestWallet {
   private client?: RelayClient;
   private cleanup?: () => void;
   signed: string[] = []; // userPrompt of every request this wallet approved
+  rejectNext = false; // the person taps "Reject" on the next request, as in Selene or Paytaca
 
   constructor() {
     if (!existsSync(SEED_FILE)) writeFileSync(SEED_FILE, JSON.stringify({ seed: randomBytes(32).toString('hex') }));
@@ -104,6 +105,10 @@ export class TestWallet {
     if (m.action !== RelayMsgAction.SignTransactionRequest) return;
     console.log('[test wallet] sign request', (m as SignTransactionRequest).sequence);
     const req = m as SignTransactionRequest;
+    if (this.rejectNext) {
+      this.rejectNext = false;
+      return this.client!.relay({ action: RelayMsgAction.SignTransactionResponse, time: now, sequence: req.sequence, signedTransaction: '', error: 'User rejected the request' } as never);
+    }
     const wc = req.transaction as unknown as { transaction: string; sourceOutputs: Record<string, unknown>[]; userPrompt?: string };
     const tx = decodeTransaction(hexToBin(wc.transaction));
     if (typeof tx === 'string') throw new Error(tx);

@@ -4,7 +4,7 @@ import { SignatureTemplate } from 'cashscript';
 import { rally, provider, vault, rallyLink, type Rally } from '../chain';
 import { buildReclaim, buildAddStall } from '../lib/tx.js';
 import { explorerTx, addressOf } from '../wallet';
-import { LOADED_AT, sats, tr, reclaimStoreKey } from '../shared';
+import { LOADED_AT, sats, tr, reclaimStoreKey, explain } from '../shared';
 
 // ---- #/reclaim: after a rally ends, its organizer takes back what is left of the pool. Signed locally with the rally's
 // reclaim key (created on #/organize and kept in this browser, or pasted from the backup); no wallet prompt needed.
@@ -26,7 +26,7 @@ export function Reclaim() {
     try {
       const { builder } = await buildReclaim({ rally, provider, vault, signer: new SignatureTemplate(key!), to: dest! });
       setDone((await builder.send()).txid);
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+    } catch (e) { setErr(explain(e)); } finally { setBusy(false); }
   }
   return (
     <main className="organize">
@@ -76,7 +76,7 @@ function AddStall({ keyBytes }: { keyBytes: Uint8Array }) {
         stall: { name: s.name.trim() || 'New stall', emoji: s.emoji || '⭐', price: Number(s.price), memberPrice: Number(s.memberPrice || s.price), lock } });
       const { txid } = await builder.send();
       setMsg({ txid, link: await rallyLink(next as Rally) });
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+    } catch (e) { setErr(explain(e)); } finally { setBusy(false); }
   }
   const set = (k: keyof typeof s) => (e: React.ChangeEvent<HTMLInputElement>) => setS({ ...s, [k]: e.target.value });
   return (

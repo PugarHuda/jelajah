@@ -3,7 +3,7 @@ import { hexToBin } from '@bitauth/libauth';
 import { rally, provider, minters } from '../chain';
 import { stallSales } from '../lib/tx.js';
 import { explorerTx, addressOf } from '../wallet';
-import { sats, tr, shortAddr, back } from '../shared';
+import { sats, tr, shortAddr, back, explain } from '../shared';
 
 // ---- #/till/<stall id>: the stall's cashier screen. Rings on every paid stamp as soon as it hits the mempool,
 // and keeps the totals, all read from the stall covenant's own history (no server, nothing to fake).
@@ -39,7 +39,7 @@ export function Till() {
         }
         first = false;
         setErr(null);
-      } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { setErr(explain(e)); }
       if (!stop) timer = window.setTimeout(poll, 5000);
     };
     poll();

@@ -5,7 +5,7 @@ import { TransactionBuilder } from 'cashscript';
 import { rally, provider } from '../chain';
 import { sponsorPool } from '../lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, addressOf, explorerTx, type Coin } from '../wallet';
-import { sats, tr, qrImage, back, wcSubtitle } from '../shared';
+import { sats, tr, qrImage, back, wcSubtitle, explain } from '../shared';
 
 const PER_LINK = 2000n; // sats riding with each voucher: enough to pay the network fee when the buyer takes it
 
@@ -62,7 +62,7 @@ export function Sponsor() {
       const txid = await signAndSend(wc.manager!, tb, inputs, tr(`Split ${count} ${sp!.name} vouchers into gift links`, `Pecah ${count} voucher ${sp!.name} jadi link hadiah`), 0);
       const base = `${location.origin}${location.pathname}${location.search}#/gift/`;
       setLinks({ txid, urls: keys.map((k) => base + encodePrivateKeyWif(k, rally.network === 'mainnet' ? 'mainnet' : 'testnet')) });
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+    } catch (e) { setErr(explain(e)); } finally { setBusy(false); }
   }
 
   return (

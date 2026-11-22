@@ -3,7 +3,7 @@ import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
 import { provider, passportFromLink } from '../chain';
 import { buildPassportClaim, isTrophyOf } from '../lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, type Coin } from '../wallet';
-import { sats, tr, hex, wcSubtitle } from '../shared';
+import { sats, tr, hex, wcSubtitle, explain } from '../shared';
 
 // ---- #/passport (?pp=…): trade a trophy from each of two rallies for the passport reward + a Passport NFT
 export function PassportPage() {
@@ -31,7 +31,7 @@ export function PassportPage() {
       const { builder, inputs } = await buildPassportClaim({ passport: pp, provider, ownerLock: lock!, coins: fresh.filter((c) => !c.utxo.token),
         trophyA: fresh.find((c) => isTrophyOf(pp.rallyA.category, pkh, c.utxo)), trophyB: fresh.find((c) => isTrophyOf(pp.rallyB.category, pkh, c.utxo)) });
       setDone(await signAndSend(wc.manager!, builder, inputs, tr(`Trade your two trophies for the ${pp.name} passport + ${sats(pp.reward)}`, `Tukar dua trofimu dengan paspor ${pp.name} + ${sats(pp.reward)}`)));
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+    } catch (e) { setErr(explain(e)); } finally { setBusy(false); }
   }
   return (
     <main className="organize">

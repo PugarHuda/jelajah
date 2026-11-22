@@ -63,6 +63,10 @@ test('a buyer pairs a wallet, buys at 3 stalls and claims the set (chipnet, real
   await till.getByRole('button', { name: '🔔 Turn on the sale bell' }).click();
   await expect(till.getByText(/With the till in the background/)).toBeVisible();
   const boughtKopi = !(await page.locator('article.stall', { hasText: 'Kopi Joss' }).getAttribute('class'))!.includes('have');
+  // the buyer changes their mind once: Reject in the wallet -> a plain message, nothing sent, the stall can be bought again
+  w.rejectNext = true;
+  await page.locator('article.stall:not(.have)').first().getByRole('button', { name: /^Buy/ }).click();
+  await expect(page.getByRole('alert')).toContainText('You declined in the wallet. Nothing was sent.', { timeout: 120_000 });
   // buy at stalls the wallet has no stamp from yet (a rerun keeps the stamps of an earlier run) until the set is complete
   while (!(await page.locator('.progress').innerText()).startsWith('3/3')) {
     const stall = page.locator('article.stall:not(.have)').first();
@@ -70,7 +74,11 @@ test('a buyer pairs a wallet, buys at 3 stalls and claims the set (chipnet, real
     await stall.getByRole('button', { name: /^Buy/ }).click();
     await done(page, `Stamped at ${name}`);
     await expect(page.locator('article.stall', { hasText: name })).toHaveClass(/have/, { timeout: 60_000 });
-    if (!(await page.locator('.progress').innerText()).startsWith('3/3')) await expect(page.getByText(/more stalls? to go\. Next stop:/)).toBeVisible();
+    if (!(await page.locator('.progress').innerText()).startsWith('3/3')) {
+      await expect(page.getByText(/more stalls? to go\. Next stop:/)).toBeVisible();
+      const route = await page.getByRole('link', { name: /walk them all/ }).getAttribute('href');
+      expect(route).toMatch(/^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&travelmode=walking&destination=/);
+    }
   }
   if (boughtKopi) await expect.poll(() => till.evaluate(() => (window as unknown as { notes: string[] }).notes.join(' | ')), { timeout: 60_000 }).toContain('Kopi Joss: +');
   await tillCtx.close();

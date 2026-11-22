@@ -6,7 +6,7 @@ import { RELAYS, NIP39_KIND, buildProofTx, linkEvent, nip39Event, findVerified, 
 import { rally, provider, officialRallies } from '../chain';
 import { isRallyNft } from '../lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf } from '../wallet';
-import { tr, type NostrSigner, nostrSigner, wcSubtitle } from '../shared';
+import { tr, type NostrSigner, nostrSigner, wcSubtitle, explain } from '../shared';
 
 // ---- #/identity: Jelajah ID — link your BCH address and a Nostr key (each vouching for the other), find and verify
 // anyone's link from public relays + the chain, see their Jelajah reputation, pay them, and log in by challenge.
@@ -45,7 +45,7 @@ export function IdentityPage() {
       await Promise.allSettled(pool.publish(RELAYS, await signer!.sign(nip39Event(current, { address: address!, txid }))));
       pool.close(RELAYS);
       setLinked({ txid, relays: res.filter((r) => r.status === 'fulfilled').length });
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); }
+    } catch (e) { setErr(explain(e)); } finally { setBusy(null); }
   }
 
   async function verify() {
@@ -59,7 +59,7 @@ export function IdentityPage() {
         const held = (await provider.getUtxos(r.address!)).filter((u) => officialRallies.some((x) => isRallyNft(x, u)));
         setFound({ ...r, stamps: held.filter((u) => !u.token!.nft!.commitment.startsWith('00')).length, trophies: held.filter((u) => u.token!.nft!.commitment.startsWith('00')).length });
       } else setFound(r);
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); }
+    } catch (e) { setErr(explain(e)); } finally { setBusy(null); }
   }
 
   async function doLogin() {
@@ -73,7 +73,7 @@ export function IdentityPage() {
       const r = await findVerified(pool, { nostrPubkey: answer.pubkey }, provider);
       pool.close(RELAYS);
       setLogin(r?.ok ? { address: r.address! } : { note: tr('Signature OK, but no verified BCH link yet. Link first.', 'Tanda tangan OK, tapi belum ada tautan BCH terverifikasi. Tautkan dulu.') });
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    } catch (e) { setErr(explain(e)); }
   }
 
   return (

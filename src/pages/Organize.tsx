@@ -7,7 +7,7 @@ import { RELAYS, rallyEvent } from '../lib/identity.js';
 import { rally, provider, rallyLink, type Rally } from '../chain';
 import { bcmrRegistry, checkRallyConfig, genesisNeed, planRally, buildGenesis } from '../lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, receiveZeroCoin } from '../wallet';
-import { sats, tr, reclaimStoreKey, nostrSigner, wcSubtitle } from '../shared';
+import { sats, tr, reclaimStoreKey, nostrSigner, wcSubtitle, explain } from '../shared';
 
 // ---- #/organize: open your own rally from the browser. The genesis is the same code the CLI uses (src/lib/tx.js),
 // signed by the organizer's wallet over WizardConnect; the finished rally travels in its share link.
@@ -45,7 +45,7 @@ export function Organize() {
       const res = await Promise.allSettled(pool.publish(RELAYS, event));
       pool.close(RELAYS);
       setListed(res.filter((r) => r.status === 'fulfilled').length);
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    } catch (e) { setErr(explain(e)); }
   }
 
   const payout = (address: string) => {
@@ -70,7 +70,7 @@ export function Organize() {
   });
   let problem: string | null = null;
   let need = 0n;
-  try { const c = cfg(); checkRallyConfig(c); need = genesisNeed(c); } catch (e) { problem = e instanceof Error ? e.message : String(e); }
+  try { const c = cfg(); checkRallyConfig(c); need = genesisNeed(c); } catch (e) { problem = explain(e); }
   if (!problem && f.bcmrUrl.trim() && !/^https:\/\/[^\s]+\.json$/.test(f.bcmrUrl.trim())) problem = tr('The metadata URL must be https://… ending in .json', 'URL metadata harus https://… berakhiran .json');
   // organizer's fee in a levy rally, enforced by the contracts: levies above the reward stay in the pool until reclaim
   // (lower bound: RewardVault2.merge() lets at most 600 sats per input go to fees)
@@ -109,7 +109,7 @@ export function Organize() {
       setMade({ name: r.name, category: r.category });
       if (reg) setBcmrBody(reg.body);
       setLink(await rallyLink({ ...r, genesisTx: txid } as Rally));
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); }
+    } catch (e) { setErr(explain(e)); } finally { setBusy(null); }
   }
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });

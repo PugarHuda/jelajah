@@ -4,7 +4,7 @@ import { secp256k1, generatePrivateKey, encodePrivateKeyWif, decodePrivateKeyWif
 import { TransactionBuilder, SignatureTemplate } from 'cashscript';
 import { rally, provider } from '../chain';
 import { buyerLock, explorerTx, addressOf } from '../wallet';
-import { sats, tr, qrImage, back, wcSubtitle } from '../shared';
+import { sats, tr, qrImage, back, wcSubtitle, explain } from '../shared';
 
 // ---- #/gift/<wif>: a gift link holding a few sats, so someone with an empty wallet can buy their first stamp.
 // The key lives only in the link's #fragment, which browsers never send to a server. Whoever opens it first can take it.
@@ -58,7 +58,7 @@ export function Gift() {
       if (feeFromToken && (!tokens.length || tokens[0].satoshis - (fee - total) < 1000n)) throw new Error(tr('This gift is empty (or already taken).', 'Hadiah ini kosong (atau sudah diambil).'));
       if (!feeFromToken) tb.addOutput({ to: lock!, amount: total - fee });
       setDone((await tb.send()).txid);
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    } catch (e) { setErr(explain(e)); }
   }
   if (!giftLock) return <main className="organize"><p className="error">{tr('This gift link is broken.', 'Link hadiah ini rusak.')}</p>{back}</main>;
   return (

@@ -7,7 +7,7 @@ import { rally, provider, officialRallies, type Rally } from '../chain';
 import { isRallyNft, stampDays, streakOf, todayWib } from '../lib/tx.js';
 import { explorerTx, addressOf } from '../wallet';
 import { Stamp, Trophy } from '../Stamp';
-import { tr, back } from '../shared';
+import { tr, back, explain } from '../shared';
 
 // ---- #/u/<BCH address or npub>: a collector's page. What they hold in this rally, read from the chain, and their
 // verified Nostr identity (Jelajah ID) if they linked one. Shareable: nothing here is self-reported.
@@ -46,7 +46,7 @@ export function Profile() {
       held.filter((c) => !c.startsWith('00')).forEach((c) => { const s = parseInt(c.slice(0, 2), 16); stamps[s] = (stamps[s] ?? 0) + 1; });
       const trophies = held.filter((c) => c.startsWith('00'));
       setP({ address, npub, record, stamps, bought: held.filter((c) => !c.startsWith('00') && c.slice(2, 42) === pkh).length, trophies: trophies.length, bonus: trophies.filter((c) => c.length > 42 && c.endsWith('02')).length, streak: stampedDays && streakOf(stampedDays, todayWib()), days: stampedDays?.length ?? 0 });
-    })().catch((e) => setErr(e instanceof Error ? e.message : String(e))).finally(() => pool.close(RELAYS));
+    })().catch((e) => setErr(explain(e))).finally(() => pool.close(RELAYS));
   }, [q]);
   return (
     <main className="organize">

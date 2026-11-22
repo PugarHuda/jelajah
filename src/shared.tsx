@@ -89,3 +89,17 @@ export async function nostrSigner(): Promise<NostrSigner> {
 export const wcSubtitle = () => (matchMedia('(pointer: coarse)').matches
   ? tr('On this phone? Tap copy under the code, open Selene or Paytaca and paste it in its WizardConnect screen, then come back.', 'Di ponsel ini? Ketuk salin di bawah kode, buka Selene atau Paytaca dan tempel di layar WizardConnect-nya, lalu kembali ke sini.')
   : tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca'));
+
+// Errors from the wallet, the node or the network, in words a buyer can act on; the raw reason stays in brackets.
+const PLAIN: [RegExp, () => string][] = [
+  [/reject|declin|cancel|denied by user/i, () => tr('You declined in the wallet. Nothing was sent.', 'Kamu menolak di wallet. Tidak ada yang terkirim.')],
+  [/mempool-conflict|missingorspent|missing ?inputs|txn-already-in-mempool/i, () => tr('Someone else bought at this stall in the same moment, so its coin was taken. Tap again: it picks a fresh one.', 'Ada pembeli lain di warung ini pada saat yang sama, jadi koinnya sudah terpakai. Ketuk lagi: koin lain akan dipilih.')],
+  [/insufficient|not enough|needs at least|Send at least/i, () => tr('Not enough BCH in the wallet for this.', 'BCH di wallet belum cukup untuk ini.')],
+  [/timed out|connect|socket|network|offline|closed/i, () => tr('Could not reach the Bitcoin Cash network. Check the connection and try again.', 'Tidak bisa terhubung ke jaringan Bitcoin Cash. Cek koneksi lalu coba lagi.')],
+  [/dust/i, () => tr('An amount is below the network’s minimum (dust).', 'Ada jumlah di bawah minimum jaringan (dust).')],
+];
+export function explain(e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e);
+  const hit = PLAIN.find(([re]) => re.test(raw));
+  return hit ? `${hit[1]()} (${raw.length > 120 ? raw.slice(0, 120) + '…' : raw})` : raw;
+}
