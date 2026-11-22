@@ -83,3 +83,9 @@ export async function nostrSigner(): Promise<NostrSigner> {
   const sk = hexToBin(hexKey);
   return { pubkey: getPublicKey(sk), sign: async (t) => finalizeEvent(t, sk) };
 }
+
+// WizardConnect pairing text. A phone can't scan its own screen, and no wallet documents a wiz: link handler,
+// so on a touch screen the dependable same-phone path is: copy the link (the dialog's copy button), paste it in the wallet.
+export const wcSubtitle = () => (matchMedia('(pointer: coarse)').matches
+  ? tr('On this phone? Tap copy under the code, open Selene or Paytaca and paste it in its WizardConnect screen, then come back.', 'Di ponsel ini? Ketuk salin di bawah kode, buka Selene atau Paytaca dan tempel di layar WizardConnect-nya, lalu kembali ke sini.')
+  : tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca'));

@@ -79,3 +79,13 @@ test('once visited, the app opens offline (service worker), and says the chain i
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Kopi Joss');
   await context.setOffline(false);
 });
+
+test.describe('on a phone, connecting a wallet that lives on the same phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  test('the pairing dialog says to copy the link into the wallet, and offers the copy button', async ({ page }) => {
+    await page.goto('/?lang=en');
+    await page.getByRole('button', { name: 'Connect wallet' }).click();
+    await expect(page.getByText(/On this phone\? Tap copy under the code/)).toBeVisible();
+    await expect(page.getByText(/^wiz:\/\//)).toBeVisible();
+  });
+});

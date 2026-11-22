@@ -106,6 +106,8 @@ test('a friend funds a gift link, the receiver opens it, connects and takes it (
 test('a collector links their BCH address to a Nostr key and anyone can verify it (chipnet)', async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const w = new TestWallet();
+  // the proof spends a plain coin from receive/0 (the app says so if there is none): make sure there is one, as a user would
+  if (!(await provider.getUtxos(w.address('receive', 0))).some((u) => !u.token)) await w.pay(w.address('receive', 0), 2000n);
   await page.goto('/?net=chipnet&lang=en#/identity');
   const link = page.getByRole('button', { name: 'Link my BCH address and Nostr key' });
   await pair(page, w, /^Connect wallet$/, link);

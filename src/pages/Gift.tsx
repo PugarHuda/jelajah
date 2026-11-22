@@ -4,7 +4,7 @@ import { secp256k1, generatePrivateKey, encodePrivateKeyWif, decodePrivateKeyWif
 import { TransactionBuilder, SignatureTemplate } from 'cashscript';
 import { rally, provider } from '../chain';
 import { buyerLock, explorerTx, addressOf } from '../wallet';
-import { sats, tr, qrImage, back } from '../shared';
+import { sats, tr, qrImage, back, wcSubtitle } from '../shared';
 
 // ---- #/gift/<wif>: a gift link holding a few sats, so someone with an empty wallet can buy their first stamp.
 // The key lives only in the link's #fragment, which browsers never send to a server. Whoever opens it first can take it.
@@ -80,7 +80,7 @@ export function Gift() {
         <code className="wrap">{location.href}</code>
         <p className="muted">{tr('Changed your mind? Open the link yourself and take it back.', 'Berubah pikiran? Buka link-nya sendiri dan ambil kembali.')}</p>
       </details>
-      {wc.uri && wc.qrUri && <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri} title="WizardConnect" subtitle={tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca')} />}
+      {wc.uri && wc.qrUri && <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri} title="WizardConnect" subtitle={wcSubtitle()} />}
       {back}
     </main>
   );

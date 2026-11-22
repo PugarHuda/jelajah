@@ -3,7 +3,7 @@ import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
 import { provider, passportFromLink } from '../chain';
 import { buildPassportClaim, isTrophyOf } from '../lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, type Coin } from '../wallet';
-import { sats, tr, hex } from '../shared';
+import { sats, tr, hex, wcSubtitle } from '../shared';
 
 // ---- #/passport (?pp=…): trade a trophy from each of two rallies for the passport reward + a Passport NFT
 export function PassportPage() {
@@ -49,7 +49,7 @@ export function PassportPage() {
           <button className="primary big" disabled={!a || !b || busy} onClick={claim}>{busy ? tr('Approve in wallet…', 'Setujui di wallet…') : tr('Get my passport', 'Ambil pasporku')}</button>
         </>)}
       {err && <p className="error" role="alert">{err}</p>}
-      {wc.uri && wc.qrUri && <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri} title="WizardConnect" subtitle={tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca')} />}
+      {wc.uri && wc.qrUri && <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri} title="WizardConnect" subtitle={wcSubtitle()} />}
     </main>
   );
 }

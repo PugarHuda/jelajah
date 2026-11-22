@@ -6,7 +6,7 @@ import { RELAYS, NIP39_KIND, buildProofTx, linkEvent, nip39Event, findVerified, 
 import { rally, provider, officialRallies } from '../chain';
 import { isRallyNft } from '../lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, explorerTx, addressOf } from '../wallet';
-import { tr, type NostrSigner, nostrSigner } from '../shared';
+import { tr, type NostrSigner, nostrSigner, wcSubtitle } from '../shared';
 
 // ---- #/identity: Jelajah ID — link your BCH address and a Nostr key (each vouching for the other), find and verify
 // anyone's link from public relays + the chain, see their Jelajah reputation, pay them, and log in by challenge.
@@ -108,7 +108,7 @@ export function IdentityPage() {
       <button className="ghost" disabled={!signer} onClick={doLogin}>{tr('Log in with Jelajah ID', 'Login dengan Jelajah ID')}</button>
       {login && <p className="hint">{login.address ? `✅ ${tr('Logged in as', 'Masuk sebagai')} ${login.address}` : login.note}</p>}
       {err && <p className="error" role="alert">{err}</p>}
-      {wc.uri && wc.qrUri && <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri} title="WizardConnect" subtitle={tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca')} />}
+      {wc.uri && wc.qrUri && <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri} title="WizardConnect" subtitle={wcSubtitle()} />}
       <p><a href={location.pathname + location.search}>{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
     </main>
   );

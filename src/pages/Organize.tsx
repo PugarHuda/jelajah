@@ -7,7 +7,7 @@ import { RELAYS, rallyEvent } from '../lib/identity.js';
 import { rally, provider, rallyLink, type Rally } from '../chain';
 import { bcmrRegistry, checkRallyConfig, genesisNeed, planRally, buildGenesis } from '../lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, receiveZeroCoin } from '../wallet';
-import { sats, tr, reclaimStoreKey, nostrSigner } from '../shared';
+import { sats, tr, reclaimStoreKey, nostrSigner, wcSubtitle } from '../shared';
 
 // ---- #/organize: open your own rally from the browser. The genesis is the same code the CLI uses (src/lib/tx.js),
 // signed by the organizer's wallet over WizardConnect; the finished rally travels in its share link.
@@ -180,7 +180,7 @@ export function Organize() {
       </>)}
       {wc.uri && wc.qrUri && (
         <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri}
-          title={tr('Connect with WizardConnect', 'Hubungkan lewat WizardConnect')} subtitle={tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca')} />
+          title={tr('Connect with WizardConnect', 'Hubungkan lewat WizardConnect')} subtitle={wcSubtitle()} />
       )}
       <p><a href="#">{tr('← Back to the rally', '← Kembali ke rally')}</a></p>
     </main>

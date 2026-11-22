@@ -5,7 +5,7 @@ import { TransactionBuilder } from 'cashscript';
 import { rally, provider } from '../chain';
 import { sponsorPool } from '../lib/tx.js';
 import { buyerLock, walletCoins, signAndSend, addressOf, explorerTx, type Coin } from '../wallet';
-import { sats, tr, qrImage, back } from '../shared';
+import { sats, tr, qrImage, back, wcSubtitle } from '../shared';
 
 const PER_LINK = 2000n; // sats riding with each voucher: enough to pay the network fee when the buyer takes it
 
@@ -88,7 +88,7 @@ export function Sponsor() {
         <button className="primary big" onClick={wc.connect} disabled={wc.state === 'connecting' || wc.state === 'connected'}>{wc.state === 'connected' ? tr('Loading wallet…', 'Memuat wallet…') : tr('Connect the sponsor wallet', 'Hubungkan wallet sponsor')}</button>
       )}
       {err && <p className="error" role="alert">{err}</p>}
-      {wc.uri && wc.qrUri && <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri} title="WizardConnect" subtitle={tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca')} />}
+      {wc.uri && wc.qrUri && <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri} title="WizardConnect" subtitle={wcSubtitle()} />}
       {back}
     </main>
   );

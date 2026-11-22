@@ -20,7 +20,7 @@ import { Profile } from './pages/Profile';
 import { Rallies } from './pages/Rallies';
 import { Gift } from './pages/Gift';
 import { Sponsor } from './pages/Sponsor';
-import { LOADED_AT, sats, idrPerBch, idrRate, rupiah, ID, tr, switchLang, cost, stallOf, mapUrl, shareUrl, shareTx, qrImage, hex } from './shared';
+import { LOADED_AT, sats, idrPerBch, idrRate, rupiah, ID, tr, switchLang, cost, stallOf, mapUrl, shareUrl, shareTx, qrImage, hex, wcSubtitle } from './shared';
 
 // the live mainnet levy rally, and one full set of it on chain (README "A full levy cycle on mainnet")
 const LEVY_MAINNET = '6dd1cc7da85cdb72d7cbe597a505b11197173ebb25c3e49e079c778ac1a5cbf3';
@@ -178,7 +178,7 @@ function Rally() {
       </header>
       {wc.uri && wc.qrUri && (
         <WizardConnectQRDialog show={wc.state === 'connecting'} onClose={wc.disconnect} uri={wc.uri} qrUri={wc.qrUri}
-          title={tr('Connect with WizardConnect', 'Hubungkan lewat WizardConnect')} subtitle={tr('Scan with Selene or Paytaca', 'Pindai dengan Selene atau Paytaca')} />
+          title={tr('Connect with WizardConnect', 'Hubungkan lewat WizardConnect')} subtitle={wcSubtitle()} />
       )}
 
       <main>
