@@ -1,7 +1,7 @@
 // Fund N gift links on mainnet so newcomers can try a full set with real sats (the #/gift page sweeps one into their wallet).
 //   SOLIDCASH_MNEMONIC_MAINNET="$(cut -d= -f2- solidcash/.env.mainnet)" node scripts/gift-links.mjs --count 5 --sats 14000
 // Keys live in scripts/.gifts.mainnet.json (gitignored). Rerunning reuses them and only funds the ones still empty.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { ElectrumNetworkProvider, SignatureTemplate, TransactionBuilder } from 'cashscript';
 import {
@@ -22,7 +22,8 @@ const from = addr(funder);
 
 const gifts = existsSync(FILE) ? JSON.parse(readFileSync(FILE, 'utf8')) : [];
 while (gifts.length < N) gifts.push({ wif: encodePrivateKeyWif(generatePrivateKey(), 'mainnet') });
-writeFileSync(FILE, JSON.stringify(gifts, null, 1)); // saved before any money moves
+writeFileSync(FILE, JSON.stringify(gifts, null, 1), { mode: 0o600 }); // saved before any money moves; owner-only (they are keys)
+chmodSync(FILE, 0o600);
 
 const provider = new ElectrumNetworkProvider('mainnet');
 const todo = [];
