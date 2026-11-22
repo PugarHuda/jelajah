@@ -26,6 +26,7 @@
     --accent-ink: #1a0f0a;
     --gold: #e0a64a;
     --gold-soft: #3a2c16;
+    --ok: #4ade80; /* 4.5:1+ on --paper (the light green fails in dark mode) */
     color-scheme: dark;
   }
 }
